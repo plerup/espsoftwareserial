@@ -88,7 +88,7 @@ int SoftwareSerial::available() {
 }
 
 // Use micros loop to get as exect timing as possible
-#define WAIT while (micros()-start < wait); wait += m_bitTime;
+#define WAIT { while (micros()-start < wait); wait += m_bitTime; }
 
 size_t SoftwareSerial::write(uint8_t b) {
    if (!m_txValid) return 0;
@@ -99,15 +99,15 @@ size_t SoftwareSerial::write(uint8_t b) {
    unsigned long start = micros();
     // Start bit;
    digitalWrite(m_txPin, LOW);
-   WAIT
+   WAIT;
    for (int i = 0; i < 8; i++) {
      digitalWrite(m_txPin, (b & 1) ? HIGH : LOW);
-     WAIT
+     WAIT;
      b >>= 1;
    }
    // Stop bit
    digitalWrite(m_txPin, HIGH);
-   WAIT
+   WAIT;
    sei();
    return 1;
 }
@@ -127,17 +127,17 @@ void SoftwareSerial::rxRead() {
    // Skip half start bit unless this is less than normal interrupt delay time
    if (m_bitTime > 10) {
      wait = m_bitTime/2;
-     WAIT
+     WAIT;
    }
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
-     WAIT
+     WAIT;
      rec >>= 1;
      if (digitalRead(m_rxPin))
        rec |= 0x80;
    }
    // Stop bit
-   WAIT
+   WAIT;
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
    if (next != m_inPos) {
