@@ -32,7 +32,7 @@ extern "C" {
 SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool invertedLogic, unsigned int buffSize) {
    m_rxValid = m_txValid = false;
    m_buffer = NULL;
-   inverseLogic=invertedLogic;
+   m_inverseLogic =invertedLogic;
    if (isValidGPIOpin(receivePin)) {
       m_rxPin = receivePin;
       m_buffSize = buffSize;
@@ -44,7 +44,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool invertedLog
          // Use SDK interrupt management as Arduino attachInterrupt doesn't take any parameter
          ETS_GPIO_INTR_ATTACH(handle_interrupt, this);
          GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, BIT(m_rxPin));
-         if (inverseLogic) {
+         if (m_inverseLogic) {
 			 gpio_pin_intr_state_set(GPIO_ID_PIN(m_rxPin), GPIO_PIN_INTR_POSEDGE);
 		 } else {
 			 gpio_pin_intr_state_set(GPIO_ID_PIN(m_rxPin), GPIO_PIN_INTR_NEGEDGE);
@@ -141,7 +141,7 @@ void SoftwareSerial::rxRead() {
      if (digitalRead(m_rxPin))
        rec |= 0x80;
    }
-	if (inverseLogic) rec=~rec;
+   if (m_inverseLogic) rec=~rec;
    // Stop bit
    WAIT;
    // Store the received value in the buffer unless we have an overflow
@@ -163,7 +163,7 @@ void SoftwareSerial::handle_interrupt(SoftwareSerial *swSerObj) {
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, gpioStatus);
    // Seems like the interrupt is delivered on all flanks in spite
    // of GPIO_PIN_INTR_NEGEDGE. Hence ignore unless we have a start bit
-   if (digitalRead(pin)==!swSerObj->inverseLogic) return;
+   if (digitalRead(pin)==!swSerObj->m_inverseLogic) return;
 
    // Disable GPIO interrupts when sampling the incoming byte
    ETS_GPIO_INTR_DISABLE();

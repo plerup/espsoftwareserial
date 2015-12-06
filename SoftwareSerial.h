@@ -59,7 +59,7 @@ private:
    // Member variables
    int m_rxPin, m_txPin;
    bool m_rxValid, m_txValid;
-   bool inverseLogic;
+   bool m_inverseLogic;
    unsigned long m_bitTime;
    unsigned int m_inPos, m_outPos;
    int m_buffSize;
