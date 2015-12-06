@@ -45,10 +45,10 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool invertedLog
          ETS_GPIO_INTR_ATTACH(handle_interrupt, this);
          GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, BIT(m_rxPin));
          if (m_inverseLogic) {
-			 gpio_pin_intr_state_set(GPIO_ID_PIN(m_rxPin), GPIO_PIN_INTR_POSEDGE);
-		 } else {
-			 gpio_pin_intr_state_set(GPIO_ID_PIN(m_rxPin), GPIO_PIN_INTR_NEGEDGE);
-		 }
+            gpio_pin_intr_state_set(GPIO_ID_PIN(m_rxPin), GPIO_PIN_INTR_POSEDGE);
+         } else {
+            gpio_pin_intr_state_set(GPIO_ID_PIN(m_rxPin), GPIO_PIN_INTR_NEGEDGE);
+         }
       }
    }
    if (isValidGPIOpin(transmitPin)) {
