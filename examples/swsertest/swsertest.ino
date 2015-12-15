@@ -1,7 +1,7 @@
 
 #include <SoftwareSerial.h>
 
-SoftwareSerial swSer(14, 12, 128);
+SoftwareSerial swSer(14, 12, false, 128);
 
 void setup() {
   Serial.begin(115200);
@@ -17,10 +17,10 @@ void setup() {
 }
 
 void loop() {
-  if (swSer.available()) {
+  while (swSer.available() > 0) {
     Serial.write(swSer.read());
   }
-  if (Serial.available()) {
+  while (Serial.available() > 0) {
     swSer.write(Serial.read());
   }
 

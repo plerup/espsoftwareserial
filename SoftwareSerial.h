@@ -35,7 +35,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 class SoftwareSerial : public Stream
 {
 public:
-   SoftwareSerial(int receivePin, int transmitPin, bool invertedLogic=false, unsigned int buffSize = 64);
+   SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
    ~SoftwareSerial();
 
    void begin(long speed);
@@ -48,6 +48,9 @@ public:
    virtual void flush();
    operator bool() {return m_rxValid || m_txValid;}
 
+   // Disable or enable interrupts on the rx pin
+   void enableRx(bool on);
+
    static void handle_interrupt(SoftwareSerial *swSerObj);
 
    using Print::write;
@@ -59,7 +62,7 @@ private:
    // Member variables
    int m_rxPin, m_txPin;
    bool m_rxValid, m_txValid;
-   bool m_inverseLogic;
+   bool m_invert;
    unsigned long m_bitTime;
    unsigned int m_inPos, m_outPos;
    int m_buffSize;
