@@ -109,7 +109,7 @@ size_t SoftwareSerial::write(uint8_t b) {
    if (m_invert) b = ~b;
    // Disable interrupt in order to get a clean transmit
    cli();
-   uint16_t wait = m_bitTime;
+   unsigned long wait = m_bitTime;
    digitalWrite(m_txPin, HIGH);
    unsigned long start = ESP.getCycleCount();
     // Start bit;
@@ -137,7 +137,7 @@ int SoftwareSerial::peek() {
 }
 
 void SoftwareSerial::rxRead() {
-   uint16_t wait = m_bitTime;
+   unsigned long wait = m_bitTime;
    unsigned long start = ESP.getCycleCount();
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
