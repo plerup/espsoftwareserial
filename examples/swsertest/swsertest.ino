@@ -19,6 +19,7 @@ void setup() {
 void loop() {
   while (swSer.available() > 0) {
     Serial.write(swSer.read());
+    yield();
   }
   while (Serial.available() > 0) {
     swSer.write(Serial.read());

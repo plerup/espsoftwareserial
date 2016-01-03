@@ -136,7 +136,7 @@ int SoftwareSerial::peek() {
    return m_buffer[m_outPos];
 }
 
-void SoftwareSerial::rxRead() {
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    unsigned long wait = m_bitTime;
    unsigned long start = ESP.getCycleCount();
    uint8_t rec = 0;
@@ -157,7 +157,7 @@ void SoftwareSerial::rxRead() {
    }
 }
 
-void SoftwareSerial::handle_interrupt(SoftwareSerial *swSerObj) {
+void ICACHE_RAM_ATTR SoftwareSerial::handle_interrupt(SoftwareSerial *swSerObj) {
    if (!swSerObj) return;
 
    // Check if this interrupt was was coming from the the rx pin of this object

@@ -5,5 +5,5 @@ Speed up to 115200 baud is supported. The constructor also has an optional input
 
 Please note that during read operations interrupts are disabled for a period of time corresponding to reading
 one byte. For low baud rates with heavy load this can be a problem as the ESP WiFi may not get called often
-enough and this can cause a crash or watchdog reset.
+enough and this can cause a crash or watchdog reset. Try to include calls to yield() when possible.
 
