@@ -29,6 +29,12 @@ extern "C" {
 
 #include <SoftwareSerial.h>
 
+#define MAX_PIN 15
+
+// List of SoftSerial object for each possible Rx pin
+SoftwareSerial *InterruptList[MAX_PIN+1];
+bool InterruptsEnabled = false;
+
 SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, unsigned int buffSize) {
    m_rxValid = m_txValid = false;
    m_buffer = NULL;
@@ -41,8 +47,11 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
          m_rxValid = true;
          m_inPos = m_outPos = 0;
          pinMode(m_rxPin, INPUT);
-         // Use SDK interrupt management as Arduino attachInterrupt doesn't take any parameter
-         ETS_GPIO_INTR_ATTACH(handle_interrupt, this);
+         if (!InterruptsEnabled) {
+            ETS_GPIO_INTR_ATTACH(handle_interrupt, 0);
+            InterruptsEnabled = true;
+         }
+         InterruptList[m_rxPin] = this;
          GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, BIT(m_rxPin));
          enableRx(true);
       }
@@ -57,16 +66,16 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
 }
 
 SoftwareSerial::~SoftwareSerial() {
-   // No available SDK API to detach an interrupt handler,
-   // just disable the pin interrupt for now
    enableRx(false);
+   if (m_rxValid)
+      InterruptList[m_rxPin] = NULL;
    if (m_buffer)
       free(m_buffer);
 }
 
 bool SoftwareSerial::isValidGPIOpin(int pin) {
    // Some GPIO pins are reserved by the system
-   return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 15);
+   return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= MAX_PIN);
 }
 
 void SoftwareSerial::begin(long speed) {
@@ -107,7 +116,7 @@ size_t SoftwareSerial::write(uint8_t b) {
    if (!m_txValid) return 0;
 
    if (m_invert) b = ~b;
-   // Disable interrupt in order to get a clean transmit
+   // Disable interrupts in order to get a clean transmit
    cli();
    unsigned long wait = m_bitTime;
    digitalWrite(m_txPin, HIGH);
@@ -157,22 +166,19 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    }
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::handle_interrupt(SoftwareSerial *swSerObj) {
-   if (!swSerObj) return;
-
-   // Check if this interrupt was was coming from the the rx pin of this object
-   int pin = swSerObj->m_rxPin;
+void ICACHE_RAM_ATTR SoftwareSerial::handle_interrupt(void *arg) {
    uint32_t gpioStatus = GPIO_REG_READ(GPIO_STATUS_ADDRESS);
-   if (!(gpioStatus & BIT(pin))) return;
-   // Clear the interrupt
+   // Clear the interrupt(s) otherwise we get called again
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, gpioStatus);
-   // Seems like the interrupt is delivered on all flanks in regardless
-   // of what edge that has been set. Hence ignore unless we have a start bit
-   if (digitalRead(pin) != swSerObj->m_invert) return;
-
-   // Disable GPIO interrupts when sampling the incoming byte
    ETS_GPIO_INTR_DISABLE();
-   swSerObj->rxRead();
+   for (uint8_t pin = 0; pin <= MAX_PIN; pin++) {
+      if ((gpioStatus & BIT(pin)) && InterruptList[pin]) {
+         // Seems like the interrupt is delivered on all flanks in regardless
+         // of what edge that has been set. Hence ignore unless we have a start bit
+         if (digitalRead(pin) == InterruptList[pin]->m_invert)
+            InterruptList[pin]->rxRead();
+      }
+   }
    ETS_GPIO_INTR_ENABLE();
 }
 

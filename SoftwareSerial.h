@@ -51,7 +51,7 @@ public:
    // Disable or enable interrupts on the rx pin
    void enableRx(bool on);
 
-   static void handle_interrupt(SoftwareSerial *swSerObj);
+   static void handle_interrupt(void *arg);
 
    using Print::write;
 
