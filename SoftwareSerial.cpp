@@ -60,6 +60,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
       m_txValid = true;
       m_txPin = transmitPin;
       pinMode(m_txPin, OUTPUT);
+      digitalWrite(m_txPin, !m_invert);
    }
    // Default speed
    begin(9600);
@@ -146,6 +147,7 @@ int SoftwareSerial::peek() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
+   cli();
    unsigned long wait = m_bitTime;
    unsigned long start = ESP.getCycleCount();
    uint8_t rec = 0;
@@ -164,6 +166,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
       m_buffer[m_inPos] = rec;
       m_inPos = next;
    }
+   sei();
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::handle_interrupt(void *arg) {
@@ -171,8 +174,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::handle_interrupt(void *arg) {
    // Clear the interrupt(s) otherwise we get called again
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, gpioStatus);
    ETS_GPIO_INTR_DISABLE();
-   for (uint8_t pin = 0; pin <= MAX_PIN; pin++) {
-      if ((gpioStatus & BIT(pin)) && InterruptList[pin]) {
+   uint8_t pin = 0;
+   while (gpioStatus) {
+      while(!(gpioStatus & (1 << pin))) pin++;
+      gpioStatus &= ~(1 << pin);
+      if (InterruptList[pin]) {
          // Seems like the interrupt is delivered on all flanks in regardless
          // of what edge that has been set. Hence ignore unless we have a start bit
          if (digitalRead(pin) == InterruptList[pin]->m_invert)
@@ -181,4 +187,3 @@ void ICACHE_RAM_ATTR SoftwareSerial::handle_interrupt(void *arg) {
    }
    ETS_GPIO_INTR_ENABLE();
 }
-
