@@ -147,7 +147,6 @@ int SoftwareSerial::peek() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
-   cli();
    unsigned long wait = m_bitTime;
    unsigned long start = ESP.getCycleCount();
    uint8_t rec = 0;
@@ -166,7 +165,6 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
       m_buffer[m_inPos] = rec;
       m_inPos = next;
    }
-   sei();
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::handle_interrupt(void *arg) {
@@ -179,8 +177,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::handle_interrupt(void *arg) {
       while(!(gpioStatus & (1 << pin))) pin++;
       gpioStatus &= ~(1 << pin);
       if (InterruptList[pin]) {
-         // Seems like the interrupt is delivered on all flanks in regardless
-         // of what edge that has been set. Hence ignore unless we have a start bit
+         // For some reason there is always an interrupt directly after the
+         // stop bit. Detect that by checking if we have a start bit
          if (digitalRead(pin) == InterruptList[pin]->m_invert)
             InterruptList[pin]->rxRead();
       }
