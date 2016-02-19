@@ -53,32 +53,14 @@ void SoftwareSerial::begin(long speed) {
   m_frameCommitted = true;
   m_bitState = !m_invert;
 
-  #ifdef SOFTWARESERIAL_DEBUG
-  Serial.print("SoftwareSerial::begin(");
-  Serial.print(speed);
-  Serial.print("), bitTime = ");
-  Serial.print(m_bitTime);
-  #endif
-
   if (m_rxValid)
-  {
     pinMode(m_rxPin, INPUT);
-	#ifdef SOFTWARESERIAL_DEBUG
-	Serial.print(", RX");
-	#endif
-  }
 
   if (m_txValid) {
     pinMode(m_txPin, OUTPUT);
     digitalWrite(m_txPin, !m_invert);
-	#ifdef SOFTWARESERIAL_DEBUG
-	Serial.print(", TX");
-	#endif
   }
   
-  #ifdef SOFTWARESERIAL_DEBUG
-  Serial.println();
-  #endif
 
   attachRxInterrupt();
 }
@@ -137,7 +119,6 @@ int SoftwareSerial::read() {
   uint8_t ch = m_buffer[m_outPos];
   ++m_outPos;
   m_outPos %= m_buffSize;
-
   return ch;
 }
 
@@ -148,7 +129,7 @@ int SoftwareSerial::available() {
   // check if we have to commit the frame or not
   unsigned long now = ESP.getCycleCount();
   if (now - m_frameStart > m_bitTime * (1 + 8 + 1))
-    commitFrame();
+    commitFrame(m_frameStart + m_bitTime * (1 + 8 + 1));
 
   int avail = m_inPos - m_outPos;
   if (avail < 0)
@@ -190,50 +171,51 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
   return 1;
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::updateFrame(uint8_t bitState, unsigned long const endTime)
+void ICACHE_RAM_ATTR SoftwareSerial::updateFrame(uint8_t bitState, uint32_t endTime)
 {
-  for (uint32_t i = m_lastBitTime; i < endTime - m_bitTime / 2; i += m_bitTime)
+  uint32_t now = ESP.getCycleCount();
+  for (uint32_t i = m_frameStart + m_lastBit * m_bitTime; i < endTime - m_bitTime / 2; i += m_bitTime)
   {
     m_currentByte >>= 1;
     if (m_bitState == HIGH)
       m_currentByte |= 0x8000;
+	++m_lastBit;
   }
 
   m_bitState = bitState;
-  m_lastBitTime = endTime;
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::commitFrame() {
+void ICACHE_RAM_ATTR SoftwareSerial::commitFrame(uint32_t now) {
   if (m_frameCommitted)
     return;
 
   // set the frame as committed as soon as possible
   m_frameCommitted = true;
 
-  updateFrame(m_bitState, m_frameStart + m_bitTime * (1 + 8 + 1));
+  updateFrame(m_bitState, now);
 
-  if (m_invert)
-    m_currentByte = ~m_currentByte;
-  m_currentByte >>= 7;
-  
   // Store the received value in the buffer unless we have an overflow
-  int next = (m_inPos + 1);
+  int next = m_inPos + 1;
   if (next >= m_buffSize)
 	next = 0;
   if (next != m_inPos) {
+    if (m_invert)
+      m_currentByte = ~m_currentByte;
+	m_currentByte >>= 7;
     m_buffer[m_inPos] = m_currentByte & 0xff;
     m_inPos = next;
   }
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
+  // record this as soon as we enter the interrupt.
   uint32_t now = ESP.getCycleCount();
 
-  if (now - m_lastBitTime > m_bitTime * (1 + 8 + 1)) {
-    commitFrame();
+  if (now - m_frameStart > m_bitTime * (1 + 8 + 1)) {
+    commitFrame(m_frameStart + m_bitTime * (1 + 8 + 1));
     m_frameCommitted = false;
     m_frameStart = now;
-    m_lastBitTime = now + m_bitTime; // skip the start bit
+    m_lastBit = 0;
   }
 
   updateFrame(digitalRead(m_rxPin), now);

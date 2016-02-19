@@ -61,8 +61,8 @@ class SoftwareSerial : public Stream
     void attachRxInterrupt();
     void detachRxInterrupt();
     void rxRead();
-    void commitFrame();
-    void updateFrame(uint8_t bitState, unsigned long const endTime);
+    void commitFrame(uint32_t endTime);
+    void updateFrame(uint8_t bitState, uint32_t endTime);
 
     // Member variables
     size_t m_buffSize;
@@ -76,7 +76,7 @@ class SoftwareSerial : public Stream
     uint32_t m_frameStart;
     uint8_t m_bitState;
     uint16_t m_currentByte;
-    uint32_t m_lastBitTime;
+    uint8_t m_lastBit;
     bool m_frameCommitted;
 
     static SoftwareSerial * M_instances[EXTERNAL_NUM_INTERRUPTS];
