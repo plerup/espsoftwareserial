@@ -158,7 +158,7 @@ int SoftwareSerial::available() {
 
 #define WAIT { while (ESP.getCycleCount() - start < wait); wait += m_bitTime; }
 
-size_t SoftwareSerial::write(uint8_t b) {
+size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
   if (!m_txValid)
     return 0;
 
@@ -190,7 +190,7 @@ size_t SoftwareSerial::write(uint8_t b) {
   return 1;
 }
 
-void SoftwareSerial::updateFrame(uint8_t bitState, unsigned long const endTime)
+void ICACHE_RAM_ATTR SoftwareSerial::updateFrame(uint8_t bitState, unsigned long const endTime)
 {
   for (uint32_t i = m_lastBitTime; i < endTime - m_bitTime / 2; i += m_bitTime)
   {
@@ -203,7 +203,7 @@ void SoftwareSerial::updateFrame(uint8_t bitState, unsigned long const endTime)
   m_lastBitTime = endTime;
 }
 
-void SoftwareSerial::commitFrame() {
+void ICACHE_RAM_ATTR SoftwareSerial::commitFrame() {
   if (m_frameCommitted)
     return;
 
@@ -226,7 +226,7 @@ void SoftwareSerial::commitFrame() {
   }
 }
 
-void SoftwareSerial::rxRead() {
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
   uint32_t now = ESP.getCycleCount();
 
   if (now - m_lastBitTime > m_bitTime * (1 + 8 + 1)) {
@@ -237,4 +237,12 @@ void SoftwareSerial::rxRead() {
   }
 
   updateFrame(digitalRead(m_rxPin), now);
+}
+
+template <uint8_t interrupt>
+void ICACHE_RAM_ATTR SoftwareSerial::M_isr()
+{
+  register SoftwareSerial *thiz = M_instances[interrupt];
+  if (thiz != NULL)
+    thiz->rxRead();
 }

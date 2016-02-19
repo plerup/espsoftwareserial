@@ -12,7 +12,7 @@ It is not possible to use the standard Arduino attachInterrupt when using this l
 
 ## Capability / Limitations
 
-1. full duplex (loop-back) up to 57600 (latency of interrupt by attachInterrupt() on ESP8266 is SUPER HIGH, approx 300 cycles @ 80Mhz, i dunno why...)
+1. full duplex (loop-back) up to 115200 (latency of interrupt by attachInterrupt() on ESP8266 is SUPER HIGH, approx 300 cycles @ 80Mhz, i dunno why...)
 2. half duplex up to 115200 (thx to the high latency, i can't achieve higher baudrate even with a 80Mhz mcu...)
 3. transmit to one endpoint at a time (due to the nature of no tx buffering)
 4. receive from all endpoints, always (thx to interrupt), but you may encounter data-drop at high baudrate. use a lower baudrate if more than 1 SoftwareSerial is used.

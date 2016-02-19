@@ -82,11 +82,7 @@ class SoftwareSerial : public Stream
     static SoftwareSerial * M_instances[EXTERNAL_NUM_INTERRUPTS];
 
     template<uint8_t interrupt>
-    static void M_isr() {
-      register SoftwareSerial *thiz = M_instances[interrupt];
-      if (thiz != NULL)
-        thiz->rxRead();
-    }
+    static void M_isr();
 };
 
 // If only one tx or rx wanted then use this as parameter for the unused pin
