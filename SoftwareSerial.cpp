@@ -30,15 +30,13 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
   // the rxPin has to be on an interrupt, and isr != NULL for rx to work.
   m_rxPin(receivePin),
   m_rxInterrupt(digitalPinToInterrupt(receivePin)),
-  m_rxValid(digitalPinToInterrupt(receivePin) != NOT_AN_INTERRUPT),
+  m_rxValid(true),
   // txPin can be any GPIO pin (I guess...)
   m_txValid(transmitPin < NUM_DIGITAL_PINS), m_txPin(transmitPin),
   // other stuff
   m_invert(inverse_logic), m_buffSize(buffSize),
-  m_buffer(m_buffer = (uint8_t*)malloc(buffSize)), m_inPos(0), m_outPos(0)
+  m_buffer(NULL), m_inPos(0), m_outPos(0)
 {
-  if (m_buffer == NULL)
-    m_rxValid = false;
 }
 
 SoftwareSerial::~SoftwareSerial() {
@@ -49,9 +47,15 @@ SoftwareSerial::~SoftwareSerial() {
 
 void SoftwareSerial::begin(long speed) {
   // Use getCycleCount() loop to get as exact timing as possible
-  m_bitTime = ESP.getCpuFreqMHz() * 1000000.0 / speed;
+  m_bitTime = ESP.getCpuFreqMHz() * 1000000 / speed;
   m_frameCommitted = true;
-  m_bitState = !m_invert;
+
+  m_rxValid = digitalPinToInterrupt(receivePin) != NOT_AN_INTERRUPT;
+  if (m_buffer == NULL) {
+    m_buffer = (uint8_t*)malloc(m_buffSize);
+    if (m_buffer == NULL)
+      m_rxValid = false;
+  }
 
   if (m_rxValid)
     pinMode(m_rxPin, INPUT);
@@ -61,7 +65,6 @@ void SoftwareSerial::begin(long speed) {
     digitalWrite(m_txPin, !m_invert);
   }
   
-
   attachRxInterrupt();
 }
 
