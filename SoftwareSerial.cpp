@@ -35,14 +35,13 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
   m_txValid(transmitPin < NUM_DIGITAL_PINS), m_txPin(transmitPin),
   // other stuff
   m_invert(inverse_logic), m_buffSize(buffSize),
-  m_buffer(NULL), m_inPos(0), m_outPos(0)
+  m_buffer(NULL), m_inPos(0), m_outPos(0),
+  m_bitTime(0)
 {
 }
 
 SoftwareSerial::~SoftwareSerial() {
-  detachRxInterrupt();
-  if (m_buffer)
-    free(m_buffer);
+  end();
 }
 
 void SoftwareSerial::begin(long speed) {
@@ -66,6 +65,12 @@ void SoftwareSerial::begin(long speed) {
   }
   
   attachRxInterrupt();
+}
+
+void SoftwareSerial::end() {
+  m_bitTime = 0;
+  detachRxInterrupt();
+  free(m_buffer);
 }
 
 void SoftwareSerial::attachRxInterrupt() {
@@ -143,7 +148,7 @@ int SoftwareSerial::available() {
 #define WAIT { while (ESP.getCycleCount() - start < wait); wait += m_bitTime; }
 
 size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
-  if (!m_txValid)
+  if (!m_txValid || m_bitTime == 0)
     return 0;
 
   if (m_invert)

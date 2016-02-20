@@ -39,6 +39,7 @@ class SoftwareSerial : public Stream
     ~SoftwareSerial();
 
     void begin(long speed);
+	void end();
 
     int peek() {
       if (!m_rxValid || (m_inPos == m_outPos)) return -1;
