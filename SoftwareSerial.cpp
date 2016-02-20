@@ -30,7 +30,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
   // the rxPin has to be on an interrupt, and isr != NULL for rx to work.
   m_rxPin(receivePin),
   m_rxInterrupt(digitalPinToInterrupt(receivePin)),
-  m_rxValid(true),
+  m_rxValid(false),
   // txPin can be any GPIO pin (I guess...)
   m_txValid(transmitPin < NUM_DIGITAL_PINS), m_txPin(transmitPin),
   // other stuff
