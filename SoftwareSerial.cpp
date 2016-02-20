@@ -160,7 +160,8 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
   digitalWrite(m_txPin, HIGH);
   unsigned long start = ESP.getCycleCount();
   // Start bit;
-  digitalWrite(m_txPin, LOW); WAIT;
+  digitalWrite(m_txPin, LOW);
+  WAIT;
   // data bits
   for (int i = 1;i < 9;++i) {
     digitalWrite(m_txPin, b & 1);
