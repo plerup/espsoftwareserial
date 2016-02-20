@@ -210,15 +210,19 @@ void ICACHE_RAM_ATTR SoftwareSerial::commitFrame(uint32_t now) {
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
   // record this as soon as we enter the interrupt.
   uint32_t now = ESP.getCycleCount();
+  uint8_t state = digitalRead(m_rxPin);
 
   if (now - m_frameStart > m_bitTime * (1 + 8 + 1)) {
     commitFrame(m_frameStart + m_bitTime * (1 + 8 + 1));
-    m_frameCommitted = false;
     m_frameStart = now;
     m_lastBit = 0;
+	
+	// filter out bogus inputs
+	if (state == (m_invert ? HIGH : LOW))
+		m_frameCommitted = false;
   }
 
-  updateFrame(digitalRead(m_rxPin), now);
+  updateFrame(state, now);
 }
 
 template <uint8_t interrupt>
