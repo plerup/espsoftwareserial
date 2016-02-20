@@ -110,13 +110,11 @@ void SoftwareSerial::attachRxInterrupt() {
 }
 
 void SoftwareSerial::detachRxInterrupt() {
-  if (m_rxValid) {
-    // do not attempt to detach interrupt not handled by this
-    if (M_instances[m_rxInterrupt] == this)
-    {
-      M_instances[m_rxInterrupt] = NULL;
-      detachInterrupt(m_rxInterrupt);
-    }
+  // do not attempt to detach interrupt not handled by this
+  if (M_instances[m_rxInterrupt] == this)
+  {
+    M_instances[m_rxInterrupt] = NULL;
+    detachInterrupt(m_rxInterrupt);
   }
 }
 
