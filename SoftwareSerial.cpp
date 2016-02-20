@@ -49,7 +49,7 @@ void SoftwareSerial::begin(long speed) {
   m_bitTime = ESP.getCpuFreqMHz() * 1000000 / speed;
   m_frameCommitted = true;
 
-  m_rxValid = digitalPinToInterrupt(receivePin) != NOT_AN_INTERRUPT;
+  m_rxValid = digitalPinToInterrupt(m_rxPin) != NOT_AN_INTERRUPT;
   if (m_buffer == NULL) {
     m_buffer = (uint8_t*)malloc(m_buffSize);
     if (m_buffer == NULL)
