@@ -147,7 +147,9 @@ int SoftwareSerial::peek() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
-   unsigned long wait = m_bitTime;
+   // Advance the starting point for the samples but compensate for the
+   // initial delay which occurs before the first interrupt is delivered
+   unsigned long wait = m_bitTime + m_bitTime/3 - 360;
    unsigned long start = ESP.getCycleCount();
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
@@ -169,19 +171,18 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
 
 void ICACHE_RAM_ATTR SoftwareSerial::handle_interrupt(void *arg) {
    uint32_t gpioStatus = GPIO_REG_READ(GPIO_STATUS_ADDRESS);
-   // Clear the interrupt(s) otherwise we get called again
-   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, gpioStatus);
    ETS_GPIO_INTR_DISABLE();
    uint8_t pin = 0;
-   while (gpioStatus) {
-      while(!(gpioStatus & (1 << pin))) pin++;
-      gpioStatus &= ~(1 << pin);
+   uint32_t mask = gpioStatus;
+   while (mask) {
+      while(!(mask & (1 << pin))) pin++;
+      mask &= ~(1 << pin);
       if (InterruptList[pin]) {
-         // For some reason there is always an interrupt directly after the
-         // stop bit. Detect that by checking if we have a start bit
-         if (digitalRead(pin) == InterruptList[pin]->m_invert)
-            InterruptList[pin]->rxRead();
+         InterruptList[pin]->rxRead();
       }
    }
+   // Clear the interrupt register now, it gets set
+   // even when interrupts are disabled
+   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, gpioStatus);
    ETS_GPIO_INTR_ENABLE();
 }
