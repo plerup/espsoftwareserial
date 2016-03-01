@@ -1,7 +1,7 @@
 /*
 
 SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
-Copyright (c) 2015 Peter Lerup. All rights reserved.
+Copyright (c) 2015-2016 Peter Lerup. All rights reserved.
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
@@ -31,9 +31,40 @@ extern "C" {
 
 #define MAX_PIN 15
 
-// List of SoftSerial object for each possible Rx pin
-SoftwareSerial *InterruptList[MAX_PIN+1];
-bool InterruptsEnabled = false;
+// As the Arduino attachInterrupt has no parameter, lists of objects
+// and callbacks corresponding to each possible GPIO pins have to be defined
+SoftwareSerial *ObjList[MAX_PIN+1];
+
+void ICACHE_RAM_ATTR sws_isr_0() { ObjList[0]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_1() { ObjList[1]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_2() { ObjList[2]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_3() { ObjList[3]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_4() { ObjList[4]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };
+// Pin 6 to 11 can not be used
+void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };
+
+static void (*ISRList[MAX_PIN+1])() = {
+      sws_isr_0,
+      sws_isr_1,
+      sws_isr_2,
+      sws_isr_3,
+      sws_isr_4,
+      sws_isr_5,
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      sws_isr_12,
+      sws_isr_13,
+      sws_isr_14,
+      sws_isr_15
+};
 
 SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, unsigned int buffSize) {
    m_rxValid = m_txValid = false;
@@ -47,12 +78,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
          m_rxValid = true;
          m_inPos = m_outPos = 0;
          pinMode(m_rxPin, INPUT);
-         if (!InterruptsEnabled) {
-            ETS_GPIO_INTR_ATTACH(handle_interrupt, 0);
-            InterruptsEnabled = true;
-         }
-         InterruptList[m_rxPin] = this;
-         GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, BIT(m_rxPin));
+         ObjList[m_rxPin] = this;
          enableRx(true);
       }
    }
@@ -69,13 +95,12 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
 SoftwareSerial::~SoftwareSerial() {
    enableRx(false);
    if (m_rxValid)
-      InterruptList[m_rxPin] = NULL;
+      ObjList[m_rxPin] = NULL;
    if (m_buffer)
       free(m_buffer);
 }
 
 bool SoftwareSerial::isValidGPIOpin(int pin) {
-   // Some GPIO pins are reserved by the system
    return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= MAX_PIN);
 }
 
@@ -86,14 +111,10 @@ void SoftwareSerial::begin(long speed) {
 
 void SoftwareSerial::enableRx(bool on) {
    if (m_rxValid) {
-      GPIO_INT_TYPE type;
-      if (!on)
-         type = GPIO_PIN_INTR_DISABLE;
-      else if (m_invert)
-         type = GPIO_PIN_INTR_POSEDGE;
+      if (on)
+         attachInterrupt(m_rxPin, ISRList[m_rxPin], m_invert ? RISING : FALLING);
       else
-         type = GPIO_PIN_INTR_NEGEDGE;
-      gpio_pin_intr_state_set(GPIO_ID_PIN(m_rxPin), type);
+         detachInterrupt(m_rxPin);
    }
 }
 
@@ -148,8 +169,8 @@ int SoftwareSerial::peek() {
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // Advance the starting point for the samples but compensate for the
-   // initial delay which occurs before the first interrupt is delivered
-   unsigned long wait = m_bitTime + m_bitTime/3 - 360;
+   // initial delay which occurs before the interrupt is delivered
+   unsigned long wait = m_bitTime + m_bitTime/3 - 500;
    unsigned long start = ESP.getCycleCount();
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
@@ -167,22 +188,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
       m_buffer[m_inPos] = rec;
       m_inPos = next;
    }
-}
-
-void ICACHE_RAM_ATTR SoftwareSerial::handle_interrupt(void *arg) {
-   uint32_t gpioStatus = GPIO_REG_READ(GPIO_STATUS_ADDRESS);
-   ETS_GPIO_INTR_DISABLE();
-   uint8_t pin = 0;
-   uint32_t mask = gpioStatus;
-   while (mask) {
-      while(!(mask & (1 << pin))) pin++;
-      mask &= ~(1 << pin);
-      if (InterruptList[pin]) {
-         InterruptList[pin]->rxRead();
-      }
-   }
-   // Clear the interrupt register now, it gets set
-   // even when interrupts are disabled
-   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, gpioStatus);
-   ETS_GPIO_INTR_ENABLE();
+   // Must clear this bit in the interrupt register,
+   // it gets set even when interrupts are disabled
+   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
 }

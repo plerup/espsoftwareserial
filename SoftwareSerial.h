@@ -2,7 +2,7 @@
 SoftwareSerial.h
 
 SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
-Copyright (c) 2015 Peter Lerup. All rights reserved.
+Copyright (c) 2015-2016 Peter Lerup. All rights reserved.
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
@@ -51,13 +51,12 @@ public:
    // Disable or enable interrupts on the rx pin
    void enableRx(bool on);
 
-   static void handle_interrupt(void *arg);
+   void rxRead();
 
    using Print::write;
 
 private:
    bool isValidGPIOpin(int pin);
-   void rxRead();
 
    // Member variables
    int m_rxPin, m_txPin;
