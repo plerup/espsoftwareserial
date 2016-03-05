@@ -66,7 +66,7 @@ static void (*ISRList[MAX_PIN+1])() = {
       sws_isr_15
 };
 
-SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, unsigned int buffSize) {
+SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, unsigned int buffSize, int transmitEnablePin) {
    m_rxValid = m_txValid = false;
    m_buffer = NULL;
    m_invert = inverse_logic;
@@ -87,6 +87,12 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
       m_txPin = transmitPin;
       pinMode(m_txPin, OUTPUT);
       digitalWrite(m_txPin, !m_invert);
+   }
+   if (isValidGPIOpin(transmitEnablePin)) {
+      m_txEnableValid = true;
+      m_txEnablePin = transmitEnablePin;
+      pinMode(m_txEnablePin, OUTPUT);
+      digitalWrite(m_txEnablePin, LOW);
    }
    // Default speed
    begin(9600);
@@ -140,6 +146,7 @@ size_t SoftwareSerial::write(uint8_t b) {
    if (m_invert) b = ~b;
    // Disable interrupts in order to get a clean transmit
    cli();
+   if (m_txEnableValid) digitalWrite(m_txEnablePin, HIGH);
    unsigned long wait = m_bitTime;
    digitalWrite(m_txPin, HIGH);
    unsigned long start = ESP.getCycleCount();
@@ -154,6 +161,7 @@ size_t SoftwareSerial::write(uint8_t b) {
    // Stop bit
    digitalWrite(m_txPin, HIGH);
    WAIT;
+   if (m_txEnableValid) digitalWrite(m_txEnablePin, LOW);
    sei();
    return 1;
 }
