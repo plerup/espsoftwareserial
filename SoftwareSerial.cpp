@@ -67,7 +67,7 @@ static void (*ISRList[MAX_PIN+1])() = {
 };
 
 SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, unsigned int buffSize, int transmitEnablePin) {
-   m_rxValid = m_txValid = false;
+   m_rxValid = m_txValid = m_txEnableValid = false;
    m_buffer = NULL;
    m_invert = inverse_logic;
    if (isValidGPIOpin(receivePin)) {
