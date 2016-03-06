@@ -1,0 +1,14 @@
+{
+    "name": "EspSoftwareSerial",
+    "keywords": [
+      "serial", "io", "softwareserial"
+    ],
+    "description": "Implementation of the Arduino software serial for ESP8266.",
+    "repository":
+    {
+        "type": "git",
+        "url": "https://github.com/plerup/espsoftwareserial"
+    },
+    "frameworks": "arduino",
+    "platforms": "espressif"
+}

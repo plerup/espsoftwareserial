@@ -39,6 +39,7 @@ public:
    ~SoftwareSerial();
 
    void begin(long speed);
+   void setTransmitEnablePin(int transmitEnablePin);
 
    int peek();
 
@@ -59,8 +60,8 @@ private:
    bool isValidGPIOpin(int pin);
 
    // Member variables
-   int m_rxPin, m_txPin;
-   bool m_rxValid, m_txValid;
+   int m_rxPin, m_txPin, m_txEnablePin;
+   bool m_rxValid, m_txValid, m_txEnableValid;
    bool m_invert;
    unsigned long m_bitTime;
    unsigned int m_inPos, m_outPos;
