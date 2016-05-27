@@ -109,6 +109,12 @@ void SoftwareSerial::begin(long speed) {
    m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;
 }
 
+long SoftwareSerial::baudRate() {
+   // Use getCycleCount() loop to get as exact timing as possible
+  long speed = ESP.getCpuFreqMHz()*1000000/m_bitTime;
+   return speed;
+}
+
 void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
   if (isValidGPIOpin(transmitEnablePin)) {
      m_txEnableValid = true;
@@ -205,3 +211,5 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // it gets set even when interrupts are disabled
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
 }
+
+

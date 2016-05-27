@@ -39,7 +39,9 @@ public:
    ~SoftwareSerial();
 
    void begin(long speed);
+   long baudRate();
    void setTransmitEnablePin(int transmitEnablePin);
+
 
    int peek();
 
