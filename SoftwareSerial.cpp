@@ -70,6 +70,8 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
    m_rxValid = m_txValid = m_txEnableValid = false;
    m_buffer = NULL;
    m_invert = inverse_logic;
+   m_overflow = false;
+   m_rxEnabled = false;
    if (isValidGPIOpin(receivePin)) {
       m_rxPin = receivePin;
       m_buffSize = buffSize;
@@ -110,9 +112,7 @@ void SoftwareSerial::begin(long speed) {
 }
 
 long SoftwareSerial::baudRate() {
-   // Use getCycleCount() loop to get as exact timing as possible
-  long speed = ESP.getCpuFreqMHz()*1000000/m_bitTime;
-   return speed;
+   return ESP.getCpuFreqMHz()*1000000/m_bitTime;
 }
 
 void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
@@ -132,6 +132,7 @@ void SoftwareSerial::enableRx(bool on) {
          attachInterrupt(m_rxPin, ISRList[m_rxPin], m_invert ? RISING : FALLING);
       else
          detachInterrupt(m_rxPin);
+      m_rxEnabled = on;
    }
 }
 
@@ -181,6 +182,12 @@ void SoftwareSerial::flush() {
    m_inPos = m_outPos = 0;
 }
 
+bool SoftwareSerial::overflow() {
+   bool res = m_overflow;
+   m_overflow = false;
+   return res;
+}
+
 int SoftwareSerial::peek() {
    if (!m_rxValid || (m_inPos == m_outPos)) return -1;
    return m_buffer[m_outPos];
@@ -206,10 +213,10 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    if (next != m_inPos) {
       m_buffer[m_inPos] = rec;
       m_inPos = next;
+   } else {
+      m_overflow = true;
    }
    // Must clear this bit in the interrupt register,
    // it gets set even when interrupts are disabled
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
 }
-
-
