@@ -20,8 +20,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 */
 
-#ifndef SoftwareSerial_h
-#define SoftwareSerial_h
+#ifndef SoftwareSerial9_h
+#define SoftwareSerial9_h
 
 #include <inttypes.h>
 #include <Stream.h>
@@ -32,7 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // Speed up to 115200 can be used.
 
 
-class SoftwareSerial : public Stream
+class SoftwareSerial9 : public Stream
 {
 public:
    SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
