@@ -109,6 +109,9 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 void SoftwareSerial::begin(long speed) {
    // Use getCycleCount() loop to get as exact timing as possible
    m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;
+
+   if (!m_rxEnabled)
+     enableRx(true);
 }
 
 long SoftwareSerial::baudRate() {
