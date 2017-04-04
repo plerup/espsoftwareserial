@@ -66,7 +66,7 @@ static void (*ISRList[MAX_PIN+1])() = {
       sws_isr_15
 };
 
-SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, unsigned int buffSize) {
+SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, bool txOpenDrain, unsigned int buffSize) {
    m_rxValid = m_txValid = m_txEnableValid = false;
    m_buffer = NULL;
    m_invert = inverse_logic;
@@ -87,7 +87,10 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
    if (isValidGPIOpin(transmitPin)) {
       m_txValid = true;
       m_txPin = transmitPin;
-      pinMode(m_txPin, OUTPUT);
+      if (txOpenDrain)
+         pinMode(m_txPin, OUTPUT_OPEN_DRAIN);
+      else
+         pinMode(m_txPin, OUTPUT);
       digitalWrite(m_txPin, !m_invert);
    }
    // Default speed

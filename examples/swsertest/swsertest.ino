@@ -1,7 +1,7 @@
 
 #include <SoftwareSerial.h>
 
-SoftwareSerial swSer(14, 12, false, 256);
+SoftwareSerial swSer(14, 12, false, true, 256);
 
 void setup() {
   Serial.begin(115200);
