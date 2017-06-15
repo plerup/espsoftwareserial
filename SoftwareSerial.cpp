@@ -106,9 +106,10 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
    return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= MAX_PIN);
 }
 
-void SoftwareSerial::begin(long speed) {
+void SoftwareSerial::begin(long speed, int dataBits) {
    // Use getCycleCount() loop to get as exact timing as possible
    m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;
+   m_dataBits = dataBits;
 
    if (!m_rxEnabled)
      enableRx(true);
@@ -168,7 +169,7 @@ size_t SoftwareSerial::write(uint8_t b) {
     // Start bit;
    digitalWrite(m_txPin, LOW);
    WAIT;
-   for (int i = 0; i < 8; i++) {
+   for (int i = 0; i < m_dataBits; i++) {
      digitalWrite(m_txPin, (b & 1) ? HIGH : LOW);
      WAIT;
      b >>= 1;
@@ -202,11 +203,14 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    unsigned long wait = m_bitTime + m_bitTime/3 - 500;
    unsigned long start = ESP.getCycleCount();
    uint8_t rec = 0;
+   uint8_t dataBits = m_dataBits;
    for (int i = 0; i < 8; i++) {
-     WAIT;
      rec >>= 1;
-     if (digitalRead(m_rxPin))
-       rec |= 0x80;
+     if(dataBits-- > 0) {
+       WAIT;
+       if (digitalRead(m_rxPin))
+         rec |= 0x80;
+     }
    }
    if (m_invert) rec = ~rec;
    // Stop bit

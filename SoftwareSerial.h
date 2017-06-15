@@ -38,7 +38,7 @@ public:
    SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
    ~SoftwareSerial();
 
-   void begin(long speed);
+   void begin(long speed, int dataBits=8);
    long baudRate();
    void setTransmitEnablePin(int transmitEnablePin);
 
@@ -77,7 +77,8 @@ private:
    unsigned int m_inPos, m_outPos;
    int m_buffSize;
    uint8_t *m_buffer;
-
+   int m_dataBits;
+   
 };
 
 // If only one tx or rx wanted then use this as parameter for the unused pin
