@@ -65,7 +65,7 @@ public:
    using Print::write;
 
 private:
-   bool isValidGPIOpin(int pin);
+   bool isValidGPIOtxPin(int pin);
 
    // Member variables
    int m_rxPin, m_txPin, m_txEnablePin;

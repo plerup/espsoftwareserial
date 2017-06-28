@@ -29,7 +29,7 @@ extern "C" {
 
 #include <SoftwareSerial.h>
 
-#define MAX_PIN 15
+#define MAX_PIN 16
 
 // As the Arduino attachInterrupt has no parameter, lists of objects
 // and callbacks corresponding to each possible GPIO pins have to be defined
@@ -63,7 +63,8 @@ static void (*ISRList[MAX_PIN+1])() = {
       sws_isr_12,
       sws_isr_13,
       sws_isr_14,
-      sws_isr_15
+      sws_isr_15,
+      NULL
 };
 
 SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, unsigned int buffSize) {
@@ -72,7 +73,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
    m_invert = inverse_logic;
    m_overflow = false;
    m_rxEnabled = false;
-   if (isValidGPIOpin(receivePin)) {
+   if ((receivePin >= 0 && receivePin <= 5) || (receivePin >= 12 && receivePin <= 15)) {
       m_rxPin = receivePin;
       m_buffSize = buffSize;
       m_buffer = (uint8_t*)malloc(m_buffSize);
@@ -84,7 +85,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
          enableRx(true);
       }
    }
-   if (isValidGPIOpin(transmitPin)) {
+   if (isValidGPIOtxPin(transmitPin)) {
       m_txValid = true;
       m_txPin = transmitPin;
       pinMode(m_txPin, OUTPUT);
@@ -102,8 +103,8 @@ SoftwareSerial::~SoftwareSerial() {
       free(m_buffer);
 }
 
-bool SoftwareSerial::isValidGPIOpin(int pin) {
-   return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= MAX_PIN);
+bool SoftwareSerial::isValidGPIOtxPin(int pin) {
+   return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 16);
 }
 
 void SoftwareSerial::begin(long speed) {
@@ -119,7 +120,7 @@ long SoftwareSerial::baudRate() {
 }
 
 void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
-  if (isValidGPIOpin(transmitEnablePin)) {
+  if (isValidGPIOtxPin(transmitEnablePin)) {
      m_txEnableValid = true;
      m_txEnablePin = transmitEnablePin;
      pinMode(m_txEnablePin, OUTPUT);
