@@ -79,7 +79,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
       if (m_buffer != NULL) {
          m_rxValid = true;
          m_inPos = m_outPos = 0;
-         pinMode(m_rxPin, INPUT);
+         pinMode(m_rxPin, INPUT_PULLUP);
          ObjList[m_rxPin] = this;
          enableRx(true);
       }
@@ -164,22 +164,33 @@ size_t SoftwareSerial::write(uint8_t b) {
    if (m_invert) b = ~b;
    // Disable interrupts in order to get a clean transmit
    cli();
-   if (m_txEnableValid) digitalWrite(m_txEnablePin, HIGH);
+   
+   pinMode(m_rxPin, OUTPUT_OPEN_DRAIN);
+   
+   //if (m_txEnableValid) digitalWrite(m_txEnablePin, HIGH);
+   if (m_txEnableValid) digitalWrite(m_rxPin, HIGH);
    unsigned long wait = m_bitTime;
-   digitalWrite(m_txPin, HIGH);
+   //digitalWrite(m_txPin, HIGH);
+   digitalWrite(m_rxPin, HIGH);
    unsigned long start = ESP.getCycleCount();
     // Start bit;
-   digitalWrite(m_txPin, LOW);
+   //digitalWrite(m_txPin, LOW);
+   digitalWrite(m_rxPin, LOW);
    WAIT;
    for (int i = 0; i < 8; i++) {
-     digitalWrite(m_txPin, (b & 1) ? HIGH : LOW);
+     //digitalWrite(m_txPin, (b & 1) ? HIGH : LOW);
+     digitalWrite(m_rxPin, (b & 1) ? HIGH : LOW);
      WAIT;
      b >>= 1;
    }
    // Stop bit
-   digitalWrite(m_txPin, HIGH);
+   //digitalWrite(m_txPin, HIGH);
+   digitalWrite(m_rxPin, HIGH);
    WAIT;
    if (m_txEnableValid) digitalWrite(m_txEnablePin, LOW);
+   
+   pinMode(m_rxPin, INPUT_PULLUP);
+   
    sei();
    return 1;
 }
