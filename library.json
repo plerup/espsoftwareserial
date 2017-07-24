@@ -1,5 +1,6 @@
 {
     "name": "EspSoftwareSerial",
+    "version": "3.2.3",
     "keywords": [
       "serial", "io", "softwareserial"
     ],
@@ -10,5 +11,5 @@
         "url": "https://github.com/plerup/espsoftwareserial"
     },
     "frameworks": "arduino",
-    "platforms": "espressif"
+    "platforms": "espressif8266"
 }
