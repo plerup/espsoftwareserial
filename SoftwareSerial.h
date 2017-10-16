@@ -74,6 +74,7 @@ private:
    bool m_invert;
    bool m_overflow;
    unsigned long m_bitTime;
+   bool m_highSpeed;
    unsigned int m_inPos, m_outPos;
    int m_buffSize;
    uint8_t *m_buffer;
