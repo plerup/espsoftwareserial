@@ -53,6 +53,7 @@ public:
 
    // Disable or enable interrupts on the rx pin
    void enableRx(bool on);
+   void enableTx(bool on);  // added for one wire communization
 
    void rxRead();
 
@@ -68,6 +69,7 @@ private:
    bool isValidGPIOpin(int pin);
 
    // Member variables
+   bool m_oneWire;
    int m_rxPin, m_txPin, m_txEnablePin;
    bool m_rxValid, m_rxEnabled;
    bool m_txValid, m_txEnableValid;
