@@ -145,6 +145,7 @@ void SoftwareSerial::enableTx(bool on) {
       pinMode(m_rxPin, INPUT);
       enableRx(true);
     }
+	delay(1); // it's important to have a delay after switching
   }
 }
 
