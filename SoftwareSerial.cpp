@@ -88,8 +88,8 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
     m_txValid = true;
     m_txPin = transmitPin;
     if (!m_oneWire) {
-      pinMode(m_txPin, OUTPUT);
-      digitalWrite(m_txPin, !m_invert);
+      pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+      if (m_invert) digitalWrite(m_txPin, LOW);
     }
   }
   // Default speed
@@ -185,22 +185,31 @@ size_t SoftwareSerial::write(uint8_t b) {
   if (!m_intTxEnabled)
     // Disable interrupts in order to get a clean transmit
     cli();
-  if (m_txEnableValid) digitalWrite(m_txEnablePin, HIGH);
+   if (m_txEnableValid) {
+       pinMode(m_txEnablePin, INPUT_PULLUP);
+   }
   unsigned long wait = m_bitTime;
-  digitalWrite(m_txPin, HIGH);
+   pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+   if (m_invert) digitalWrite(m_txPin, LOW);
   unsigned long start = ESP.getCycleCount();
   // Start bit;
-  digitalWrite(m_txPin, LOW);
+   pinMode(m_txPin, m_invert ? INPUT_PULLUP : OUTPUT);
+   if (!m_invert) digitalWrite(m_txPin, LOW);
   WAIT;
   for (int i = 0; i < 8; i++) {
-    digitalWrite(m_txPin, (b & 1) ? HIGH : LOW);
+     pinMode(m_txPin, (b & 1) ? INPUT_PULLUP : OUTPUT);
+     if (!(b & 1)) digitalWrite(m_txPin, LOW);
     WAIT;
     b >>= 1;
   }
   // Stop bit
-  digitalWrite(m_txPin, HIGH);
+  pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+  if (m_invert) digitalWrite(m_txPin, LOW);
   WAIT;
-  if (m_txEnableValid) digitalWrite(m_txEnablePin, LOW);
+  if (m_txEnableValid) {
+    pinMode(m_txEnablePin, OUTPUT);
+    digitalWrite(m_txEnablePin, LOW);
+  }
   if (!m_intTxEnabled)
     sei();
   return 1;
