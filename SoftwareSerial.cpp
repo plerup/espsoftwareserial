@@ -77,23 +77,12 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
     m_rxPin = receivePin;
     m_buffSize = buffSize;
     m_buffer = (uint8_t*)malloc(m_buffSize);
-    if (m_buffer != NULL) {
-      m_rxValid = true;
-      m_inPos = m_outPos = 0;
-      pinMode(m_rxPin, INPUT);
-      ObjList[m_rxPin] = this;
-    }
   }
   if (isValidGPIOpin(transmitPin) || (!m_oneWire && (transmitPin == 16))) {
     m_txValid = true;
     m_txPin = transmitPin;
-    if (!m_oneWire) {
-      pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-      if (m_invert) digitalWrite(m_txPin, LOW);
     }
   }
-  // Default speed
-  begin(9600);
 }
 
 SoftwareSerial::~SoftwareSerial() {
@@ -113,6 +102,17 @@ void SoftwareSerial::begin(long speed) {
   m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;
   // By default enable interrupt during tx only for low speed
   m_intTxEnabled = speed < 9600;
+  if (m_buffer != NULL) {
+       m_rxValid = true;
+       m_inPos = m_outPos = 0;
+        pinMode(m_rxPin, INPUT);
+        if (this != ObjList[m_rxPin]) delete ObjList[m_rxPin];
+        ObjList[m_rxPin] = this;
+   }
+   if (m_txValid && !m_oneWire) {
+      pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+      if (m_invert) digitalWrite(m_txPin, LOW);
+   }
 
   if (!m_rxEnabled)
     enableRx(true);
@@ -176,7 +176,7 @@ int SoftwareSerial::available() {
   return avail;
 }
 
-#define WAIT { while (ESP.getCycleCount()-start < wait) if (m_intTxEnabled) optimistic_yield(1); wait += m_bitTime; }
+#define WAIT { while (ESP.getCycleCount() < deadline) if (m_intTxEnabled) optimistic_yield(1); deadline += m_bitTime; }
 
 size_t SoftwareSerial::write(uint8_t b) {
   if (!m_txValid) return 0;
@@ -188,11 +188,10 @@ size_t SoftwareSerial::write(uint8_t b) {
    if (m_txEnableValid) {
        pinMode(m_txEnablePin, INPUT_PULLUP);
    }
-  unsigned long wait = m_bitTime;
+   unsigned long deadline = ESP.getCycleCount() + m_bitTime;
    pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
    if (m_invert) digitalWrite(m_txPin, LOW);
-  unsigned long start = ESP.getCycleCount();
-  // Start bit;
+   // Start bit;
    pinMode(m_txPin, m_invert ? INPUT_PULLUP : OUTPUT);
    if (!m_invert) digitalWrite(m_txPin, LOW);
   WAIT;
@@ -234,7 +233,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
   // Advance the starting point for the samples but compensate for the
   // initial delay which occurs before the interrupt is delivered
   unsigned long wait = m_bitTime + m_bitTime/3 - 500;
-  unsigned long start = ESP.getCycleCount();
+  unsigned long deadline = ESP.getCycleCount() + wait;
   uint8_t rec = 0;
   for (int i = 0; i < 8; i++) {
     WAIT;
