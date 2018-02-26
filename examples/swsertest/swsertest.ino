@@ -1,11 +1,14 @@
 
+
 #include <SoftwareSerial.h>
+
+#define BAUD_RATE 115200
 
 SoftwareSerial swSer(14, 12, false, 256);
 
 void setup() {
-  Serial.begin(115200);
-  swSer.begin(115200);
+  Serial.begin(BAUD_RATE);
+  swSer.begin(BAUD_RATE);
 
   Serial.println("\nSoftware serial test started");
 
@@ -19,9 +22,11 @@ void setup() {
 void loop() {
   while (swSer.available() > 0) {
     Serial.write(swSer.read());
+    yield();
   }
   while (Serial.available() > 0) {
     swSer.write(Serial.read());
+    yield();
   }
 
 }
