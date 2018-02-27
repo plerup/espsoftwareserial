@@ -155,9 +155,9 @@ void SoftwareSerial::enableTx(bool on) {
 void SoftwareSerial::enableRx(bool on) {
   if (m_rxValid) {
     if (on)
-      attachInterrupt(m_rxPin, ISRList[m_rxPin], m_invert ? RISING : FALLING);
+         attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_rxPin], m_invert ? RISING : FALLING);
     else
-      detachInterrupt(m_rxPin);
+         detachInterrupt(digitalPinToInterrupt(m_rxPin));
     m_rxEnabled = on;
   }
 }

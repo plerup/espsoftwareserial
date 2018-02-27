@@ -77,10 +77,10 @@ private:
   bool m_rxValid, m_rxEnabled;
   bool m_txValid, m_txEnableValid;
   bool m_invert;
-  bool m_overflow;
-   unsigned long m_bitCycles;
+  volatile bool m_overflow;
+  unsigned long m_bitCycles;
   bool m_intTxEnabled;
-  unsigned int m_inPos, m_outPos;
+  volatile unsigned int m_inPos, m_outPos;
   int m_buffSize;
   uint8_t *m_buffer;
 
