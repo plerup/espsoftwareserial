@@ -81,7 +81,6 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
   if (isValidGPIOpin(transmitPin) || (!m_oneWire && (transmitPin == 16))) {
     m_txValid = true;
     m_txPin = transmitPin;
-    }
   }
 }
 
