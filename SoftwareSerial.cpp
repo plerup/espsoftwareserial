@@ -241,8 +241,8 @@ int SoftwareSerial::peek() {
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
     // Advance the starting point for the samples but compensate for the
     // initial delay which occurs before the interrupt is delivered
-    unsigned long wait = m_bitCycles + m_bitCycles / 3 - 500;
-    unsigned long deadline = ESP.getCycleCount() + wait;
+    unsigned long deadline = ESP.getCycleCount() + m_bitCycles - 400 + m_bitCycles / 3;
+
     uint8_t rec = 0;
     for (int i = 0; i < 8; i++) {
         WAIT;
@@ -262,7 +262,4 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
     else {
         m_overflow = true;
     }
-    // Must clear this bit in the interrupt register,
-    // it gets set even when interrupts are disabled
-    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
 }
