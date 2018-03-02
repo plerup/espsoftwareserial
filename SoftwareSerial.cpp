@@ -104,21 +104,20 @@ void SoftwareSerial::begin(long speed) {
   if (m_buffer != NULL) {
        m_rxValid = true;
        m_inPos = m_outPos = 0;
-        pinMode(m_rxPin, INPUT);
-        if (this != ObjList[m_rxPin]) delete ObjList[m_rxPin];
-        ObjList[m_rxPin] = this;
-   }
-   if (m_txValid && !m_oneWire) {
-      pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-      if (m_invert) digitalWrite(m_txPin, LOW);
-   }
+       pinMode(m_rxPin, INPUT);
+       if (this != ObjList[m_rxPin]) delete ObjList[m_rxPin];
+       ObjList[m_rxPin] = this;
+  }
+  if (m_txValid && !m_oneWire) {
+    pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+    if (m_invert) digitalWrite(m_txPin, LOW);
+  }
 
-  if (!m_rxEnabled)
-    enableRx(true);
+  if (!m_rxEnabled) enableRx(true);
 }
 
 long SoftwareSerial::baudRate() {
-   return ESP.getCpuFreqMHz()*1000000/m_bitCycles;
+  return ESP.getCpuFreqMHz()*1000000/m_bitCycles;
 }
 
 void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
@@ -154,9 +153,9 @@ void SoftwareSerial::enableTx(bool on) {
 void SoftwareSerial::enableRx(bool on) {
   if (m_rxValid) {
     if (on)
-         attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_rxPin], m_invert ? RISING : FALLING);
+      attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_rxPin], m_invert ? RISING : FALLING);
     else
-         detachInterrupt(digitalPinToInterrupt(m_rxPin));
+      detachInterrupt(digitalPinToInterrupt(m_rxPin));
     m_rxEnabled = on;
   }
 }
@@ -169,18 +168,18 @@ int SoftwareSerial::read() {
 }
 
 #define WAIT { while (ESP.getCycleCount() < deadline) \
-    if (!m_intTxEnabled) optimistic_yield((deadline-ESP.getCycleCount())*1000000/ESP.getCpuFreqMHz()); \
-    deadline += m_bitCycles; }
+  if (!m_intTxEnabled) optimistic_yield((deadline-ESP.getCycleCount())*1000000/ESP.getCpuFreqMHz()); \
+  deadline += m_bitCycles; }
 
 int SoftwareSerial::available() {
   if (!m_rxValid) return 0;
   int avail = m_inPos - m_outPos;
   if (avail < 0) avail += m_buffSize;
-   if (!avail) {
-       optimistic_yield((10 * m_bitCycles) * 1000000 / ESP.getCpuFreqMHz());
-       avail = m_inPos - m_outPos;
-       if (avail < 0) avail += m_buffSize;
-   }
+  if (!avail) {
+    optimistic_yield((10 * m_bitCycles) * 1000000 / ESP.getCpuFreqMHz());
+    avail = m_inPos - m_outPos;
+    if (avail < 0) avail += m_buffSize;
+  }
   return avail;
 }
 
@@ -191,19 +190,19 @@ size_t SoftwareSerial::write(uint8_t b) {
   if (!m_intTxEnabled)
     // Disable interrupts in order to get a clean transmit
     cli();
-   if (m_txEnableValid) {
-       pinMode(m_txEnablePin, INPUT_PULLUP);
-   }
-   unsigned long deadline = ESP.getCycleCount() + m_bitCycles;
-   pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-   if (m_invert) digitalWrite(m_txPin, LOW);
-   // Start bit;
-   pinMode(m_txPin, m_invert ? INPUT_PULLUP : OUTPUT);
-   if (!m_invert) digitalWrite(m_txPin, LOW);
+  if (m_txEnableValid) {
+    pinMode(m_txEnablePin, INPUT_PULLUP);
+  }
+  unsigned long deadline = ESP.getCycleCount() + m_bitCycles;
+  pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+  if (m_invert) digitalWrite(m_txPin, LOW);
+  // Start bit;
+  pinMode(m_txPin, m_invert ? INPUT_PULLUP : OUTPUT);
+  if (!m_invert) digitalWrite(m_txPin, LOW);
   WAIT;
   for (int i = 0; i < 8; i++) {
-     pinMode(m_txPin, (b & 1) ? INPUT_PULLUP : OUTPUT);
-     if (!(b & 1)) digitalWrite(m_txPin, LOW);
+    pinMode(m_txPin, (b & 1) ? INPUT_PULLUP : OUTPUT);
+    if (!(b & 1)) digitalWrite(m_txPin, LOW);
     WAIT;
     b >>= 1;
   }
@@ -238,7 +237,7 @@ int SoftwareSerial::peek() {
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
   // Advance the starting point for the samples but compensate for the
   // initial delay which occurs before the interrupt is delivered
-   unsigned long wait = m_bitCycles + m_bitCycles/3 - 500;
+  unsigned long wait = m_bitCycles + m_bitCycles/3 - 500;
   unsigned long deadline = ESP.getCycleCount() + wait;
   uint8_t rec = 0;
   for (int i = 0; i < 8; i++) {
