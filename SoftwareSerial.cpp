@@ -140,11 +140,13 @@ void SoftwareSerial::enableTx(bool on) {
     if (m_oneWire && m_txValid) {
         if (on) {
             enableRx(false);
-            digitalWrite(m_txPin, !m_invert);
+            pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+            if (m_invert) digitalWrite(m_txPin, LOW);
             pinMode(m_rxPin, OUTPUT);
         }
         else {
-            digitalWrite(m_txPin, !m_invert);
+            pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+            if (m_invert) digitalWrite(m_txPin, LOW);
             pinMode(m_rxPin, INPUT);
             enableRx(true);
         }
@@ -170,7 +172,7 @@ int SoftwareSerial::read() {
 }
 
 #define WAIT { while (ESP.getCycleCount() < deadline) \
-  if (!m_intTxEnabled) optimistic_yield((deadline-ESP.getCycleCount())*1000000/ESP.getCpuFreqMHz()); \
+  if (!m_intTxEnabled) optimistic_yield((deadline-ESP.getCycleCount())/ESP.getCpuFreqMHz()); \
   deadline += m_bitCycles; }
 
 int SoftwareSerial::available() {
@@ -178,7 +180,7 @@ int SoftwareSerial::available() {
     int avail = m_inPos - m_outPos;
     if (avail < 0) avail += m_buffSize;
     if (!avail) {
-        optimistic_yield((10 * m_bitCycles) * 1000000 / ESP.getCpuFreqMHz());
+        optimistic_yield((20 * m_bitCycles) / ESP.getCpuFreqMHz());
         avail = m_inPos - m_outPos;
         if (avail < 0) avail += m_buffSize;
     }
