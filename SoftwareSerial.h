@@ -70,6 +70,7 @@ public:
 
 private:
     bool isValidGPIOpin(int pin);
+    bool rxPendingByte();
 
     // Member variables
     bool m_oneWire;
@@ -83,6 +84,9 @@ private:
     volatile unsigned int m_inPos, m_outPos;
     int m_buffSize;
     uint8_t *m_buffer;
+    volatile int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
+    volatile uint8_t m_rxCurByte;
+    volatile unsigned long m_rxCurBitCycle;
 
 };
 

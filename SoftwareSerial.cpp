@@ -157,8 +157,11 @@ void SoftwareSerial::enableTx(bool on) {
 
 void SoftwareSerial::enableRx(bool on) {
     if (m_rxValid) {
-        if (on)
-            attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_rxPin], m_invert ? RISING : FALLING);
+        if (on) {
+            m_rxCurBit = 8;
+            m_rxCurBitCycle = 0;
+            attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_rxPin], CHANGE);
+        } 
         else
             detachInterrupt(digitalPinToInterrupt(m_rxPin));
         m_rxEnabled = on;
@@ -166,7 +169,7 @@ void SoftwareSerial::enableRx(bool on) {
 }
 
 int SoftwareSerial::read() {
-    if (!m_rxValid || (m_inPos == m_outPos)) return -1;
+    if (!m_rxValid || (rxPendingByte(), m_inPos == m_outPos)) return -1;
     uint8_t ch = m_buffer[m_outPos];
     m_outPos = (m_outPos + 1) % m_buffSize;
     return ch;
@@ -181,7 +184,7 @@ int SoftwareSerial::available() {
     int avail = m_inPos - m_outPos;
     if (avail < 0) avail += m_buffSize;
     if (!avail) {
-        optimistic_yield((20 * m_bitCycles) / ESP.getCpuFreqMHz());
+        if (!rxPendingByte()) optimistic_yield((20 * m_bitCycles) / ESP.getCpuFreqMHz());
         avail = m_inPos - m_outPos;
         if (avail < 0) avail += m_buffSize;
     }
@@ -230,32 +233,74 @@ bool SoftwareSerial::overflow() {
 }
 
 int SoftwareSerial::peek() {
-    if (!m_rxValid || (m_inPos == m_outPos)) return -1;
+    if (!m_rxValid || (rxPendingByte(), m_inPos == m_outPos)) return -1;
     return m_buffer[m_outPos];
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
-    // Advance the starting point for the samples but compensate for the
-    // initial delay which occurs before the interrupt is delivered
-    unsigned long deadline = ESP.getCycleCount() + m_bitCycles - 400 + m_bitCycles / 3;
-
-    uint8_t rec = 0;
-    for (int i = 0; i < 8; i++) {
-        WAIT;
-        rec >>= 1;
-        if (digitalRead(m_rxPin))
-            rec |= 0x80;
+bool ICACHE_RAM_ATTR SoftwareSerial::rxPendingByte() {
+    // stop bit interrupt can be missing if leading data bits are same level
+    // also had no stop to start bit edge interrupt yet, so one byte may be pending
+    unsigned long cycle = ESP.getCycleCount();
+    if (m_rxCurBit < 0 || m_rxCurBit >= 8 || cycle <= m_rxCurBitCycle + (8 - m_rxCurBit) * m_bitCycles) return false;
+    // data bits
+    while (m_rxCurBit < 7) {
+        ++m_rxCurBit;
+        m_rxCurByte >>= 1;
+        if (!m_invert) m_rxCurByte |= 0x80;
+        continue;
     }
-    if (m_invert) rec = ~rec;
-    // Stop bit
-    WAIT;
+    // stop bit
+    ++m_rxCurBit;
+    m_rxCurBitCycle = cycle;
     // Store the received value in the buffer unless we have an overflow
     int next = (m_inPos + 1) % m_buffSize;
     if (next != m_outPos) {
-        m_buffer[m_inPos] = rec;
+        m_buffer[m_inPos] = m_rxCurByte;
         m_inPos = next;
     }
     else {
         m_overflow = true;
+        return false;
+    }
+    return true;
+}
+
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
+    // Compensate for the initial delay which occurs before the interrupt is delivered
+    unsigned long cycle = ESP.getCycleCount() - 400;
+    bool level = digitalRead(m_rxPin) ? !m_invert : m_invert;
+    while (cycle > m_rxCurBitCycle) {
+        // data bits
+        if (m_rxCurBit >= -1 && m_rxCurBit < 7) {
+            ++m_rxCurBit;
+            m_rxCurByte >>= 1;
+            if (level) m_rxCurByte |= 0x80;
+            m_rxCurBitCycle += m_bitCycles;
+            continue;
+        }
+        // stop bit
+        if (m_rxCurBit == 7) {
+            ++m_rxCurBit;
+            // Store the received value in the buffer unless we have an overflow
+            int next = (m_inPos + 1) % m_buffSize;
+            if (next != m_outPos) {
+                m_buffer[m_inPos] = m_rxCurByte;
+                m_inPos = next;
+            }
+            else {
+                m_overflow = true;
+            }
+            m_rxCurBitCycle += m_bitCycles;
+            continue;
+        }
+        // start bit
+        if (m_rxCurBit == 8) {
+            if (!level) {
+                m_rxCurBit = -1;
+                m_rxCurByte = 0;
+                m_rxCurBitCycle = cycle + m_bitCycles;
+            }
+            break;
+        }
     }
 }
