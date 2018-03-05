@@ -80,6 +80,7 @@ private:
     bool m_invert;
     volatile bool m_overflow;
     unsigned long m_bitCycles;
+    volatile unsigned long m_rxBitCycles;
     bool m_intTxEnabled;
     volatile unsigned int m_inPos, m_outPos;
     int m_buffSize;
@@ -87,6 +88,7 @@ private:
     volatile int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
     volatile uint8_t m_rxCurByte;
     volatile unsigned long m_rxCurBitCycle;
+    volatile unsigned long m_rxStartBitCycle;
 
 };
 

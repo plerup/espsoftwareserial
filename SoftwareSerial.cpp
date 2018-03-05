@@ -98,9 +98,9 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 
 void SoftwareSerial::begin(long speed) {
     // Use getCycleCount() loop to get as exact timing as possible
-    m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / speed;
+    m_rxBitCycles = m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / speed;
     // By default enable interrupt during tx only for low speed
-    m_intTxEnabled = speed < 9600;
+    m_intTxEnabled = speed <= 9600;
     if (m_buffer != NULL) {
         m_rxValid = true;
         m_inPos = m_outPos = 0;
@@ -159,7 +159,6 @@ void SoftwareSerial::enableRx(bool on) {
     if (m_rxValid) {
         if (on) {
             m_rxCurBit = 8;
-            m_rxCurBitCycle = 0;
             attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_rxPin], CHANGE);
         } 
         else
@@ -184,7 +183,7 @@ int SoftwareSerial::available() {
     int avail = m_inPos - m_outPos;
     if (avail < 0) avail += m_buffSize;
     if (!avail) {
-        if (!rxPendingByte()) optimistic_yield((20 * m_bitCycles) / ESP.getCpuFreqMHz());
+        if (!rxPendingByte()) optimistic_yield((20 * m_rxBitCycles) / ESP.getCpuFreqMHz());
         avail = m_inPos - m_outPos;
         if (avail < 0) avail += m_buffSize;
     }
@@ -197,7 +196,7 @@ size_t SoftwareSerial::write(uint8_t b) {
     if (m_invert) b = ~b;
     if (!m_intTxEnabled)
         // Disable interrupts in order to get a clean transmit
-        cli();
+        noInterrupts();
     if (m_txEnableValid) {
         pinMode(m_txEnablePin, INPUT_PULLUP);
     }
@@ -218,7 +217,7 @@ size_t SoftwareSerial::write(uint8_t b) {
         pinMode(m_txEnablePin, OUTPUT);
     }
     if (!m_intTxEnabled)
-        sei();
+        interrupts();
     return 1;
 }
 
@@ -240,8 +239,9 @@ int SoftwareSerial::peek() {
 bool ICACHE_RAM_ATTR SoftwareSerial::rxPendingByte() {
     // stop bit interrupt can be missing if leading data bits are same level
     // also had no stop to start bit edge interrupt yet, so one byte may be pending
+    noInterrupts();
     unsigned long cycle = ESP.getCycleCount();
-    if (m_rxCurBit < 0 || m_rxCurBit >= 8 || cycle <= m_rxCurBitCycle + (8 - m_rxCurBit) * m_bitCycles) return false;
+    if (m_rxCurBit < 0 || m_rxCurBit > 7 || cycle <= m_rxStartBitCycle + 9 * m_rxBitCycles) return false;
     // data bits
     while (m_rxCurBit < 7) {
         ++m_rxCurBit;
@@ -251,7 +251,6 @@ bool ICACHE_RAM_ATTR SoftwareSerial::rxPendingByte() {
     }
     // stop bit
     ++m_rxCurBit;
-    m_rxCurBitCycle = cycle;
     // Store the received value in the buffer unless we have an overflow
     int next = (m_inPos + 1) % m_buffSize;
     if (next != m_outPos) {
@@ -260,23 +259,31 @@ bool ICACHE_RAM_ATTR SoftwareSerial::rxPendingByte() {
     }
     else {
         m_overflow = true;
+        interrupts();
         return false;
     }
+    interrupts();
     return true;
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
-    // Compensate for the initial delay which occurs before the interrupt is delivered
-    unsigned long cycle = ESP.getCycleCount() - 400;
-    bool level = digitalRead(m_rxPin) ? !m_invert : m_invert;
-    while (cycle > m_rxCurBitCycle) {
+    bool level = digitalRead(m_rxPin);
+    level ^= m_invert;
+    unsigned long cycle = ESP.getCycleCount();
+    do {
         // data bits
         if (m_rxCurBit >= -1 && m_rxCurBit < 7) {
             ++m_rxCurBit;
             m_rxCurByte >>= 1;
-            if (level) m_rxCurByte |= 0x80;
-            m_rxCurBitCycle += m_bitCycles;
-            continue;
+            m_rxCurBitCycle += m_rxBitCycles;
+            if (cycle > m_rxCurBitCycle) {
+                // edge from adjacent bit level
+                if (!level) m_rxCurByte |= 0x80;
+            } else
+            {
+                if (level) m_rxCurByte |= 0x80;
+            }
+            continue; 
         }
         // stop bit
         if (m_rxCurBit == 7) {
@@ -290,17 +297,18 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
             else {
                 m_overflow = true;
             }
-            m_rxCurBitCycle += m_bitCycles;
+            m_rxCurBitCycle += m_rxBitCycles;
             continue;
         }
         // start bit
         if (m_rxCurBit == 8) {
             if (!level) {
-                m_rxCurBit = -1;
-                m_rxCurByte = 0;
-                m_rxCurBitCycle = cycle + m_bitCycles;
+                m_rxCurBit = -1; // start bit must be falling edge
+                m_rxStartBitCycle = cycle;
             }
             break;
         }
-    }
+    } while (cycle > m_rxCurBitCycle);
+    if (m_rxCurBit == 7) m_rxBitCycles = (cycle - m_rxStartBitCycle) / 9;
+    m_rxCurBitCycle = cycle + m_rxBitCycles - 400;
 }
