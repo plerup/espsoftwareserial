@@ -276,7 +276,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
             ++m_rxCurBit;
             m_rxCurByte >>= 1;
             m_rxCurBitCycle += m_rxBitCycles;
-            if (cycle > m_rxCurBitCycle) {
+            if (cycle >= m_rxCurBitCycle) {
                 // edge from adjacent bit level
                 if (!level) m_rxCurByte |= 0x80;
             } else
@@ -308,7 +308,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
             }
             break;
         }
-    } while (cycle > m_rxCurBitCycle);
+    } while (cycle >= m_rxCurBitCycle);
     if (m_rxCurBit == 7) m_rxBitCycles = (cycle - m_rxStartBitCycle) / 9;
-    m_rxCurBitCycle = cycle + m_rxBitCycles - 400;
+    m_rxCurBitCycle = cycle + m_rxBitCycles - m_rxBitCycles / 17;
 }
