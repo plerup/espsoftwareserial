@@ -183,7 +183,7 @@ int SoftwareSerial::available() {
     int avail = m_inPos - m_outPos;
     if (avail < 0) avail += m_buffSize;
     if (!avail) {
-        if (!rxPendingByte()) optimistic_yield((20 * m_rxBitCycles) / ESP.getCpuFreqMHz());
+        if (!rxPendingByte()) optimistic_yield((40 * m_rxBitCycles) / ESP.getCpuFreqMHz());
         avail = m_inPos - m_outPos;
         if (avail < 0) avail += m_buffSize;
     }
