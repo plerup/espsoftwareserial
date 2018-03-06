@@ -109,8 +109,8 @@ void SoftwareSerial::begin(long speed) {
         ObjList[m_rxPin] = this;
     }
     if (m_txValid && !m_oneWire) {
+        digitalWrite(m_txPin, LOW);
         pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-        if (m_invert) digitalWrite(m_txPin, LOW);
     }
 
     if (!m_rxEnabled) enableRx(true);
@@ -124,8 +124,8 @@ void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
     if (isValidGPIOpin(transmitEnablePin)) {
         m_txEnableValid = true;
         m_txEnablePin = transmitEnablePin;
-        pinMode(m_txEnablePin, OUTPUT);
         digitalWrite(m_txEnablePin, LOW);
+        pinMode(m_txEnablePin, OUTPUT);
     }
     else {
         m_txEnableValid = false;
@@ -140,13 +140,14 @@ void SoftwareSerial::enableTx(bool on) {
     if (m_oneWire && m_txValid) {
         if (on) {
             enableRx(false);
+            digitalWrite(m_txPin, LOW);
             pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-            if (m_invert) digitalWrite(m_txPin, LOW);
-            pinMode(m_rxPin, OUTPUT);
+            digitalWrite(m_rxPin, LOW);
+            pinMode(m_rxPin, m_invert ? OUTPUT : INPUT_PULLUP);
         }
         else {
+            digitalWrite(m_txPin, LOW);
             pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-            if (m_invert) digitalWrite(m_txPin, LOW);
             pinMode(m_rxPin, INPUT);
             enableRx(true);
         }
@@ -199,24 +200,19 @@ size_t SoftwareSerial::write(uint8_t b) {
     }
     unsigned long deadline = ESP.getCycleCount() + m_bitCycles;
     pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-    if (m_invert) digitalWrite(m_txPin, LOW);
     // Start bit;
     pinMode(m_txPin, m_invert ? INPUT_PULLUP : OUTPUT);
-    if (!m_invert) digitalWrite(m_txPin, LOW);
     WAIT;
     for (int i = 0; i < 8; i++) {
         pinMode(m_txPin, (b & 1) ? INPUT_PULLUP : OUTPUT);
-        if (!(b & 1)) digitalWrite(m_txPin, LOW);
         WAIT;
         b >>= 1;
     }
     // Stop bit
     pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-    if (m_invert) digitalWrite(m_txPin, LOW);
     WAIT;
     if (m_txEnableValid) {
         pinMode(m_txEnablePin, OUTPUT);
-        digitalWrite(m_txEnablePin, LOW);
     }
     if (!m_intTxEnabled)
         sei();
