@@ -4,6 +4,8 @@ SoftwareSerial loopBack(D5, D6);
 unsigned long start;
 String bitRateTxt("\tBitrate: ");
 int txCount;
+int rxCount;
+int expect;
 int rxErrors;
 constexpr int ReportInterval = 100000;
 
@@ -14,6 +16,8 @@ void setup()
 	loopBack.enableIntTx(true);
 	start = micros();
 	txCount = 0;
+	rxCount = 0;
+	expect = -1;
 	rxErrors = 0;
 }
 
@@ -21,8 +25,7 @@ unsigned char c = 0;
 
 void loop()
 {
-	auto expect = c;
-	auto rxCount = txCount;
+	if (expect == -1) expect = c;
 	do {
 		loopBack.write(c++);
 		++txCount;
@@ -41,12 +44,14 @@ void loop()
 
 	if (txCount >= ReportInterval) {
 		auto end = micros();
-		auto cps = 1000000 / ((end - start) / txCount);
+		auto cps = 1000000 / ((end - start) / rxCount);
 		auto errorCps = (1000000 * rxErrors / (end - start));
 		Serial.println(bitRateTxt + 10 * cps + "bps, "
 			+ errorCps + "cps errors (" + 100.0 * errorCps / cps + "%)");
 		start = end;
+		rxCount = 0;
 		txCount = 0;
+		expect = -1;
 		rxErrors = 0;
 		c = 0;
 	}
