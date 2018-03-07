@@ -17,11 +17,11 @@ void setup()
 	rxErrors = 0;
 }
 
-char c = 0;
+unsigned char c = 0;
 
 void loop()
 {
-	char expect = c;
+	auto expect = c;
 	auto rxCount = txCount;
 	do {
 		loopBack.write(c++);
@@ -37,7 +37,7 @@ void loop()
 			++rxErrors;
 		}
 	}
-	rxErrors += txCount - rxCount;
+	rxErrors += txCount - rxCount; // missing bytes most likely are also duplicated in mismatch rxErrors count
 
 	if (txCount >= ReportInterval) {
 		auto end = micros();
