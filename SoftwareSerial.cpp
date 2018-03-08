@@ -99,8 +99,8 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 void SoftwareSerial::begin(long speed) {
     // Use getCycleCount() loop to get as exact timing as possible
     m_rxBitCycles = m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / speed;
-    // By default enable interrupt during tx only for low speed
-    m_intTxEnabled = speed <= 9600;
+    // Enable interrupts during tx at any speed to allow full duplex
+    m_intTxEnabled = true;
     if (m_buffer != NULL) {
         m_rxValid = true;
         m_inPos = m_outPos = 0;
@@ -175,7 +175,8 @@ int SoftwareSerial::read() {
 }
 
 #define WAIT { while (ESP.getCycleCount() < deadline) \
-  if (!m_intTxEnabled) optimistic_yield((deadline-ESP.getCycleCount())/ESP.getCpuFreqMHz()); \
+    if (m_intTxEnabled) { auto d_us = (deadline-ESP.getCycleCount())/ESP.getCpuFreqMHz(); \
+        if (d_us > 1) optimistic_yield(d_us - 1); } \
   deadline += m_bitCycles; }
 
 int SoftwareSerial::available() {
