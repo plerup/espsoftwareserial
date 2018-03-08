@@ -184,7 +184,7 @@ int SoftwareSerial::available() {
     int avail = m_inPos - m_outPos;
     if (avail < 0) avail += m_buffSize;
     if (!avail) {
-        if (!rxPendingByte()) optimistic_yield((40 * m_rxBitCycles) / ESP.getCpuFreqMHz());
+        if (!rxPendingByte()) optimistic_yield((10 * m_rxBitCycles) / ESP.getCpuFreqMHz());
         avail = m_inPos - m_outPos;
         if (avail < 0) avail += m_buffSize;
     }
@@ -311,5 +311,5 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
         }
     } while (cycle >= m_rxCurBitCycle);
     if (m_rxCurBit == 7) m_rxBitCycles = (cycle - m_rxStartBitCycle) / 9;
-    m_rxCurBitCycle = cycle + m_rxBitCycles - m_rxBitCycles / 17;
+    m_rxCurBitCycle = cycle + m_rxBitCycles - m_rxBitCycles / 19;
 }
