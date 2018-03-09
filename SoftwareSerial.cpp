@@ -174,17 +174,18 @@ int SoftwareSerial::read() {
     return ch;
 }
 
-#define WAIT { while (ESP.getCycleCount() < deadline) \
-    if (m_intTxEnabled) { auto d_us = (deadline-ESP.getCycleCount())/ESP.getCpuFreqMHz(); \
-        if (d_us > 1) optimistic_yield(d_us - 1); } \
-  deadline += m_bitCycles; }
+#define WAIT { long int c = deadline-ESP.getCycleCount(); \
+    while (c > 0) { \
+        if (m_intTxEnabled && c > 9 * m_bitCycles / 10) optimistic_yield(m_bitCycles / 10 / ESP.getCpuFreqMHz()); \
+        c = deadline-ESP.getCycleCount(); } \
+    deadline += m_bitCycles; }
 
 int SoftwareSerial::available() {
     if (!m_rxValid) return 0;
     int avail = m_inPos - m_outPos;
     if (avail < 0) avail += m_buffSize;
     if (!avail) {
-        if (!rxPendingByte()) optimistic_yield((10 * m_rxBitCycles) / ESP.getCpuFreqMHz());
+        if (!rxPendingByte()) optimistic_yield((20 * m_rxBitCycles) / ESP.getCpuFreqMHz());
         avail = m_inPos - m_outPos;
         if (avail < 0) avail += m_buffSize;
     }
