@@ -98,7 +98,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 
 void SoftwareSerial::begin(long speed) {
     // Use getCycleCount() loop to get as exact timing as possible
-    m_rxBitCycles = m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / speed;
+    m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / speed;
     // Enable interrupts during tx at any speed to allow full duplex
     m_intTxEnabled = true;
     if (m_buffer != NULL) {
@@ -185,7 +185,7 @@ int SoftwareSerial::available() {
     int avail = m_inPos - m_outPos;
     if (avail < 0) avail += m_buffSize;
     if (!avail) {
-        if (!rxPendingByte()) optimistic_yield((20 * m_rxBitCycles) / ESP.getCpuFreqMHz());
+        if (!rxPendingByte()) optimistic_yield((20 * m_bitCycles) / ESP.getCpuFreqMHz());
         avail = m_inPos - m_outPos;
         if (avail < 0) avail += m_buffSize;
     }
@@ -241,9 +241,9 @@ int SoftwareSerial::peek() {
 bool ICACHE_RAM_ATTR SoftwareSerial::rxPendingByte() {
     // stop bit interrupt can be missing if leading data bits are same level
     // also had no stop to start bit edge interrupt yet, so one byte may be pending
-    noInterrupts();
+    // TODO: implement lock free queue
     unsigned long cycle = ESP.getCycleCount();
-    if (m_rxCurBit < 0 || m_rxCurBit > 7 || cycle <= m_rxStartBitCycle + 9 * m_rxBitCycles) return false;
+    if (m_rxCurBit < 0 || m_rxCurBit > 7 || cycle <= m_rxStartBitCycle + 9 * m_bitCycles) return false;
     // data bits
     while (m_rxCurBit < 7) {
         ++m_rxCurBit;
@@ -261,10 +261,10 @@ bool ICACHE_RAM_ATTR SoftwareSerial::rxPendingByte() {
     }
     else {
         m_overflow = true;
-        interrupts();
+        //interrupts();
         return false;
     }
-    interrupts();
+    //interrupts();
     return true;
 }
 
@@ -277,7 +277,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
         if (m_rxCurBit >= -1 && m_rxCurBit < 7) {
             ++m_rxCurBit;
             m_rxCurByte >>= 1;
-            m_rxCurBitCycle += m_rxBitCycles;
+            m_rxCurBitCycle += m_bitCycles;
             if (cycle >= m_rxCurBitCycle) {
                 // edge from adjacent bit level
                 if (!level) m_rxCurByte |= 0x80;
@@ -299,7 +299,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
             else {
                 m_overflow = true;
             }
-            m_rxCurBitCycle += m_rxBitCycles;
+            m_rxCurBitCycle += m_bitCycles;
             continue;
         }
         // start bit
@@ -311,6 +311,5 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
             break;
         }
     } while (cycle >= m_rxCurBitCycle);
-    if (m_rxCurBit == 7) m_rxBitCycles = (cycle - m_rxStartBitCycle) / 9;
-    m_rxCurBitCycle = cycle + m_rxBitCycles - m_rxBitCycles / 19;
+    m_rxCurBitCycle = cycle + m_bitCycles / 2; // [52,56] p.c.
 }
