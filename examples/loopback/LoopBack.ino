@@ -1,5 +1,6 @@
 #include <ESP8266WiFi.h>
 #include <SoftwareSerial.h>
+#include <user_interface.h>
 
 SoftwareSerial loopBack(D5, D6);
 unsigned long start;
@@ -12,6 +13,7 @@ constexpr int ReportInterval = 10000;
 
 void setup()
 {
+	//system_update_cpu_freq(SYS_CPU_160MHZ);
 	Serial.begin(115200);
 	WiFi.mode(WIFI_OFF);
 	WiFi.forceSleepBegin();
@@ -39,7 +41,7 @@ void loop()
 	{
 		unsigned char r = loopBack.read();
 		if (r == expect) ++rxCount;
-		//else Serial.println(String("tx: ") + expect + " rx: " + r);
+		else Serial.println(String("tx: ") + static_cast<char>(expect) + " rx: " + static_cast<char>(r));
 		expect = ++expect % 256;
 	}
 	rxErrors += txCount - rxCount;
