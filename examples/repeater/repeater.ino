@@ -12,12 +12,12 @@ constexpr int ReportInterval = 10000;
 
 void setup()
 {
-	//system_update_cpu_freq(SYS_CPU_160MHZ);
+	system_update_cpu_freq(SYS_CPU_160MHZ);
 	Serial.begin(115200);
 	WiFi.mode(WIFI_OFF);
 	WiFi.forceSleepBegin();
 	delay(1);
-	repeater.begin(115200);
+	repeater.begin(19200);
 	start = micros();
 	rxCount = 0;
 	seqErrors = 0;
@@ -37,11 +37,11 @@ void loop()
 		if (r != expected) {
 			++seqErrors;
 			expected = -1;
-			Serial.println(String("tx: ") + static_cast<char>(expected) + " rx: " + static_cast<char>(r));
 		}
 		++rxCount;
 		repeater.write(r);
 		if (rxCount >= ReportInterval) break;
+		wdt_reset();
 	}
 
 	if (rxCount >= ReportInterval) {
@@ -53,6 +53,7 @@ void loop()
 		start = end;
 		rxCount = 0;
 		seqErrors = 0;
+		expected = -1;
 	}
 	wdt_reset();
 }

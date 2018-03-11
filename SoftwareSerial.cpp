@@ -96,7 +96,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
     return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= MAX_PIN);
 }
 
-void SoftwareSerial::begin(long speed) {
+void SoftwareSerial::begin(long unsigned speed) {
     // Use getCycleCount() loop to get as exact timing as possible
     m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / speed;
     // Enable interrupts during tx at any speed to allow full duplex
@@ -176,16 +176,18 @@ int SoftwareSerial::read() {
 
 #define WAIT { long int c = deadline-ESP.getCycleCount(); \
     while (c > 0) { \
-        if (m_intTxEnabled && c > 9 * m_bitCycles / 10) optimistic_yield(m_bitCycles / 10 / ESP.getCpuFreqMHz()); \
+        if (m_intTxEnabled && c > 2 * m_bitCycles / 3) optimistic_yield(2 * m_bitCycles / 3 / ESP.getCpuFreqMHz()); \
         c = deadline-ESP.getCycleCount(); } \
     deadline += m_bitCycles; }
+
+
 
 int SoftwareSerial::available() {
     if (!m_rxValid) return 0;
     int avail = m_inPos - m_outPos;
     if (avail < 0) avail += m_buffSize;
     if (!avail) {
-        if (!rxPendingByte()) optimistic_yield((20 * m_bitCycles) / ESP.getCpuFreqMHz());
+        if (!rxPendingByte()) optimistic_yield((10 * m_bitCycles) / ESP.getCpuFreqMHz());
         avail = m_inPos - m_outPos;
         if (avail < 0) avail += m_buffSize;
     }
@@ -202,7 +204,7 @@ size_t SoftwareSerial::write(uint8_t b) {
     if (m_txEnableValid) {
         pinMode(m_txEnablePin, INPUT_PULLUP);
     }
-    unsigned long deadline = ESP.getCycleCount() + m_bitCycles;
+    long unsigned deadline = ESP.getCycleCount() + m_bitCycles;
     pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
     // Start bit;
     pinMode(m_txPin, m_invert ? INPUT_PULLUP : OUTPUT);
@@ -242,7 +244,7 @@ bool ICACHE_RAM_ATTR SoftwareSerial::rxPendingByte() {
     // stop bit interrupt can be missing if leading data bits are same level
     // also had no stop to start bit edge interrupt yet, so one byte may be pending
     // TODO: implement lock free queue
-    unsigned long cycle = ESP.getCycleCount();
+    long unsigned cycle = ESP.getCycleCount();
     if (m_rxCurBit < 0 || m_rxCurBit > 7 || cycle <= m_rxStartBitCycle + 9 * m_bitCycles) return false;
     // data bits
     while (m_rxCurBit < 7) {
@@ -271,7 +273,7 @@ bool ICACHE_RAM_ATTR SoftwareSerial::rxPendingByte() {
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
     bool level = digitalRead(m_rxPin);
     level ^= m_invert;
-    unsigned long cycle = ESP.getCycleCount();
+    long unsigned cycle = ESP.getCycleCount();
     do {
         // data bits
         if (m_rxCurBit >= -1 && m_rxCurBit < 7) {
@@ -311,5 +313,5 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
             break;
         }
     } while (cycle >= m_rxCurBitCycle);
-    m_rxCurBitCycle = cycle + m_bitCycles / 2; // [52,56] p.c.
+    m_rxCurBitCycle = cycle + 70 * m_bitCycles / 100; // 30; [52,56] p.c.
 }

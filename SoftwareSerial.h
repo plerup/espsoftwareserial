@@ -37,7 +37,7 @@ public:
     SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
     ~SoftwareSerial();
 
-    void begin(long speed);
+    void begin(long unsigned speed);
     long baudRate();
     // Transmit control pin
     void setTransmitEnablePin(int transmitEnablePin);
@@ -79,15 +79,15 @@ private:
     bool m_txValid, m_txEnableValid;
     bool m_invert;
     volatile bool m_overflow;
-    unsigned long m_bitCycles;
+    long unsigned m_bitCycles;
     bool m_intTxEnabled;
     volatile int m_inPos, m_outPos;
     int m_buffSize;
     uint8_t *m_buffer;
     volatile int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
     volatile uint8_t m_rxCurByte;
-    volatile unsigned long m_rxCurBitCycle;
-    volatile unsigned long m_rxStartBitCycle;
+    volatile long unsigned m_rxCurBitCycle;
+    volatile long unsigned m_rxStartBitCycle;
 
 };
 

@@ -4,12 +4,13 @@
 
 SoftwareSerial loopBack(D5, D6);
 unsigned long start;
-String bitRateTxt("Effective data rate: ");
+String effTxTxt("eff. tx: ");
+String effRxTxt("eff. rx: ");
 int txCount;
 int rxCount;
-unsigned char expect;
+unsigned char expected;
 int rxErrors;
-constexpr int ReportInterval = 10000;
+constexpr int ReportInterval = 20000;
 
 void setup()
 {
@@ -18,11 +19,11 @@ void setup()
 	WiFi.mode(WIFI_OFF);
 	WiFi.forceSleepBegin();
 	delay(1);
-	loopBack.begin(115200);
+	loopBack.begin(19200);
 	start = micros();
 	txCount = 0;
 	rxCount = 0;
-	expect = -1;
+	expected = -1;
 	rxErrors = 0;
 }
 
@@ -30,8 +31,6 @@ unsigned char c = 0;
 
 void loop()
 {
-	expect = c;
-	rxCount = txCount;
 	do {
 		loopBack.write(c);
 		c = ++c % 256;
@@ -40,25 +39,34 @@ void loop()
 	while (loopBack.available())
 	{
 		unsigned char r = loopBack.read();
-		if (r == expect) ++rxCount;
-		else Serial.println(String("tx: ") + static_cast<char>(expect) + " rx: " + static_cast<char>(r));
-		expect = ++expect % 256;
+		if (expected == -1) expected = r;
+		else
+		{
+			expected = ++expected % 256;
+		}
+		if (r != expected) {
+			++rxErrors;
+			expected = -1;
+		}
+		++rxCount;
+		if (rxCount >= ReportInterval) break;
 	}
-	rxErrors += txCount - rxCount;
 
 	if (txCount >= ReportInterval) {
-		delay(1);
+		Serial.println(String("rx: ") + rxCount);
 		const auto end = micros();
 		const unsigned long interval = end - start;
-		Serial.println(String("tx: ") + txCount + " rx: " + rxCount + " us: " + interval);
 		const long txCps = txCount * (1000000.0 / interval);
-		const long cps = rxCount * (1000000.0 / interval);
+		const long rxCps = rxCount * (1000000.0 / interval);
 		const long errorCps = rxErrors * (1000000.0 / interval);
-		Serial.println(bitRateTxt + 10 * cps + "bps, "
-			+ errorCps + "cps errors (" + 100.0 * errorCps / txCps + "%)");
+		Serial.println(effTxTxt + 10 * txCps + "bps, "
+			+ effRxTxt + 10 * rxCps + "bps, "
+			+ errorCps + "cps errors (" + 100.0 * rxErrors / rxCount + "%)");
 		start = end;
 		txCount = 0;
+		rxCount = 0;
 		rxErrors = 0;
 	}
+	delay(1);
 	wdt_reset();
 }
