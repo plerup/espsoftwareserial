@@ -194,7 +194,7 @@ int SoftwareSerial::available() {
     return avail;
 }
 
-size_t SoftwareSerial::write(uint8_t b) {
+size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
     if (!m_txValid) return 0;
 
     if (m_invert) b = ~b;
@@ -240,7 +240,7 @@ int SoftwareSerial::peek() {
     return m_buffer[m_outPos];
 }
 
-bool ICACHE_RAM_ATTR SoftwareSerial::rxPendingByte() {
+bool SoftwareSerial::rxPendingByte() {
     // stop bit interrupt can be missing if leading data bits are same level
     // also had no stop to start bit edge interrupt yet, so one byte may be pending
     // TODO: implement lock free queue
