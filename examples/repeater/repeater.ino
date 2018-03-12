@@ -7,7 +7,7 @@ String bitRateTxt("Effective data rate: ");
 int rxCount;
 int seqErrors;
 int expected;
-constexpr int ReportInterval = 10000;
+constexpr int ReportInterval = 5000;
 
 void setup()
 {
