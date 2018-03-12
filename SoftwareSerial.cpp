@@ -29,6 +29,8 @@ extern "C" {
 
 #include <SoftwareSerial.h>
 
+#define ALT_DIGITAL_WRITE 1
+
 #define MAX_PIN 15
 
 // As the Arduino attachInterrupt has no parameter, lists of objects
@@ -109,8 +111,12 @@ void SoftwareSerial::begin(long unsigned speed) {
         ObjList[m_rxPin] = this;
     }
     if (m_txValid && !m_oneWire) {
+#ifdef ALT_DIGITAL_WRITE
+        digitalWrite(m_txPin, LOW);
+        pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);#else
         pinMode(m_txPin, OUTPUT);
         digitalWrite(m_txPin, !m_invert);
+#endif
     }
 
     if (!m_rxEnabled) enableRx(true);
@@ -124,8 +130,13 @@ void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
     if (isValidGPIOpin(transmitEnablePin)) {
         m_txEnableValid = true;
         m_txEnablePin = transmitEnablePin;
+#ifdef ALT_DIGITAL_WRITE
+        digitalWrite(m_txEnablePin, LOW);
+        pinMode(m_txEnablePin, OUTPUT);
+#else
         pinMode(m_txEnablePin, OUTPUT);
         digitalWrite(m_txEnablePin, LOW);
+#endif
     }
     else {
         m_txEnableValid = false;
@@ -140,14 +151,26 @@ void SoftwareSerial::enableTx(bool on) {
     if (m_oneWire && m_txValid) {
         if (on) {
             enableRx(false);
+#ifdef ALT_DIGITAL_WRITE
+            digitalWrite(m_txPin, LOW);
+            pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+            digitalWrite(m_rxPin, LOW);
+            pinMode(m_rxPin, m_invert ? OUTPUT : INPUT_PULLUP);
+#else
             pinMode(m_txPin, OUTPUT);
             digitalWrite(m_txPin, !m_invert);
             pinMode(m_rxPin, OUTPUT);
             digitalWrite(m_rxPin, !m_invert);
+#endif
         }
         else {
+#ifdef ALT_DIGITAL_WRITE
+            digitalWrite(m_txPin, LOW);
+            pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+#else
             pinMode(m_txPin, OUTPUT);
             digitalWrite(m_txPin, !m_invert);
+#endif
             pinMode(m_rxPin, INPUT);
             enableRx(true);
         }
@@ -160,7 +183,7 @@ void SoftwareSerial::enableRx(bool on) {
         if (on) {
             m_rxCurBit = 8;
             attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_rxPin], CHANGE);
-        } 
+        }
         else
             detachInterrupt(digitalPinToInterrupt(m_rxPin));
         m_rxEnabled = on;
@@ -202,23 +225,44 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
         // Disable interrupts in order to get a clean transmit
         noInterrupts();
     if (m_txEnableValid) {
+#ifdef ALT_DIGITAL_WRITE
+        pinMode(m_txEnablePin, INPUT_PULLUP);
+#else
         digitalWrite(m_txEnablePin, HIGH);
+#endif
     }
     long unsigned deadline = ESP.getCycleCount() + m_bitCycles;
+#ifdef ALT_DIGITAL_WRITE
+    pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);#else
     digitalWrite(m_txPin, !m_invert);
+#endif
     // Start bit;
+#ifdef ALT_DIGITAL_WRITE
+    pinMode(m_txPin, m_invert ? INPUT_PULLUP : OUTPUT);
+#else
     digitalWrite(m_txPin, m_invert);
+#endif
     WAIT;
     for (int i = 0; i < 8; i++) {
+#ifdef ALT_DIGITAL_WRITE
+        pinMode(m_txPin, (b & 1) ? INPUT_PULLUP : OUTPUT);#else
         digitalWrite(m_txPin, (b & 1));
+#endif
         WAIT;
         b >>= 1;
     }
     // Stop bit
+#ifdef ALT_DIGITAL_WRITE
+    pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);#else
     digitalWrite(m_txPin, !m_invert);
+#endif
     WAIT;
     if (m_txEnableValid) {
+#ifdef ALT_DIGITAL_WRITE
+        pinMode(m_txEnablePin, OUTPUT);
+#else
         digitalWrite(m_txEnablePin, LOW);
+#endif
     }
     if (!m_intTxEnabled)
         interrupts();
@@ -283,11 +327,12 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
             if (cycle >= m_rxCurBitCycle) {
                 // edge from adjacent bit level
                 if (!level) m_rxCurByte |= 0x80;
-            } else
+            }
+            else
             {
                 if (level) m_rxCurByte |= 0x80;
             }
-            continue; 
+            continue;
         }
         // stop bit
         if (m_rxCurBit == 7) {
