@@ -1,6 +1,5 @@
 #include <ESP8266WiFi.h>
 #include <SoftwareSerial.h>
-#include <user_interface.h>
 
 SoftwareSerial loopBack(D5, D6);
 unsigned long start;
@@ -14,12 +13,11 @@ constexpr int ReportInterval = 20000;
 
 void setup()
 {
-	//system_update_cpu_freq(SYS_CPU_160MHZ);
 	Serial.begin(115200);
-	WiFi.mode(WIFI_OFF);
-	WiFi.forceSleepBegin();
-	delay(1);
-	loopBack.begin(19200);
+	//WiFi.mode(WIFI_OFF);
+	//WiFi.forceSleepBegin();
+	//delay(1);
+	loopBack.begin(38400);
 	start = micros();
 	txCount = 0;
 	rxCount = 0;
@@ -67,6 +65,4 @@ void loop()
 		rxCount = 0;
 		rxErrors = 0;
 	}
-	delay(1);
-	wdt_reset();
 }
