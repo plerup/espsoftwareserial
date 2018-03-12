@@ -113,7 +113,8 @@ void SoftwareSerial::begin(long unsigned speed) {
     if (m_txValid && !m_oneWire) {
 #ifdef ALT_DIGITAL_WRITE
         digitalWrite(m_txPin, LOW);
-        pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);#else
+        pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+#else
         pinMode(m_txPin, OUTPUT);
         digitalWrite(m_txPin, !m_invert);
 #endif
@@ -233,7 +234,8 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
     }
     long unsigned deadline = ESP.getCycleCount() + m_bitCycles;
 #ifdef ALT_DIGITAL_WRITE
-    pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);#else
+    pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+#else
     digitalWrite(m_txPin, !m_invert);
 #endif
     // Start bit;
@@ -245,7 +247,8 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
     WAIT;
     for (int i = 0; i < 8; i++) {
 #ifdef ALT_DIGITAL_WRITE
-        pinMode(m_txPin, (b & 1) ? INPUT_PULLUP : OUTPUT);#else
+        pinMode(m_txPin, (b & 1) ? INPUT_PULLUP : OUTPUT);
+#else
         digitalWrite(m_txPin, (b & 1));
 #endif
         WAIT;
@@ -253,7 +256,8 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
     }
     // Stop bit
 #ifdef ALT_DIGITAL_WRITE
-    pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);#else
+    pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+#else
     digitalWrite(m_txPin, !m_invert);
 #endif
     WAIT;
