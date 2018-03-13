@@ -357,7 +357,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
         if (m_rxCurBit == 8) {
             if (!level) {
                 m_rxCurBit = -1; // start bit must be falling edge
-                m_rxCurBitCycle = cycle + m_bitCycles - 9 * ESP.getCpuFreqMHz();
+                m_rxCurBitCycle = cycle + m_bitCycles - 10 * ESP.getCpuFreqMHz();
             }
             break;
         }
