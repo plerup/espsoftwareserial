@@ -87,8 +87,6 @@ private:
     volatile int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
     volatile uint8_t m_rxCurByte;
     volatile long unsigned m_rxCurBitCycle;
-    volatile long unsigned m_rxStartBitCycle;
-
 };
 
 // If only one tx or rx wanted then use this as parameter for the unused pin

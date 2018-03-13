@@ -7,7 +7,7 @@ String bitRateTxt("Effective data rate: ");
 int rxCount;
 int seqErrors;
 int expected;
-constexpr int ReportInterval = 5000;
+constexpr int ReportInterval = 10000;
 
 void setup()
 {
@@ -15,7 +15,7 @@ void setup()
 	//WiFi.mode(WIFI_OFF);
 	//WiFi.forceSleepBegin();
 	//delay(1);
-	repeater.begin(38400);
+	repeater.begin(56000);
 	start = micros();
 	rxCount = 0;
 	seqErrors = 0;

@@ -291,18 +291,20 @@ int SoftwareSerial::peek() {
 bool SoftwareSerial::rxPendingByte() {
     // stop bit interrupt can be missing if leading data bits are same level
     // also had no stop to start bit edge interrupt yet, so one byte may be pending
-    // TODO: implement lock free queue
     long unsigned cycle = ESP.getCycleCount();
-    if (m_rxCurBit < 0 || m_rxCurBit > 7 || cycle <= m_rxStartBitCycle + 9 * m_bitCycles) return false;
-    // data bits
-    while (m_rxCurBit < 7) {
-        ++m_rxCurBit;
-        m_rxCurByte >>= 1;
-        if (!m_invert) m_rxCurByte |= 0x80;
-        continue;
+    noInterrupts();
+    if (m_rxCurBit < 0 || m_rxCurBit > 7
+        || cycle <= (m_rxCurBitCycle + (8 - m_rxCurBit) * m_bitCycles)) {
+        interrupts();
+        return false;
     }
+
+    // data bits
+    m_rxCurByte >>= 7 - m_rxCurBit;
+    if (!m_invert) m_rxCurByte |= 0xff << (m_rxCurBit + 1);
+
     // stop bit
-    ++m_rxCurBit;
+    m_rxCurBit = 8;
     // Store the received value in the buffer unless we have an overflow
     int next = (m_inPos + 1) % m_buffSize;
     if (next != m_outPos) {
@@ -311,10 +313,10 @@ bool SoftwareSerial::rxPendingByte() {
     }
     else {
         m_overflow = true;
-        //interrupts();
+        interrupts();
         return false;
     }
-    //interrupts();
+    interrupts();
     return true;
 }
 
@@ -325,15 +327,19 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
     do {
         // data bits
         if (m_rxCurBit >= -1 && m_rxCurBit < 7) {
-            ++m_rxCurBit;
-            m_rxCurByte >>= 1;
-            m_rxCurBitCycle += m_bitCycles;
-            if (cycle >= m_rxCurBitCycle) {
-                // edge from adjacent bit level
-                if (!level) m_rxCurByte |= 0x80;
+            if (cycle > m_rxCurBitCycle) {
+                // preceding masked bits
+                int hiddenBits = (cycle - m_rxCurBitCycle) / m_bitCycles;
+                if (hiddenBits > 7 - m_rxCurBit) hiddenBits = 7 - m_rxCurBit;
+                m_rxCurByte >>= hiddenBits;
+                if (!level) m_rxCurByte |= 0xff << (8 - hiddenBits);
+                m_rxCurBit += hiddenBits;
+                m_rxCurBitCycle += hiddenBits * m_bitCycles;
             }
-            else
-            {
+            if (m_rxCurBit < 7 && cycle >= m_rxCurBitCycle) {
+                ++m_rxCurBit;
+                m_rxCurBitCycle += m_bitCycles;
+                m_rxCurByte >>= 1;
                 if (level) m_rxCurByte |= 0x80;
             }
             continue;
@@ -341,6 +347,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
         // stop bit
         if (m_rxCurBit == 7) {
             ++m_rxCurBit;
+            m_rxCurBitCycle += m_bitCycles;
             // Store the received value in the buffer unless we have an overflow
             int next = (m_inPos + 1) % m_buffSize;
             if (next != m_outPos) {
@@ -350,17 +357,15 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
             else {
                 m_overflow = true;
             }
-            m_rxCurBitCycle += m_bitCycles;
             continue;
         }
         // start bit
         if (m_rxCurBit == 8) {
             if (!level) {
                 m_rxCurBit = -1; // start bit must be falling edge
-                m_rxStartBitCycle = cycle;
+                m_rxCurBitCycle = cycle + m_bitCycles - 5 * ESP.getCpuFreqMHz();
             }
             break;
         }
     } while (cycle >= m_rxCurBitCycle);
-    m_rxCurBitCycle = cycle + 70 * m_bitCycles / 100; // 30; [52,56] p.c.
 }

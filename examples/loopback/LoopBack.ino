@@ -9,7 +9,7 @@ int txCount;
 int rxCount;
 unsigned char expected;
 int rxErrors;
-constexpr int ReportInterval = 20000;
+constexpr int ReportInterval = 10000;
 
 void setup()
 {
@@ -17,7 +17,7 @@ void setup()
 	//WiFi.mode(WIFI_OFF);
 	//WiFi.forceSleepBegin();
 	//delay(1);
-	loopBack.begin(38400);
+	loopBack.begin(56000);
 	start = micros();
 	txCount = 0;
 	rxCount = 0;
