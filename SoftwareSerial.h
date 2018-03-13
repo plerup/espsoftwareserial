@@ -1,7 +1,7 @@
 /*
 SoftwareSerial.h
 
-SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
+SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266/ESP32.
 Copyright (c) 2015-2016 Peter Lerup. All rights reserved.
 
 This library is free software; you can redistribute it and/or

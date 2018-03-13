@@ -1,6 +1,6 @@
 /*
 
-SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
+SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266/ESP32.
 Copyright (c) 2015-2016 Peter Lerup. All rights reserved.
 
 This library is free software; you can redistribute it and/or
@@ -20,12 +20,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include <Arduino.h>
-
-// The Arduino standard GPIO routines are not enough,
-// must use some from the Espressif SDK as well
-extern "C" {
-#include "gpio.h"
-}
 
 #include <SoftwareSerial.h>
 
