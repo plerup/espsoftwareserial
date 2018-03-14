@@ -285,10 +285,10 @@ int SoftwareSerial::peek() {
 bool SoftwareSerial::rxPendingByte() {
     // stop bit interrupt can be missing if leading data bits are same level
     // also had no stop to start bit edge interrupt yet, so one byte may be pending
-    long unsigned cycle = ESP.getCycleCount();
+    long unsigned funCycle = ESP.getCycleCount();
     noInterrupts();
     if (m_rxCurBit < 0 || m_rxCurBit > 7
-        || cycle <= (m_rxCurBitCycle + (8 - m_rxCurBit) * m_bitCycles)) {
+        || funCycle <= (m_rxCurBitCycle + (8 - m_rxCurBit) * m_bitCycles)) {
         interrupts();
         return false;
     }
@@ -317,20 +317,20 @@ bool SoftwareSerial::rxPendingByte() {
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
     bool level = digitalRead(m_rxPin);
     level ^= m_invert;
-    long unsigned cycle = ESP.getCycleCount();
+    long unsigned isrCycle = ESP.getCycleCount();
     do {
         // data bits
         if (m_rxCurBit >= -1 && m_rxCurBit < 7) {
-            if (cycle > m_rxCurBitCycle) {
+            if (isrCycle > m_rxCurBitCycle) {
                 // preceding masked bits
-                int hiddenBits = (cycle - m_rxCurBitCycle) / m_bitCycles;
+                int hiddenBits = (isrCycle - m_rxCurBitCycle) / m_bitCycles;
                 if (hiddenBits > 7 - m_rxCurBit) hiddenBits = 7 - m_rxCurBit;
                 m_rxCurByte >>= hiddenBits;
                 if (!level) m_rxCurByte |= 0xff << (8 - hiddenBits);
                 m_rxCurBit += hiddenBits;
                 m_rxCurBitCycle += hiddenBits * m_bitCycles;
             }
-            if (m_rxCurBit < 7 && cycle >= m_rxCurBitCycle) {
+            if (m_rxCurBit < 7 && isrCycle >= m_rxCurBitCycle) {
                 ++m_rxCurBit;
                 m_rxCurBitCycle += m_bitCycles;
                 m_rxCurByte >>= 1;
@@ -357,9 +357,9 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
         if (m_rxCurBit == 8) {
             if (!level) {
                 m_rxCurBit = -1; // start bit must be falling edge
-                m_rxCurBitCycle = cycle + m_bitCycles - 10 * ESP.getCpuFreqMHz();
+                m_rxCurBitCycle = isrCycle + m_bitCycles - 10 * ESP.getCpuFreqMHz();
             }
             break;
         }
-    } while (cycle >= m_rxCurBitCycle);
+    } while (isrCycle >= m_rxCurBitCycle);
 }
