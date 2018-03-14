@@ -321,7 +321,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
     do {
         // data bits
         if (m_rxCurBit >= -1 && m_rxCurBit < 7) {
-            if (isrCycle > m_rxCurBitCycle) {
+            if (isrCycle > m_rxCurBitCycle + m_bitCycles) {
                 // preceding masked bits
                 int hiddenBits = (isrCycle - m_rxCurBitCycle) / m_bitCycles;
                 if (hiddenBits > 7 - m_rxCurBit) hiddenBits = 7 - m_rxCurBit;
@@ -330,7 +330,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
                 m_rxCurBit += hiddenBits;
                 m_rxCurBitCycle += hiddenBits * m_bitCycles;
             }
-            if (m_rxCurBit < 7 && isrCycle >= m_rxCurBitCycle) {
+            if (m_rxCurBit < 7) {
                 ++m_rxCurBit;
                 m_rxCurBitCycle += m_bitCycles;
                 m_rxCurByte >>= 1;
@@ -357,7 +357,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
         if (m_rxCurBit == 8) {
             if (!level) {
                 m_rxCurBit = -1; // start bit must be falling edge
-                m_rxCurBitCycle = isrCycle + m_bitCycles - 10 * ESP.getCpuFreqMHz();
+                m_rxCurBitCycle = isrCycle + m_bitCycles - m_bitCycles / 3;
             }
         }
         break; // break by default
