@@ -100,7 +100,7 @@ void SoftwareSerial::begin(long unsigned speed) {
     if (m_buffer != NULL) {
         m_rxValid = true;
         m_inPos = m_outPos = 0;
-        pinMode(m_rxPin, INPUT);
+        pinMode(m_rxPin, INPUT_PULLUP);
         if (this != ObjList[m_rxPin]) delete ObjList[m_rxPin];
         ObjList[m_rxPin] = this;
     }
@@ -166,7 +166,7 @@ void SoftwareSerial::enableTx(bool on) {
             pinMode(m_txPin, OUTPUT);
             digitalWrite(m_txPin, !m_invert);
 #endif
-            pinMode(m_rxPin, INPUT);
+            pinMode(m_rxPin, INPUT_PULLUP);
             enableRx(true);
         }
         delay(1); // it's important to have a delay after switching
