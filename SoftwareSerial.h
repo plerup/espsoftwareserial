@@ -35,7 +35,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 class SoftwareSerial : public Stream {
 public:
   SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
-  ~SoftwareSerial();
+  virtual ~SoftwareSerial();
 
   void begin(long speed);
   long baudRate();
