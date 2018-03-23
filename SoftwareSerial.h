@@ -29,15 +29,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // This class is compatible with the corresponding AVR one,
 // the constructor however has an optional rx buffer size.
-// Speed up to 115200 can be used.
+// Baudrates up to 115200 can be used.
 
 
 class SoftwareSerial : public Stream {
 public:
     SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
-    ~SoftwareSerial();
+    virtual ~SoftwareSerial();
 
-    void begin(long unsigned speed);
+    void begin(long unsigned baud);
     long baudRate();
     // Transmit control pin
     void setTransmitEnablePin(int transmitEnablePin);
@@ -45,13 +45,13 @@ public:
     void enableIntTx(bool on);
 
     bool overflow();
-    int peek();
 
-    virtual size_t write(uint8_t byte);
-    virtual int read();
-    virtual int available();
-    virtual void flush();
-    operator bool() { return m_rxValid || m_txValid; }
+    int available() override;
+    int peek() override;
+    int read() override;
+    void flush() override;
+    size_t write(uint8_t byte) override;
+    operator bool() const { return m_rxValid || m_txValid; }
 
     // Disable or enable interrupts on the rx pin
     void enableRx(bool on);
@@ -91,6 +91,5 @@ private:
 
 // If only one tx or rx wanted then use this as parameter for the unused pin
 #define SW_SERIAL_UNUSED_PIN -1
-
 
 #endif

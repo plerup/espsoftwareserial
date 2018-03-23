@@ -92,10 +92,10 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
     return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= MAX_PIN);
 }
 
-void SoftwareSerial::begin(long unsigned speed) {
+void SoftwareSerial::begin(long unsigned baud) {
     // Use getCycleCount() loop to get as exact timing as possible
-    m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / speed;
-    // Enable interrupts during tx at any speed to allow full duplex
+    m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
+    // Enable interrupts during tx at any baud to allow full duplex
     m_intTxEnabled = true;
     if (m_buffer != NULL) {
         m_rxValid = true;
