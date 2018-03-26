@@ -26,6 +26,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <inttypes.h>
 #include <Stream.h>
 
+// If only one tx or rx wanted then use this as parameter for the unused pin
+constexpr int SW_SERIAL_UNUSED_PIN = -1;
 
 // This class is compatible with the corresponding AVR one,
 // the constructor however has an optional rx buffer size.
@@ -74,22 +76,23 @@ private:
 
     // Member variables
     bool m_oneWire;
-    int m_rxPin, m_txPin, m_txEnablePin;
-    bool m_rxValid, m_rxEnabled;
-    bool m_txValid, m_txEnableValid;
+    int m_rxPin = SW_SERIAL_UNUSED_PIN;
+    int m_txPin = SW_SERIAL_UNUSED_PIN;
+    int m_txEnablePin = SW_SERIAL_UNUSED_PIN;
+    bool m_rxValid = false;
+    bool m_rxEnabled = false;
+    bool m_txValid = false;
+    bool m_txEnableValid = false;
     bool m_invert;
-    volatile bool m_overflow;
+    volatile bool m_overflow = false;
     long unsigned m_bitCycles;
     bool m_intTxEnabled;
     volatile int m_inPos, m_outPos;
-    int m_buffSize;
-    uint8_t *m_buffer;
+    int m_buffSize = 0;
+    uint8_t *m_buffer = 0;
     volatile int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
     volatile uint8_t m_rxCurByte;
     volatile long unsigned m_rxCurBitCycle;
 };
-
-// If only one tx or rx wanted then use this as parameter for the unused pin
-#define SW_SERIAL_UNUSED_PIN -1
 
 #endif
