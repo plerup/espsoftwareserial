@@ -276,6 +276,8 @@ int SoftwareSerial::peek() {
 }
 
 bool SoftwareSerial::rxPendingByte() {
+	// low-cost check first, minimize impact in tight loops
+	if (m_rxCurBit < 0 || m_rxCurBit > 7) { return false; }
 	// stop bit interrupt can be missing if leading data bits are same level
 	// also had no stop to start bit edge interrupt yet, so one byte may be pending
 	long unsigned funCycle = ESP.getCycleCount();
@@ -353,4 +355,21 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
 		}
 		break; // break by default
 	} while (isrCycle >= m_rxCurBitCycle);
+}
+
+void SoftwareSerial::onReceive(std::function<void(int available)> handler) {
+	receiveHandler = handler;
+}
+
+void SoftwareSerial::perform_work() {
+	if (receiveHandler) {
+		if (!m_rxValid) { return; }
+		int avail = m_inPos - m_outPos;
+		if (avail < 0) { avail += m_buffSize; }
+		if (!avail && rxPendingByte()) {
+			avail = m_inPos - m_outPos;
+			if (avail < 0) { avail += m_buffSize; }
+		}
+		receiveHandler(avail);
+	}
 }

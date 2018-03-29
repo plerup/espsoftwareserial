@@ -68,6 +68,9 @@ public:
 	bool isListening() { return m_rxEnabled; }
 	bool stopListening() { enableRx(false); return true; }
 
+	void onReceive(std::function<void(int available)> handler);
+	void perform_work();
+
 	using Print::write;
 
 private:
@@ -93,6 +96,8 @@ private:
 	volatile int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
 	volatile uint8_t m_rxCurByte;
 	volatile long unsigned m_rxCurBitCycle;
+
+	std::function<void(int available)> receiveHandler = 0;
 };
 
 #endif
