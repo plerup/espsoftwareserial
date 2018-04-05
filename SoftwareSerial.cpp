@@ -110,7 +110,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 
 void SoftwareSerial::begin(long speed) {
   // Use getCycleCount() loop to get as exact timing as possible
-  m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;
+  m_bitTime = F_CPU/speed;
   // By default enable interrupt during tx only for low speed
   m_intTxEnabled = speed < 9600;
 
@@ -119,7 +119,7 @@ void SoftwareSerial::begin(long speed) {
 }
 
 long SoftwareSerial::baudRate() {
-  return ESP.getCpuFreqMHz()*1000000/m_bitTime;
+  return F_CPU/m_bitTime;
 }
 
 void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
