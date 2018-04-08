@@ -14,12 +14,17 @@ SoftwareSerial	KEYWORD1
 #######################################
 
 begin	KEYWORD2
-read	KEYWORD2
-write	KEYWORD2
-available	KEYWORD2
-flush	KEYWORD2
+baudRate	KEYWORD2
+setTransmitEnablePin	KEYWORD2
+enableIntTx	KEYWORD2
 overflow	KEYWORD2
 peek	KEYWORD2
+write	KEYWORD2
+read	KEYWORD2
+available	KEYWORD2
+flush	KEYWORD2
+enableRx	KEYWORD2
+enableTx	KEYWORD2
 listen	KEYWORD2
 end	KEYWORD2
 isListening	KEYWORD2
@@ -28,4 +33,3 @@ stopListening	KEYWORD2
 #######################################
 # Constants (LITERAL1)
 #######################################
-
