@@ -186,12 +186,10 @@ int SoftwareSerial::read() {
 }
 
 #define WAIT { long int c = deadline-ESP.getCycleCount(); \
-	while (c > 0) { \
-		if (m_intTxEnabled && c > 2 * m_bitCycles / 3) optimistic_yield(2 * m_bitCycles / 3 / ESP.getCpuFreqMHz()); \
-		c = deadline-ESP.getCycleCount(); } \
+while (c > 0) { \
+	if (m_intTxEnabled && c > 2 * m_bitCycles / 3) optimistic_yield(2 * m_bitCycles / 3 / ESP.getCpuFreqMHz()); \
+	c = deadline-ESP.getCycleCount(); } \
 	deadline += m_bitCycles; }
-
-
 
 int SoftwareSerial::available() {
 	if (!m_rxValid) { return 0; }
