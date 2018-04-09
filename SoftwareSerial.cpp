@@ -187,7 +187,7 @@ int SoftwareSerial::read() {
 
 #define WAIT { long int c = deadline-ESP.getCycleCount(); \
 while (c > 0) { \
-	if (m_intTxEnabled && c > 2 * m_bitCycles / 3) optimistic_yield(2 * m_bitCycles / 3 / (F_CPU / 1000000)); \
+	if (m_intTxEnabled && c > (m_bitCycles * 2) / 3) optimistic_yield((m_bitCycles / (F_CPU / 1000000) * 2) / 3); \
 	c = deadline-ESP.getCycleCount(); } \
 	deadline += m_bitCycles; }
 
@@ -196,7 +196,7 @@ int SoftwareSerial::available() {
 	int avail = m_inPos - m_outPos;
 	if (avail < 0) { avail += m_buffSize; }
 	if (!avail) {
-		if (!rxPendingByte()) { optimistic_yield((20 * m_bitCycles) / (F_CPU / 1000000)); }
+		if (!rxPendingByte()) { optimistic_yield(m_bitCycles / (F_CPU / 1000000) * 20); }
 		avail = m_inPos - m_outPos;
 		if (avail < 0) { avail += m_buffSize; }
 	}
