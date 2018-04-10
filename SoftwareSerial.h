@@ -36,7 +36,7 @@ constexpr int SW_SERIAL_UNUSED_PIN = -1;
 
 class SoftwareSerial : public Stream {
 public:
-	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
+	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int bufSize = 64, unsigned int isrBufSize = 160);
 	virtual ~SoftwareSerial();
 
 	void begin(long unsigned baud);
@@ -75,7 +75,7 @@ public:
 
 private:
 	bool isValidGPIOpin(int pin);
-	bool rxPendingByte();
+	void rxBits();
 
 	// Member variables
 	bool m_oneWire;
@@ -91,11 +91,17 @@ private:
 	long unsigned m_bitCycles;
 	bool m_intTxEnabled;
 	volatile int m_inPos, m_outPos;
-	int m_buffSize = 0;
+	int m_bufSize = 0;
 	uint8_t *m_buffer = 0;
+	// the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
+	// 1 = positive including 0, 0 = negative.
+	volatile int m_isrInPos, m_isrOutPos;
+	int m_isrBufSize = 0;
+	long *m_isrBuffer = 0;
+	volatile long unsigned m_isrCycle = 0;
+	volatile bool m_isrOverflow = false;
 	volatile int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
 	volatile uint8_t m_rxCurByte;
-	volatile long unsigned m_rxCurBitCycle;
 
 	std::function<void(int available)> receiveHandler = 0;
 };
