@@ -62,7 +62,7 @@ static void(*ISRList[MAX_PIN + 1])() = {
 	sws_isr_15
 };
 
-SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, unsigned int bufSize, unsigned int isrBufSize) {
+SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, int bufSize, int isrBufSize) {
 	m_oneWire = (receivePin == transmitPin);
 	m_invert = inverse_logic;
 	if (isValidGPIOpin(receivePin)) {
@@ -90,7 +90,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 	return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= MAX_PIN);
 }
 
-void SoftwareSerial::begin(long unsigned baud) {
+void SoftwareSerial::begin(long baud) {
 	// Use getCycleCount() loop to get as exact timing as possible
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	// Enable interrupts during tx at any baud to allow full duplex
@@ -166,7 +166,6 @@ void SoftwareSerial::enableTx(bool on) {
 			pinMode(m_rxPin, INPUT_PULLUP);
 			enableRx(true);
 		}
-		delay(1); // it's important to have a delay after switching
 	}
 }
 
@@ -182,7 +181,11 @@ void SoftwareSerial::enableRx(bool on) {
 }
 
 int SoftwareSerial::read() {
-	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { return -1; }
+	if (!m_rxValid) { return -1; }
+	if (m_inPos == m_outPos) {
+		rxBits();
+		if (m_inPos == m_outPos)  { return -1; }
+	}
 	uint8_t ch = m_buffer[m_outPos];
 	m_outPos = (m_outPos + 1) % m_bufSize;
 	return ch;
@@ -198,18 +201,17 @@ int SoftwareSerial::available() {
 	if (!m_rxValid) { return 0; }
 	rxBits();
 	int avail = m_inPos - m_outPos;
-	if (avail < 0) { avail += m_bufSize; }
 	if (!avail) {
 		optimistic_yield(m_bitCycles / ESP.getCpuFreqMHz() * 20);
 		rxBits();
 		avail = m_inPos - m_outPos;
-		if (avail < 0) { avail += m_bufSize; }
 	}
+	if (avail < 0) { avail += m_bufSize; }
 	return avail;
 }
 
 size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
-	if (m_rxValid) rxBits();
+	if (m_rxValid) { rxBits(); }
 	if (!m_txValid) { return 0; }
 
 	if (m_invert) { b = ~b; }
@@ -266,6 +268,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
 
 void SoftwareSerial::flush() {
 	m_inPos = m_outPos = 0;
+	m_isrInPos = m_isrOutPos = 0;
 }
 
 bool SoftwareSerial::overflow() {
@@ -279,7 +282,7 @@ int SoftwareSerial::peek() {
 	return m_buffer[m_outPos];
 }
 
-void SoftwareSerial::rxBits() {
+void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 	int avail = m_isrInPos - m_isrOutPos;
 	if (avail < 0) { avail += m_isrBufSize; }
 	if (m_isrOverflow) {
@@ -290,12 +293,12 @@ void SoftwareSerial::rxBits() {
 		long cycles = m_isrBuffer[m_isrOutPos];
 		m_isrOutPos = (m_isrOutPos + 1) % m_isrBufSize;
 		bool level = cycles >= 0;
-		if (!level) cycles = -cycles;
+		if (!level) { cycles = -cycles; }
 		cycles -= m_bitCycles / 2;
 		do {
 			// data bits
 			if (m_rxCurBit >= -1 && m_rxCurBit < 7) {
-				if (cycles > m_bitCycles) {
+				if (cycles >= m_bitCycles) {
 					// preceding masked bits
 					int hiddenBits = cycles / m_bitCycles;
 					if (hiddenBits > 7 - m_rxCurBit) { hiddenBits = 7 - m_rxCurBit; }
@@ -312,53 +315,48 @@ void SoftwareSerial::rxBits() {
 				}
 				continue;
 			}
-			// stop bit
 			if (m_rxCurBit == 7) {
-				++m_rxCurBit;
+				m_rxCurBit = 8;
 				cycles -= m_bitCycles;
 				// Store the received value in the buffer unless we have an overflow
 				int next = (m_inPos + 1) % m_bufSize;
 				if (next != m_outPos) {
 					m_buffer[m_inPos] = m_rxCurByte;
 					m_inPos = next;
-				}
-				else {
+				} else {
 					m_overflow = true;
 				}
 				continue;
 			}
-			// start bit
 			if (m_rxCurBit == 8) {
+				// start bit level is low
 				if (!level) {
-					m_rxCurBit = -1; // start bit must be falling edge
+					m_rxCurBit = -1;
 				}
 			}
-			break; // break by default
+			break;
 		} while (cycles >= 0);
 	}
 
-	// stop bit can be missing if leading data bits are at same level
-	// and there also was no next start bit edge yet, so one byte may be pending.
+	// stop bit can go undetected if leading data bits are at same level
+	// and there was also no next start bit yet, so one byte may be pending.
 	// low-cost check first
-	if (m_rxCurBit < 0 || m_rxCurBit > 7) { return; }
-	constexpr long unsigned mask = static_cast< long unsigned >(~0L) >> 1;
-	long cycles = (ESP.getCycleCount() - m_isrCycle) & mask;
-	if (cycles <= ((8 - m_rxCurBit) * m_bitCycles)) { return; }
-
-	// data bits
-	m_rxCurByte >>= 7 - m_rxCurBit;
-	if (!m_invert) { m_rxCurByte |= 0xff << (m_rxCurBit + 1); }
-
-	// stop bit
-	m_rxCurBit = 8;
-	// Store the received value in the buffer unless we have an overflow
-	int next = (m_inPos + 1) % m_bufSize;
-	if (next != m_outPos) {
-		m_buffer[m_inPos] = m_rxCurByte;
-		m_inPos = next;
-	}
-	else {
-		m_overflow = true;
+	if (m_rxCurBit < 8 && m_isrInPos == m_isrOutPos && m_rxCurBit >= 0) {
+		constexpr long unsigned mask = static_cast<long unsigned>(~0L) >> 1;
+		long unsigned curCycle = ESP.getCycleCount();
+		long delta = (curCycle - m_isrCycle) & mask;
+		if (delta >= (10 - m_rxCurBit) * m_bitCycles) {
+			// Store stop bit cycle in the buffer unless we have an overflow
+			int next = (m_isrInPos + 1) % m_isrBufSize;
+			if (next != m_isrOutPos) {
+				m_isrBuffer[m_isrInPos] = delta;
+				m_isrInPos = next;
+				++avail;
+			} else {
+				m_isrOverflow = true;
+			}
+			m_isrCycle = curCycle;
+		}
 	}
 }
 
@@ -370,11 +368,10 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
 	int next = (m_isrInPos + 1) % m_isrBufSize;
 	if (next != m_isrOutPos) {
 		constexpr long unsigned mask = static_cast< long unsigned >(~0L) >> 1;
-		long unsigned delta = (curCycle - m_isrCycle) & mask;
-		m_isrBuffer[m_isrInPos] = level ? static_cast< long >(delta) : -static_cast< long >(delta);
+		long delta = (curCycle - m_isrCycle) & mask;
+		m_isrBuffer[m_isrInPos] = level ? delta : -delta;
 		m_isrInPos = next;
-	}
-	else {
+	} else {
 		m_isrOverflow = true;
 	}
 
@@ -391,6 +388,6 @@ void SoftwareSerial::perform_work() {
 		rxBits();
 		int avail = m_inPos - m_outPos;
 		if (avail < 0) { avail += m_bufSize; }
-		if (avail) receiveHandler(avail);
+		if (avail) { receiveHandler(avail); }
 	}
 }

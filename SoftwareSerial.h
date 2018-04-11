@@ -36,10 +36,10 @@ constexpr int SW_SERIAL_UNUSED_PIN = -1;
 
 class SoftwareSerial : public Stream {
 public:
-	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int bufSize = 64, unsigned int isrBufSize = 160);
+	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, int bufSize = 64, int isrBufSize = 704);
 	virtual ~SoftwareSerial();
 
-	void begin(long unsigned baud);
+	void begin(long baud);
 	long baudRate();
 	// Transmit control pin
 	void setTransmitEnablePin(int transmitEnablePin);
@@ -88,7 +88,7 @@ private:
 	bool m_txEnableValid = false;
 	bool m_invert;
 	volatile bool m_overflow = false;
-	long unsigned m_bitCycles;
+	long m_bitCycles;
 	bool m_intTxEnabled;
 	volatile int m_inPos, m_outPos;
 	int m_bufSize = 0;

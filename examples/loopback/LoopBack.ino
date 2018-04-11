@@ -17,8 +17,7 @@ unsigned char expected;
 int rxErrors;
 constexpr int ReportInterval = 10000;
 
-void setup()
-{
+void setup() {
 	Serial.begin(115200);
 	//WiFi.mode(WIFI_OFF);
 	//WiFi.forceSleepBegin();
@@ -33,19 +32,21 @@ void setup()
 
 unsigned char c = 0;
 
-void loop()
-{
+constexpr int BLOCKSIZE = 16; // use fractions of 256
+
+void loop() {
 	do {
 		loopBack.write(c);
 		c = ++c % 256;
 		++txCount;
-	} while (c % 16); // use fractions of 256
-	while (loopBack.available())
-	{
+	} while (c % BLOCKSIZE);
+	auto avail = loopBack.available();
+	if (loopBack.overflow()) { Serial.println("overflow"); }
+	while (avail--) {
 		unsigned char r = loopBack.read();
-		if (expected == -1) expected = r;
-		else
-		{
+		if (r == -1) { Serial.println("read() == -1"); }
+		if (expected == -1) { expected = r; }
+		else {
 			expected = ++expected % 256;
 		}
 		if (r != expected) {
@@ -53,19 +54,19 @@ void loop()
 			expected = -1;
 		}
 		++rxCount;
-		if (rxCount >= ReportInterval) break;
+		if (rxCount >= ReportInterval) { break; }
 	}
 
 	if (txCount >= ReportInterval) {
-		Serial.println(String("rx: ") + rxCount);
+		Serial.println(String("tx/rx: ") + txCount + "/" + rxCount);
 		const auto end = micros();
 		const unsigned long interval = end - start;
 		const long txCps = txCount * (1000000.0 / interval);
 		const long rxCps = rxCount * (1000000.0 / interval);
 		const long errorCps = rxErrors * (1000000.0 / interval);
 		Serial.println(effTxTxt + 10 * txCps + "bps, "
-			+ effRxTxt + 10 * rxCps + "bps, "
-			+ errorCps + "cps errors (" + 100.0 * rxErrors / rxCount + "%)");
+					   + effRxTxt + 10 * rxCps + "bps, "
+					   + errorCps + "cps errors (" + 100.0 * rxErrors / rxCount + "%)");
 		start = end;
 		txCount = 0;
 		rxCount = 0;
