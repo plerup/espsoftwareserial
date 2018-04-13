@@ -191,9 +191,9 @@ int SoftwareSerial::read() {
 	return ch;
 }
 
-#define WAIT { long int c = deadline-ESP.getCycleCount(); \
-while (c > 0) { \
-	if (m_intTxEnabled && c > (m_bitCycles * 3) / 4) optimistic_yield((m_bitCycles / ESP.getCpuFreqMHz() * 3) / 4); \
+#define WAIT { long unsigned c = deadline-ESP.getCycleCount(); \
+while (c <= m_bitCycles) { \
+	if (m_intTxEnabled && c > (m_bitCycles * 4) / 5) optimistic_yield((m_bitCycles / ESP.getCpuFreqMHz() * 4) / 5); \
 	c = deadline-ESP.getCycleCount(); } \
 	deadline += m_bitCycles; }
 
