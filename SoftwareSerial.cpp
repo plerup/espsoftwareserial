@@ -191,12 +191,6 @@ int SoftwareSerial::read() {
 	return ch;
 }
 
-#define WAIT { long unsigned c = deadline-ESP.getCycleCount(); \
-while (c <= m_bitCycles) { \
-	if (m_intTxEnabled && c > (m_bitCycles * 4) / 5) optimistic_yield((m_bitCycles / ESP.getCpuFreqMHz() * 4) / 5); \
-	c = deadline-ESP.getCycleCount(); } \
-	deadline += m_bitCycles; }
-
 int SoftwareSerial::available() {
 	if (!m_rxValid) { return 0; }
 	rxBits();
@@ -208,6 +202,12 @@ int SoftwareSerial::available() {
 	}
 	if (avail < 0) { avail += m_bufSize; }
 	return avail;
+}
+
+inline void SoftwareSerial::waitBitCycles(long unsigned deadline) {
+	if (m_intTxEnabled) { optimistic_yield((m_bitCycles / ESP.getCpuFreqMHz() * 4) / 5); }
+	while (deadline - ESP.getCycleCount() <= m_bitCycles) {
+	}
 }
 
 size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
@@ -237,23 +237,25 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
 #else
 	digitalWrite(m_txPin, m_invert);
 #endif
-	WAIT;
+	waitBitCycles(deadline);
 	for (int i = 0; i < 8; i++) {
+		deadline += m_bitCycles;
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txPin, (b & 1) ? INPUT_PULLUP : OUTPUT);
 #else
 		digitalWrite(m_txPin, (b & 1));
 #endif
-		WAIT;
 		b >>= 1;
+		waitBitCycles(deadline);
 	}
+	deadline += m_bitCycles;
 	// Stop bit
 #ifdef ALT_DIGITAL_WRITE
 	pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
 #else
 	digitalWrite(m_txPin, !m_invert);
 #endif
-	WAIT;
+	waitBitCycles(deadline);
 	if (m_txEnableValid) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txEnablePin, OUTPUT);

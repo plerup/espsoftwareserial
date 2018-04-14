@@ -74,6 +74,7 @@ public:
 	using Print::write;
 
 private:
+	void waitBitCycles(long unsigned deadline);
 	bool isValidGPIOpin(int pin);
 	void rxBits();
 
