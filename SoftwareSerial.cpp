@@ -80,10 +80,12 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
 
 SoftwareSerial::~SoftwareSerial() {
 	enableRx(false);
-	if (m_rxValid)
-	{ ObjList[m_rxPin] = 0; }
-	if (m_buffer)
-	{ free(m_buffer); }
+	if (m_rxValid) {
+		ObjList[m_rxPin] = 0;
+	}
+	if (m_buffer) {
+		free(m_buffer);
+	}
 }
 
 bool SoftwareSerial::isValidGPIOpin(int pin) {
@@ -174,8 +176,9 @@ void SoftwareSerial::enableRx(bool on) {
 		if (on) {
 			m_rxCurBit = 8;
 			attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_rxPin], CHANGE);
-		} else
-		{ detachInterrupt(digitalPinToInterrupt(m_rxPin)); }
+		} else {
+			detachInterrupt(digitalPinToInterrupt(m_rxPin));
+		}
 		m_rxEnabled = on;
 	}
 }
@@ -184,7 +187,7 @@ int SoftwareSerial::read() {
 	if (!m_rxValid) { return -1; }
 	if (m_inPos == m_outPos) {
 		rxBits();
-		if (m_inPos == m_outPos)  { return -1; }
+		if (m_inPos == m_outPos) { return -1; }
 	}
 	uint8_t ch = m_buffer[m_outPos];
 	m_outPos = (m_outPos + 1) % m_bufSize;
@@ -217,7 +220,9 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
 	if (m_invert) { b = ~b; }
 	if (!m_intTxEnabled)
 		// Disable interrupts in order to get a clean transmit
-	{ noInterrupts(); }
+	{
+		noInterrupts();
+	}
 	if (m_txEnableValid) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txEnablePin, INPUT_PULLUP);
@@ -263,8 +268,9 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
 		digitalWrite(m_txEnablePin, LOW);
 #endif
 	}
-	if (!m_intTxEnabled)
-	{ interrupts(); }
+	if (!m_intTxEnabled) {
+		interrupts();
+	}
 	return 1;
 }
 
@@ -344,9 +350,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 	// and there was also no next start bit yet, so one byte may be pending.
 	// low-cost check first
 	if (m_rxCurBit < 8 && m_isrInPos == m_isrOutPos && m_rxCurBit >= 0) {
-		constexpr long unsigned mask = static_cast<long unsigned>(~0L) >> 1;
 		long unsigned curCycle = ESP.getCycleCount();
-		long delta = (curCycle - m_isrCycle) & mask;
+		long unsigned delta = curCycle - m_isrCycle;
 		if (delta >= (10 - m_rxCurBit) * m_bitCycles) {
 			// Store stop bit cycle in the buffer unless we have an overflow
 			int next = (m_isrInPos + 1) % m_isrBufSize;
@@ -369,8 +374,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
 	// Store level & cycle in the buffer unless we have an overflow
 	int next = (m_isrInPos + 1) % m_isrBufSize;
 	if (next != m_isrOutPos) {
-		constexpr long unsigned mask = static_cast< long unsigned >(~0L) >> 1;
-		long delta = (curCycle - m_isrCycle) & mask;
+		long unsigned delta = curCycle - m_isrCycle;
 		m_isrBuffer[m_isrInPos] = level ? delta : -delta;
 		m_isrInPos = next;
 	} else {
