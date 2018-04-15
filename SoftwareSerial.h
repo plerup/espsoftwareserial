@@ -53,6 +53,7 @@ public:
 	int read() override;
 	void flush() override;
 	size_t write(uint8_t byte) override;
+	size_t write(const uint8_t *buffer, size_t size) override;
 	operator bool() const { return m_rxValid || m_txValid; }
 
 	// Disable or enable interrupts on the rx pin

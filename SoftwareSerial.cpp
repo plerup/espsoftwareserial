@@ -208,16 +208,19 @@ int SoftwareSerial::available() {
 }
 
 inline void SoftwareSerial::waitBitCycles(long unsigned deadline) {
-	if (m_intTxEnabled) { optimistic_yield((m_bitCycles / ESP.getCpuFreqMHz() * 4) / 5); }
+	if (m_intTxEnabled) { optimistic_yield(13 * m_bitCycles / ESP.getCpuFreqMHz() / 14); }
 	while (deadline - ESP.getCycleCount() <= m_bitCycles) {
 	}
 }
 
 size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
+	return write(&b, 1);
+}
+
+size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size) {
 	if (m_rxValid) { rxBits(); }
 	if (!m_txValid) { return 0; }
 
-	if (m_invert) { b = ~b; }
 	if (!m_intTxEnabled)
 		// Disable interrupts in order to get a clean transmit
 	{
@@ -230,37 +233,43 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
 		digitalWrite(m_txEnablePin, HIGH);
 #endif
 	}
-	long unsigned deadline = ESP.getCycleCount() + m_bitCycles;
+	// Stop bit level
 #ifdef ALT_DIGITAL_WRITE
 	pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
 #else
 	digitalWrite(m_txPin, !m_invert);
 #endif
-	// Start bit;
-#ifdef ALT_DIGITAL_WRITE
-	pinMode(m_txPin, m_invert ? INPUT_PULLUP : OUTPUT);
-#else
-	digitalWrite(m_txPin, m_invert);
-#endif
-	waitBitCycles(deadline);
-	for (int i = 0; i < 8; i++) {
+	long unsigned deadline = ESP.getCycleCount();
+	for (int cnt = 0; cnt < size; ++cnt, ++buffer) {
+		if (cnt) { waitBitCycles(deadline); } // intermediate stop bits
+		// Start bit;
 		deadline += m_bitCycles;
 #ifdef ALT_DIGITAL_WRITE
-		pinMode(m_txPin, (b & 1) ? INPUT_PULLUP : OUTPUT);
+		pinMode(m_txPin, m_invert ? INPUT_PULLUP : OUTPUT);
 #else
-		digitalWrite(m_txPin, (b & 1));
+		digitalWrite(m_txPin, m_invert);
 #endif
-		b >>= 1;
 		waitBitCycles(deadline);
-	}
-	deadline += m_bitCycles;
-	// Stop bit
+		uint8_t b = m_invert ? ~*buffer : *buffer;
+		for (int i = 0; i < 8; i++) {
+			deadline += m_bitCycles;
 #ifdef ALT_DIGITAL_WRITE
-	pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+			pinMode(m_txPin, (b & 1) ? INPUT_PULLUP : OUTPUT);
 #else
-	digitalWrite(m_txPin, !m_invert);
+			digitalWrite(m_txPin, (b & 1));
 #endif
-	waitBitCycles(deadline);
+			b >>= 1;
+			waitBitCycles(deadline);
+		}
+		deadline += m_bitCycles;
+		// Stop bit
+#ifdef ALT_DIGITAL_WRITE
+		pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+#else
+		digitalWrite(m_txPin, !m_invert);
+#endif
+	}
+	waitBitCycles(deadline); // final stop bit
 	if (m_txEnableValid) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txEnablePin, OUTPUT);
@@ -271,7 +280,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
 	if (!m_intTxEnabled) {
 		interrupts();
 	}
-	return 1;
+	return size;
 }
 
 void SoftwareSerial::flush() {
