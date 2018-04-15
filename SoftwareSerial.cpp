@@ -208,7 +208,7 @@ int SoftwareSerial::available() {
 }
 
 inline void SoftwareSerial::waitBitCycles(long unsigned deadline) {
-	if (m_intTxEnabled) { optimistic_yield(13 * m_bitCycles / ESP.getCpuFreqMHz() / 14); }
+	if (m_intTxEnabled) { optimistic_yield(12 * m_bitCycles / ESP.getCpuFreqMHz() / 13); }
 	while (deadline - ESP.getCycleCount() <= m_bitCycles) {
 	}
 }
