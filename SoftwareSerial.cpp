@@ -208,8 +208,11 @@ int SoftwareSerial::available() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::waitBitCycles(long unsigned deadline) {
-	if (m_intTxEnabled) { optimistic_yield(3 * m_bitCycles / ESP.getCpuFreqMHz() / 4); }
-	while (deadline - ESP.getCycleCount() <= m_bitCycles) {
+	long unsigned bit_us = m_bitCycles / ESP.getCpuFreqMHz();
+	if (m_intTxEnabled) { optimistic_yield(bit_us); }
+	unsigned rem_us = (deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
+	if (rem_us <= bit_us) {
+		delayMicroseconds(rem_us);
 	}
 }
 
