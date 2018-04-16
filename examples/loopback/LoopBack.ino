@@ -7,7 +7,9 @@
 
 #include <SoftwareSerial.h>
 
-SoftwareSerial loopBack(D5, D6);
+constexpr int BLOCKSIZE = 16; // use fractions of 256
+
+SoftwareSerial loopBack(D5, D6, false, BLOCKSIZE + 2);
 unsigned long start;
 String effTxTxt("eff. tx: ");
 String effRxTxt("eff. rx: ");
@@ -22,7 +24,7 @@ void setup() {
 	//WiFi.mode(WIFI_OFF);
 	//WiFi.forceSleepBegin();
 	//delay(1);
-	loopBack.begin(56000);
+	loopBack.begin(19200);
 	start = micros();
 	txCount = 0;
 	rxCount = 0;
@@ -32,17 +34,14 @@ void setup() {
 
 unsigned char c = 0;
 
-constexpr int BLOCKSIZE = 16; // use fractions of 256
-
 void loop() {
 	do {
 		loopBack.write(c);
 		c = ++c % 256;
 		++txCount;
 	} while (c % BLOCKSIZE);
-	auto avail = loopBack.available();
 	if (loopBack.overflow()) { Serial.println("overflow"); }
-	while (avail--) {
+	while (loopBack.available()) {
 		unsigned char r = loopBack.read();
 		if (r == -1) { Serial.println("read() == -1"); }
 		if (expected == -1) { expected = r; }
@@ -54,7 +53,6 @@ void loop() {
 			expected = -1;
 		}
 		++rxCount;
-		if (rxCount >= ReportInterval) { break; }
 	}
 
 	if (txCount >= ReportInterval) {

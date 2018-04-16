@@ -69,7 +69,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
 		m_rxPin = receivePin;
 		m_bufSize = bufSize;
 		m_buffer = (uint8_t*)malloc(m_bufSize);
-		m_isrBufSize = isrBufSize;
+		m_isrBufSize = isrBufSize ? isrBufSize : 10 * bufSize;
 		m_isrBuffer = (long*)malloc(m_isrBufSize * sizeof(long));
 	}
 	if (isValidGPIOpin(transmitPin) || (!m_oneWire && (transmitPin == 16))) {
@@ -207,8 +207,8 @@ int SoftwareSerial::available() {
 	return avail;
 }
 
-inline void SoftwareSerial::waitBitCycles(long unsigned deadline) {
-	if (m_intTxEnabled) { optimistic_yield(12 * m_bitCycles / ESP.getCpuFreqMHz() / 13); }
+void ICACHE_RAM_ATTR SoftwareSerial::waitBitCycles(long unsigned deadline) {
+	if (m_intTxEnabled) { optimistic_yield(3 * m_bitCycles / ESP.getCpuFreqMHz() / 4); }
 	while (deadline - ESP.getCycleCount() <= m_bitCycles) {
 	}
 }
@@ -361,11 +361,12 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 	if (m_rxCurBit < 8 && m_isrInPos == m_isrOutPos && m_rxCurBit >= 0) {
 		long unsigned curCycle = ESP.getCycleCount();
 		long unsigned delta = curCycle - m_isrCycle;
-		if (delta >= (10 - m_rxCurBit) * m_bitCycles) {
+		long unsigned expected = (10 - m_rxCurBit) * m_bitCycles;
+		if (delta >= expected) {
 			// Store stop bit cycle in the buffer unless we have an overflow
 			int next = (m_isrInPos + 1) % m_isrBufSize;
 			if (next != m_isrOutPos) {
-				m_isrBuffer[m_isrInPos] = delta;
+				m_isrBuffer[m_isrInPos] = expected;
 				m_isrInPos = next;
 				++avail;
 			} else {
