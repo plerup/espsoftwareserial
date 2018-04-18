@@ -70,7 +70,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
 		m_bufSize = bufSize;
 		m_buffer = (uint8_t*)malloc(m_bufSize);
 		m_isrBufSize = isrBufSize ? isrBufSize : 10 * bufSize;
-		m_isrBuffer = (long*)malloc(m_isrBufSize * sizeof(long));
+		m_isrBuffer = (long unsigned*)malloc(m_isrBufSize * sizeof(long));
 	}
 	if (isValidGPIOpin(transmitPin) || (!m_oneWire && (transmitPin == 16))) {
 		m_txValid = true;
@@ -208,11 +208,10 @@ int SoftwareSerial::available() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::waitBitCycles(long unsigned deadline) {
-	long unsigned bit_us = m_bitCycles / ESP.getCpuFreqMHz();
-	if (m_intTxEnabled) { optimistic_yield(bit_us); }
-	unsigned rem_us = (deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
-	if (rem_us <= bit_us) {
-		delayMicroseconds(rem_us);
+	if (m_intTxEnabled) { optimistic_yield(12 * m_bitCycles / ESP.getCpuFreqMHz() / 13); }
+	unsigned remCycles = deadline - ESP.getCycleCount();
+	if (remCycles <= m_bitCycles) {
+		delayMicroseconds(remCycles / ESP.getCpuFreqMHz());
 	}
 }
 
@@ -309,13 +308,36 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 		m_overflow = true;
 		m_isrOverflow = false;
 	}
+
+	// stop bit can go undetected if leading data bits are at same level
+	// and there was also no next start bit yet, so one byte may be pending.
+	// low-cost check first
+	if (avail == 0 && m_rxCurBit < 8 && m_isrInPos == m_isrOutPos && m_rxCurBit >= 0) {
+		long unsigned curCycle = ESP.getCycleCount();
+		long unsigned delta = curCycle - m_lastCycle;
+		long unsigned expectedDelta = (11 - m_rxCurBit) * m_bitCycles;
+		if (delta > expectedDelta) {
+			// Store inverted stop bit and cycle in the buffer unless we have an overflow
+			// cycle's LSB is repurposed for the level bit
+			int next = (m_isrInPos + 1) % m_isrBufSize;
+			if (next != m_isrOutPos) {
+				long unsigned expectedCycle = m_lastCycle + expectedDelta;
+				m_isrBuffer[m_isrInPos] = (expectedCycle | 1) ^ m_invert;
+				m_isrInPos = next;
+				++avail;
+			} else {
+				m_isrOverflow = true;
+			}
+		}
+	}
+
 	while (avail--) {
-		long ts = m_isrBuffer[m_isrOutPos];
+		// error intruduced by inverted level in LSB is neglegible
+		long unsigned isrCycle = m_isrBuffer[m_isrOutPos];
+		bool level = (isrCycle & 1) == m_invert;
 		m_isrOutPos = (m_isrOutPos + 1) % m_isrBufSize;
-		bool level = (ts >= 0) ^ m_invert;
-		long unsigned curCycle = (level ? ts : -ts) << 1;
-		long cycles = (curCycle - m_isrCycle) - m_bitCycles / 2;
-		m_isrCycle = curCycle;
+		long cycles = (isrCycle - m_lastCycle) - m_bitCycles / 2;
+		m_lastCycle = isrCycle;
 		do {
 			// data bits
 			if (m_rxCurBit >= -1 && m_rxCurBit < 7) {
@@ -323,8 +345,10 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 					// preceding masked bits
 					int hiddenBits = cycles / m_bitCycles;
 					if (hiddenBits > 7 - m_rxCurBit) { hiddenBits = 7 - m_rxCurBit; }
+					bool lastBit = m_rxCurByte & 0x80;
 					m_rxCurByte >>= hiddenBits;
-					if (!level) { m_rxCurByte |= 0xff << (8 - hiddenBits); }
+					// masked bits have same level as last unmasked bit
+					if (lastBit) { m_rxCurByte |= 0xff << (8 - hiddenBits); }
 					m_rxCurBit += hiddenBits;
 					cycles -= hiddenBits * m_bitCycles;
 				}
@@ -343,6 +367,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 				int next = (m_inPos + 1) % m_bufSize;
 				if (next != m_outPos) {
 					m_buffer[m_inPos] = m_rxCurByte;
+					// reset to 0 is important for masked bit logic
+					m_rxCurByte = 0;
 					m_inPos = next;
 				} else {
 					m_overflow = true;
@@ -358,37 +384,17 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 			break;
 		} while (cycles >= 0);
 	}
-
-	// stop bit can go undetected if leading data bits are at same level
-	// and there was also no next start bit yet, so one byte may be pending.
-	// low-cost check first
-	if (m_rxCurBit < 8 && m_isrInPos == m_isrOutPos && m_rxCurBit >= 0) {
-		long unsigned curCycle = ESP.getCycleCount();
-		long unsigned delta = curCycle - m_isrCycle;
-		long unsigned expected = (10 - m_rxCurBit) * m_bitCycles;
-		if (delta >= expected) {
-			// Store stop bit cycle in the buffer unless we have an overflow
-			int next = (m_isrInPos + 1) % m_isrBufSize;
-			if (next != m_isrOutPos) {
-				m_isrBuffer[m_isrInPos] = expected;
-				m_isrInPos = next;
-				++avail;
-			} else {
-				m_isrOverflow = true;
-			}
-			m_isrCycle = curCycle;
-		}
-	}
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
 	bool level = digitalRead(m_rxPin);
 	long unsigned curCycle = ESP.getCycleCount();
 
-	// Store level & cycle in the buffer unless we have an overflow
+	// Store inverted level & cycle in the buffer unless we have an overflow
+	// cycle's LSB is repurposed for the level bit
 	int next = (m_isrInPos + 1) % m_isrBufSize;
 	if (next != m_isrOutPos) {
-		m_isrBuffer[m_isrInPos] = level ? (curCycle >> 1) : -(curCycle >> 1);
+		m_isrBuffer[m_isrInPos] = (curCycle | 1) ^ level;
 		m_isrInPos = next;
 	} else {
 		m_isrOverflow = true;
