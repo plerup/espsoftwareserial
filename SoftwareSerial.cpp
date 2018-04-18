@@ -310,11 +310,12 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 		m_isrOverflow = false;
 	}
 	while (avail--) {
-		long cycles = m_isrBuffer[m_isrOutPos];
+		long ts = m_isrBuffer[m_isrOutPos];
 		m_isrOutPos = (m_isrOutPos + 1) % m_isrBufSize;
-		bool level = cycles >= 0;
-		if (!level) { cycles = -cycles; }
-		cycles -= m_bitCycles / 2;
+		bool level = (ts >= 0) ^ m_invert;
+		long unsigned curCycle = (level ? ts : -ts) << 1;
+		long cycles = (curCycle - m_isrCycle) - m_bitCycles / 2;
+		m_isrCycle = curCycle;
 		do {
 			// data bits
 			if (m_rxCurBit >= -1 && m_rxCurBit < 7) {
@@ -381,20 +382,17 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
-	bool level = digitalRead(m_rxPin) ^ m_invert;
+	bool level = digitalRead(m_rxPin);
 	long unsigned curCycle = ESP.getCycleCount();
 
 	// Store level & cycle in the buffer unless we have an overflow
 	int next = (m_isrInPos + 1) % m_isrBufSize;
 	if (next != m_isrOutPos) {
-		long unsigned delta = curCycle - m_isrCycle;
-		m_isrBuffer[m_isrInPos] = level ? delta : -delta;
+		m_isrBuffer[m_isrInPos] = level ? (curCycle >> 1) : -(curCycle >> 1);
 		m_isrInPos = next;
 	} else {
 		m_isrOverflow = true;
 	}
-
-	m_isrCycle = curCycle;
 }
 
 void SoftwareSerial::onReceive(std::function<void(int available)> handler) {
