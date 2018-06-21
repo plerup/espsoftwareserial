@@ -189,16 +189,18 @@ size_t SoftwareSerial::write(uint8_t b) {
   unsigned long wait = m_bitTime;
   digitalWrite(m_txPin, HIGH);
   unsigned long start = ESP.getCycleCount();
-  // Start bit;
-  digitalWrite(m_txPin, LOW);
+  // Start bit : HIGH if inverted logic, otherwise LOW
+  digitalWrite(m_txPin, m_invert);
+  //------------------------
   WAIT;
   for (int i = 0; i < 8; i++) {
     digitalWrite(m_txPin, (b & 1) ? HIGH : LOW);
     WAIT;
     b >>= 1;
   }
-  // Stop bit
-  digitalWrite(m_txPin, HIGH);
+  // Stop bit : LOW if inverted logic, otherwise HIGH
+  digitalWrite(m_txPin, !m_invert);
+//----------------------------
   WAIT;
   if (m_txEnableValid) digitalWrite(m_txEnablePin, LOW);
   if (!m_intTxEnabled)
@@ -237,7 +239,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
   // Stop bit
   WAIT;
   // Store the received value in the buffer unless we have an overflow
-  int next = (m_inPos+1) % m_buffSize;
+  unsigned int next = (m_inPos+1) % m_buffSize;
   if (next != m_outPos) {
     m_buffer[m_inPos] = rec;
     m_inPos = next;
