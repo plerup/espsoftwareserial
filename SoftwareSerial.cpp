@@ -237,7 +237,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
   // Stop bit
   WAIT;
   // Store the received value in the buffer unless we have an overflow
-  int next = (m_inPos+1) % m_buffSize;
+  unsigned int next = (m_inPos+1) % m_buffSize;
   if (next != m_outPos) {
     m_buffer[m_inPos] = rec;
     m_inPos = next;
