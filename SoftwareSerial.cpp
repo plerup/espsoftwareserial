@@ -235,7 +235,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		digitalWrite(m_txEnablePin, HIGH);
 #endif
 	}
-	// Stop bit level
+	// Stop bit level : LOW if inverted logic, otherwise HIGH
 #ifdef ALT_DIGITAL_WRITE
 	pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
 #else
@@ -244,7 +244,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	long unsigned deadline = ESP.getCycleCount();
 	for (int cnt = 0; cnt < size; ++cnt, ++buffer) {
 		if (cnt) { waitBitCycles(deadline); } // intermediate stop bits
-		// Start bit;
+		// Start bit : HIGH if inverted logic, otherwise LOW
 		deadline += m_bitCycles;
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txPin, m_invert ? INPUT_PULLUP : OUTPUT);
@@ -264,7 +264,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 			waitBitCycles(deadline);
 		}
 		deadline += m_bitCycles;
-		// Stop bit
+		// Stop bit : LOW if inverted logic, otherwise HIGH
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
 #else
