@@ -96,7 +96,7 @@ void SoftwareSerial::begin(long baud) {
 	// Use getCycleCount() loop to get as exact timing as possible
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	// Enable interrupts during tx at any baud to allow full duplex
-	m_intTxEnabled = true;
+	m_intTxEnabled = baud <= 9600;
 	if (m_buffer != 0 && m_isrBuffer != 0) {
 		m_rxValid = true;
 		m_inPos = m_outPos = 0;
@@ -208,10 +208,15 @@ int SoftwareSerial::available() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::waitBitCycles(long unsigned deadline) {
-	if (m_intTxEnabled) { optimistic_yield(12 * m_bitCycles / ESP.getCpuFreqMHz() / 13); }
-	unsigned remCycles = deadline - ESP.getCycleCount();
-	if (remCycles <= m_bitCycles) {
-		delayMicroseconds(remCycles / ESP.getCpuFreqMHz());
+	if (m_intTxEnabled)
+	{
+		optimistic_yield(12 * m_bitCycles / ESP.getCpuFreqMHz() / 13);
+		long remCycles = deadline - ESP.getCycleCount();
+		if (remCycles >= m_bitCycles) {
+			delayMicroseconds(remCycles / ESP.getCpuFreqMHz());
+		}
+	}
+	while (static_cast<long>(deadline - ESP.getCycleCount()) > 0) {
 	}
 }
 
@@ -241,37 +246,35 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 #else
 	digitalWrite(m_txPin, !m_invert);
 #endif
-	long unsigned deadline = ESP.getCycleCount();
 	for (int cnt = 0; cnt < size; ++cnt, ++buffer) {
-		if (cnt) { waitBitCycles(deadline); } // intermediate stop bits
 		// Start bit : HIGH if inverted logic, otherwise LOW
-		deadline += m_bitCycles;
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txPin, m_invert ? INPUT_PULLUP : OUTPUT);
 #else
 		digitalWrite(m_txPin, m_invert);
 #endif
-		waitBitCycles(deadline);
+		long unsigned deadline = ESP.getCycleCount() + m_bitCycles;
 		uint8_t b = m_invert ? ~*buffer : *buffer;
 		for (int i = 0; i < 8; i++) {
-			deadline += m_bitCycles;
+			waitBitCycles(deadline);
 #ifdef ALT_DIGITAL_WRITE
 			pinMode(m_txPin, (b & 1) ? INPUT_PULLUP : OUTPUT);
 #else
 			digitalWrite(m_txPin, (b & 1));
 #endif
 			b >>= 1;
-			waitBitCycles(deadline);
+			deadline += m_bitCycles;
 		}
-		deadline += m_bitCycles;
+		waitBitCycles(deadline); // last bit
 		// Stop bit : LOW if inverted logic, otherwise HIGH
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
 #else
 		digitalWrite(m_txPin, !m_invert);
 #endif
+		deadline += m_bitCycles;
+		waitBitCycles(deadline);
 	}
-	waitBitCycles(deadline); // final stop bit
 	if (m_txEnableValid) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txEnablePin, OUTPUT);
