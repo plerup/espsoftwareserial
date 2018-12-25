@@ -11,6 +11,7 @@ SoftwareSerial swSer(14, 12, false, 256);
 void setup() {
   Serial.begin(BAUD_RATE);
   swSer.begin(BAUD_RATE);
+  swSer.enableIntTx(true);
 
   // ESP8266 internal cache RAM needs warm up - allow write and ISR to load
   swSer.write(static_cast<uint8_t>(0));

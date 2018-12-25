@@ -24,7 +24,8 @@ void setup() {
 	//WiFi.mode(WIFI_OFF);
 	//WiFi.forceSleepBegin();
 	//delay(1);
-	loopBack.begin(38400);
+	loopBack.begin(56000);
+	loopBack.enableIntTx(true);
 	start = micros();
 	txCount = 0;
 	rxCount = 0;
