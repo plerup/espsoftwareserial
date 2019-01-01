@@ -247,12 +247,12 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		uint8_t o = m_invert ? ~*buffer : *buffer;
 		// Start bit : HIGH if inverted logic, otherwise LOW
 		bool b = m_invert;
-		long unsigned deadline = ESP.getCycleCount() + m_bitCycles;
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txPin, b ? INPUT_PULLUP : OUTPUT);
 #else
 		digitalWrite(m_txPin, b);
 #endif
+		long unsigned deadline = ESP.getCycleCount() + m_bitCycles;
 		for (int i = 0; i < 9; ++i) {
 			const bool pb = b;
 			// data bit
