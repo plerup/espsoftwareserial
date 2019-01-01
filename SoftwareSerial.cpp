@@ -214,7 +214,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::waitBitCycles(long unsigned deadline) {
 		interrupts();
 	}
 	long micro_s = static_cast<long>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
-	if (m_intTxEnabled && micro_s > 8)
+	if (micro_s > 8)
 	{
 		optimistic_yield(micro_s - 8);
 		micro_s = static_cast<long>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
