@@ -96,7 +96,6 @@ void SoftwareSerial::begin(long baud) {
 	// Use getCycleCount() loop to get as exact timing as possible
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	// Enable interrupts during tx at any baud to allow full duplex
-	m_intTxEnabled = baud <= 9600;
 	if (m_buffer != 0 && m_isrBuffer != 0) {
 		m_rxValid = true;
 		m_inPos = m_outPos = 0;
@@ -136,10 +135,6 @@ void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
 	} else {
 		m_txEnableValid = false;
 	}
-}
-
-void SoftwareSerial::enableIntTx(bool on) {
-	m_intTxEnabled = on;
 }
 
 void SoftwareSerial::enableTx(bool on) {
@@ -208,11 +203,8 @@ int SoftwareSerial::available() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::waitBitCycles(long unsigned deadline) {
-	if (!m_intTxEnabled)
-		// Enable interrupts for duplex receive
-	{
-		interrupts();
-	}
+	// Enable interrupts for duplex receive
+	interrupts();
 	long micro_s = static_cast<long>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
 	if (micro_s > 8)
 	{
@@ -223,11 +215,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::waitBitCycles(long unsigned deadline) {
 		delayMicroseconds(micro_s - 1);
 	}
 	while (static_cast<long>(deadline - ESP.getCycleCount()) > 1) {}
-	if (!m_intTxEnabled)
 	// Disable interrupts again for precise timing
-	{
-		noInterrupts();
-	}
+	noInterrupts();
 }
 
 size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
@@ -238,11 +227,9 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	if (m_rxValid) { rxBits(); }
 	if (!m_txValid) { return 0; }
 
-	if (!m_intTxEnabled)
-		// Disable interrupts in order to get a clean transmit
-	{
-		noInterrupts();
-	}
+	// Disable interrupts in order to get a clean transmit
+	noInterrupts();
+
 	if (m_txEnableValid) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txEnablePin, INPUT_PULLUP);
@@ -294,9 +281,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		digitalWrite(m_txEnablePin, LOW);
 #endif
 	}
-	if (!m_intTxEnabled) {
-		interrupts();
-	}
+	interrupts();
 	return size;
 }
 
