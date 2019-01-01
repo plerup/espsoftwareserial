@@ -208,15 +208,25 @@ int SoftwareSerial::available() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::waitBitCycles(long unsigned deadline) {
-	if (m_intTxEnabled)
+	if (!m_intTxEnabled)
+		// Enable interrupts for duplex receive
 	{
-		optimistic_yield(12 * m_bitCycles / ESP.getCpuFreqMHz() / 13);
-		long remCycles = deadline - ESP.getCycleCount();
-		if (remCycles >= m_bitCycles) {
-			delayMicroseconds(remCycles / ESP.getCpuFreqMHz());
-		}
+		interrupts();
 	}
-	while (static_cast<long>(deadline - ESP.getCycleCount()) > 0) {
+	long micro_s = static_cast<long>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
+	if (m_intTxEnabled && micro_s > 8)
+	{
+		optimistic_yield(micro_s - 8);
+		micro_s = static_cast<long>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
+	}
+	if (micro_s > 1) {
+		delayMicroseconds(micro_s - 1);
+	}
+	while (static_cast<long>(deadline - ESP.getCycleCount()) > 1) {}
+	if (!m_intTxEnabled)
+	// Disable interrupts again for precise timing
+	{
+		noInterrupts();
 	}
 }
 
@@ -247,32 +257,34 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	digitalWrite(m_txPin, !m_invert);
 #endif
 	for (int cnt = 0; cnt < size; ++cnt, ++buffer) {
+		uint8_t o = m_invert ? ~*buffer : *buffer;
 		// Start bit : HIGH if inverted logic, otherwise LOW
-#ifdef ALT_DIGITAL_WRITE
-		pinMode(m_txPin, m_invert ? INPUT_PULLUP : OUTPUT);
-#else
-		digitalWrite(m_txPin, m_invert);
-#endif
+		bool b = m_invert;
 		long unsigned deadline = ESP.getCycleCount() + m_bitCycles;
-		uint8_t b = m_invert ? ~*buffer : *buffer;
-		for (int i = 0; i < 8; i++) {
+#ifdef ALT_DIGITAL_WRITE
+		pinMode(m_txPin, b ? INPUT_PULLUP : OUTPUT);
+#else
+		digitalWrite(m_txPin, b);
+#endif
+		for (int i = 0; i < 9; ++i) {
+			const bool pb = b;
+			// data bit
+			// or stop bit : LOW if inverted logic, otherwise HIGH
+			b = (i < 8) ? (o & 1) : !m_invert;
+			o >>= 1;
+			if (pb == b) {
+				deadline += m_bitCycles;
+				continue;
+			}
 			waitBitCycles(deadline);
 #ifdef ALT_DIGITAL_WRITE
-			pinMode(m_txPin, (b & 1) ? INPUT_PULLUP : OUTPUT);
+			pinMode(m_txPin, b ? INPUT_PULLUP : OUTPUT);
 #else
-			digitalWrite(m_txPin, (b & 1));
+			digitalWrite(m_txPin, b);
 #endif
-			b >>= 1;
 			deadline += m_bitCycles;
 		}
-		waitBitCycles(deadline); // last bit
-		// Stop bit : LOW if inverted logic, otherwise HIGH
-#ifdef ALT_DIGITAL_WRITE
-		pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-#else
-		digitalWrite(m_txPin, !m_invert);
-#endif
-		deadline += m_bitCycles;
+		// stop bit and any preceding data bits at same level
 		waitBitCycles(deadline);
 	}
 	if (m_txEnableValid) {
@@ -390,8 +402,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
-	bool level = digitalRead(m_rxPin);
 	long unsigned curCycle = ESP.getCycleCount();
+	bool level = digitalRead(m_rxPin);
 
 	// Store inverted level & cycle in the buffer unless we have an overflow
 	// cycle's LSB is repurposed for the level bit
