@@ -1,17 +1,16 @@
 // Runs at 160MHz CPU frequency and BAUD_RATE 115200.
-// Runs at 80MHz CPU frequency and BAUD_RATE 57600.
+// Runs at 80MHz CPU frequency and BAUD_RATE 56000.
 // Connect pin 12 to 14.
 
 #include <SoftwareSerial.h>
 
-#define BAUD_RATE 115200
+#define BAUD_RATE 56000
 
-SoftwareSerial swSer(14, 12, false, 256);
+SoftwareSerial swSer(D5, D6);
 
 void setup() {
-  Serial.begin(BAUD_RATE);
+  Serial.begin(115200);
   swSer.begin(BAUD_RATE);
-  swSer.enableIntTx(true);
 
   // ESP8266 internal cache RAM needs warm up - allow write and ISR to load
   swSer.write(static_cast<uint8_t>(0));

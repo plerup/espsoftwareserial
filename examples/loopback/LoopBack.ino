@@ -7,15 +7,18 @@
 
 #include <SoftwareSerial.h>
 
+// local loopback, connect D5 to D6, or with repeater, connect crosswise.
+constexpr int SWSERBITRATE = 9600;
+
 constexpr int BLOCKSIZE = 16; // use fractions of 256
 
-SoftwareSerial loopBack(D5, D6, false, BLOCKSIZE + 2);
+SoftwareSerial loopBack(D5, D6);
 unsigned long start;
 String effTxTxt("eff. tx: ");
 String effRxTxt("eff. rx: ");
 int txCount;
 int rxCount;
-unsigned char expected;
+int expected;
 int rxErrors;
 constexpr int ReportInterval = 10000;
 
@@ -24,8 +27,7 @@ void setup() {
 	//WiFi.mode(WIFI_OFF);
 	//WiFi.forceSleepBegin();
 	//delay(1);
-	loopBack.begin(56000);
-	loopBack.enableIntTx(true);
+	loopBack.begin(SWSERBITRATE);
 	start = micros();
 	txCount = 0;
 	rxCount = 0;
@@ -43,7 +45,7 @@ void loop() {
 	} while (c % BLOCKSIZE);
 	if (loopBack.overflow()) { Serial.println("overflow"); }
 	while (loopBack.available()) {
-		unsigned char r = loopBack.read();
+		int r = loopBack.read();
 		if (r == -1) { Serial.println("read() == -1"); }
 		if (expected == -1) { expected = r; }
 		else {
@@ -70,5 +72,6 @@ void loop() {
 		txCount = 0;
 		rxCount = 0;
 		rxErrors = 0;
+		expected = -1;
 	}
 }

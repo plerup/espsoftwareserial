@@ -7,6 +7,12 @@
 
 #include <SoftwareSerial.h>
 
+// remote loopback (loopback.ino), connect D5<->D6, D6<->D5
+constexpr int SWSERBITRATE = 9600;
+
+constexpr int BLOCKSIZE = 16; // use fractions of 256
+
+
 SoftwareSerial repeater(D5, D6);
 unsigned long start;
 String bitRateTxt("Effective data rate: ");
@@ -21,8 +27,7 @@ void setup()
 	//WiFi.mode(WIFI_OFF);
 	//WiFi.forceSleepBegin();
 	//delay(1);
-	repeater.begin(56000);
-	repeater.enableIntTx(true);
+	repeater.begin(SWSERBITRATE);
 	start = micros();
 	rxCount = 0;
 	seqErrors = 0;
@@ -39,12 +44,12 @@ void loop()
 		{
 			expected = ++expected % 256;
 		}
+		repeater.write(expected);
 		if (r != expected) {
 			++seqErrors;
 			expected = -1;
 		}
 		++rxCount;
-		repeater.write(r);
 		if (rxCount >= ReportInterval) break;
 	}
 
