@@ -22,6 +22,7 @@ void setup()
 	//WiFi.forceSleepBegin();
 	//delay(1);
 	repeater.begin(56000);
+	repeater.enableIntTx(true);
 	start = micros();
 	rxCount = 0;
 	seqErrors = 0;

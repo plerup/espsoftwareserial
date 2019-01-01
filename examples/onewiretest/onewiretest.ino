@@ -9,7 +9,9 @@ void setup() {
     Serial.begin(115200);
     Serial.println("\nOne Wire Half Duplex Serial Tester");
     swSer1.begin(115200);
+    swSer1.enableIntTx(true);
     swSer2.begin(115200);
+    swSer2.enableIntTx(true);
 }
 
 void loop() {
