@@ -93,9 +93,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 }
 
 void SoftwareSerial::begin(long baud) {
-	// Use getCycleCount() loop to get as exact timing as possible
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
-	// Enable interrupts during tx at any baud to allow full duplex
 	if (m_buffer != 0 && m_isrBuffer != 0) {
 		m_rxValid = true;
 		m_inPos = m_outPos = 0;
@@ -202,7 +200,7 @@ int SoftwareSerial::available() {
 	return avail;
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::waitBitCycles(long unsigned deadline) {
+void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(long unsigned deadline) {
 	// Enable interrupts for duplex receive
 	interrupts();
 	long micro_s = static_cast<long>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
@@ -214,9 +212,32 @@ void ICACHE_RAM_ATTR SoftwareSerial::waitBitCycles(long unsigned deadline) {
 	if (micro_s > 1) {
 		delayMicroseconds(micro_s - 1);
 	}
-	while (static_cast<long>(deadline - ESP.getCycleCount()) > 1) {}
 	// Disable interrupts again for precise timing
 	noInterrupts();
+	while (static_cast<long>(deadline - ESP.getCycleCount()) > 1) {}
+}
+
+void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(long unsigned dutyCycle, long unsigned offCycle) {
+	if (dutyCycle)
+	{
+		m_periodDeadline += dutyCycle;
+#ifdef ALT_DIGITAL_WRITE
+		pinMode(m_txPin, INPUT_PULLUP);
+#else
+		digitalWrite(m_txPin, HIGH);
+#endif
+		preciseDelay(m_periodDeadline);
+	}
+	if (offCycle)
+	{
+		m_periodDeadline += offCycle;
+#ifdef ALT_DIGITAL_WRITE
+		pinMode(m_txPin, OUTPUT);
+#else
+		digitalWrite(m_txPin, LOW);
+#endif
+		preciseDelay(m_periodDeadline);
+	}
 }
 
 size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
@@ -227,9 +248,6 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	if (m_rxValid) { rxBits(); }
 	if (!m_txValid) { return 0; }
 
-	// Disable interrupts in order to get a clean transmit
-	noInterrupts();
-
 	if (m_txEnableValid) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txEnablePin, INPUT_PULLUP);
@@ -237,43 +255,38 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		digitalWrite(m_txEnablePin, HIGH);
 #endif
 	}
+	// Disable interrupts in order to get a clean transmit timing
+	noInterrupts();
+	m_periodDeadline = ESP.getCycleCount();
+	uint32_t dutyCycle = 0;
+	uint32_t offCycle = 0;
 	// Stop bit level : LOW if inverted logic, otherwise HIGH
-#ifdef ALT_DIGITAL_WRITE
-	pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-#else
-	digitalWrite(m_txPin, !m_invert);
-#endif
+	if (!m_invert) ++dutyCycle;
+	bool pb;
 	for (int cnt = 0; cnt < size; ++cnt, ++buffer) {
-		uint8_t o = m_invert ? ~*buffer : *buffer;
 		// Start bit : HIGH if inverted logic, otherwise LOW
-		bool b = m_invert;
-#ifdef ALT_DIGITAL_WRITE
-		pinMode(m_txPin, b ? INPUT_PULLUP : OUTPUT);
-#else
-		digitalWrite(m_txPin, b);
-#endif
-		long unsigned deadline = ESP.getCycleCount() + m_bitCycles;
+		if (m_invert) dutyCycle += m_bitCycles; else offCycle += m_bitCycles;
+		pb = m_invert;
+		uint8_t o = m_invert ? ~*buffer : *buffer;
+		bool b;
 		for (int i = 0; i < 9; ++i) {
-			const bool pb = b;
 			// data bit
 			// or stop bit : LOW if inverted logic, otherwise HIGH
 			b = (i < 8) ? (o & 1) : !m_invert;
 			o >>= 1;
-			if (pb == b) {
-				deadline += m_bitCycles;
-				continue;
+			if (!pb && b)
+			{
+				writePeriod(dutyCycle, offCycle);
+				dutyCycle = offCycle = 0;
 			}
-			waitBitCycles(deadline);
-#ifdef ALT_DIGITAL_WRITE
-			pinMode(m_txPin, b ? INPUT_PULLUP : OUTPUT);
-#else
-			digitalWrite(m_txPin, b);
-#endif
-			deadline += m_bitCycles;
+			if (b) dutyCycle += m_bitCycles; else offCycle += m_bitCycles;
+			pb = b;
 		}
-		// stop bit and any preceding data bits at same level
-		waitBitCycles(deadline);
+		if (cnt == size - 1) {
+			writePeriod(dutyCycle, offCycle);
+		}
 	}
+	interrupts();
 	if (m_txEnableValid) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txEnablePin, OUTPUT);
@@ -281,7 +294,6 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		digitalWrite(m_txEnablePin, LOW);
 #endif
 	}
-	interrupts();
 	return size;
 }
 

@@ -73,7 +73,8 @@ public:
 	using Print::write;
 
 private:
-	void waitBitCycles(long unsigned deadline);
+	void preciseDelay(long unsigned deadline);
+	void writePeriod(long unsigned dutyCycle, long unsigned offCycle);
 	bool isValidGPIOpin(int pin);
 	void rxBits();
 
@@ -89,6 +90,7 @@ private:
 	bool m_invert;
 	bool m_overflow = false;
 	long m_bitCycles;
+	long unsigned m_periodDeadline;
 	int m_inPos, m_outPos;
 	int m_bufSize = 0;
 	uint8_t *m_buffer = 0;
