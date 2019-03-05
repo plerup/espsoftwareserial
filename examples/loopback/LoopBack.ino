@@ -38,12 +38,16 @@ void setup() {
 unsigned char c = 0;
 
 void loop() {
-	do {
+	unsigned char block[BLOCKSIZE];
+	for (int i = 0; i < BLOCKSIZE; ++i) {
+		block[i] = c;
 		loopBack.write(c);
 		c = ++c % 256;
 		++txCount;
-	} while (c % BLOCKSIZE);
+	}
+	//loopBack.write(block, BLOCKSIZE);
 	if (loopBack.overflow()) { Serial.println("overflow"); }
+	expected = -1;
 	while (loopBack.available()) {
 		int r = loopBack.read();
 		if (r == -1) { Serial.println("read() == -1"); }
@@ -53,7 +57,6 @@ void loop() {
 		}
 		if (r != expected) {
 			++rxErrors;
-			expected = -1;
 		}
 		++rxCount;
 	}
