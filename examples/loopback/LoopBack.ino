@@ -7,12 +7,16 @@
 
 #include <SoftwareSerial.h>
 
-// local loopback, connect D5 to D6, or with repeater, connect crosswise.
-constexpr int SWSERBITRATE = 9600;
+// local SoftwareSerial loopback, connect D5 to D6, or with repeater, connect crosswise.
+// or hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
+#define HWLOOPBACK 1
+
+constexpr int SWSERBITRATE = 19200;
 
 constexpr int BLOCKSIZE = 16; // use fractions of 256
 
-SoftwareSerial loopBack(D5, D6);
+SoftwareSerial swSerial(D5, D6);
+
 unsigned long start;
 String effTxTxt("eff. tx: ");
 String effRxTxt("eff. rx: ");
@@ -22,12 +26,29 @@ int expected;
 int rxErrors;
 constexpr int ReportInterval = 10000;
 
+#ifdef HWLOOPBACK
+SoftwareSerial ssLogger(RX, TX);
+Stream& logger(ssLogger);
+#else
+Stream& logger(Serial);
+#endif
+
 void setup() {
-	Serial.begin(115200);
+
 	//WiFi.mode(WIFI_OFF);
 	//WiFi.forceSleepBegin();
 	//delay(1);
-	loopBack.begin(SWSERBITRATE);
+
+#ifdef HWLOOPBACK
+	Serial.begin(SWSERBITRATE);
+	Serial.setRxBufferSize(2 * BLOCKSIZE);
+	Serial.swap();
+	ssLogger.begin(9600);
+#else
+	Serial.begin(9600);
+#endif
+
+	swSerial.begin(SWSERBITRATE);
 	start = micros();
 	txCount = 0;
 	rxCount = 0;
@@ -41,16 +62,24 @@ void loop() {
 	unsigned char block[BLOCKSIZE];
 	for (int i = 0; i < BLOCKSIZE; ++i) {
 		block[i] = c;
-		loopBack.write(c);
+		swSerial.write(c);
 		c = ++c % 256;
 		++txCount;
+#ifdef HWLOOPBACK
+		while (0 == (i % 8) && Serial.available()) Serial.write(Serial.read());
+#endif
 	}
-	//loopBack.write(block, BLOCKSIZE);
-	if (loopBack.overflow()) { Serial.println("overflow"); }
+	//swSerial.write(block, BLOCKSIZE);
+	if (swSerial.overflow()) { logger.println("overflow"); }
+
+#ifdef HWLOOPBACK
+	while (Serial.available()) Serial.write(Serial.read());
+#endif
+
 	expected = -1;
-	while (loopBack.available()) {
-		int r = loopBack.read();
-		if (r == -1) { Serial.println("read() == -1"); }
+	while (swSerial.available()) {
+		int r = swSerial.read();
+		if (r == -1) { logger.println("read() == -1"); }
 		if (expected == -1) { expected = r; }
 		else {
 			expected = ++expected % 256;
@@ -62,13 +91,13 @@ void loop() {
 	}
 
 	if (txCount >= ReportInterval) {
-		Serial.println(String("tx/rx: ") + txCount + "/" + rxCount);
+		logger.println(String("tx/rx: ") + txCount + "/" + rxCount);
 		const auto end = micros();
 		const unsigned long interval = end - start;
 		const long txCps = txCount * (1000000.0 / interval);
 		const long rxCps = rxCount * (1000000.0 / interval);
 		const long errorCps = rxErrors * (1000000.0 / interval);
-		Serial.println(effTxTxt + 10 * txCps + "bps, "
+		logger.println(effTxTxt + 10 * txCps + "bps, "
 					   + effRxTxt + 10 * rxCps + "bps, "
 					   + errorCps + "cps errors (" + 100.0 * rxErrors / rxCount + "%)");
 		start = end;
