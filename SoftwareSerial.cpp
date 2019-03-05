@@ -212,9 +212,9 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(long unsigned deadline) {
 	if (micro_s > 1) {
 		delayMicroseconds(micro_s - 1);
 	}
+	while (static_cast<long>(deadline - ESP.getCycleCount()) > 1) {}
 	// Disable interrupts again for precise timing
 	noInterrupts();
-	while (static_cast<long>(deadline - ESP.getCycleCount()) > 1) {}
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(long unsigned dutyCycle, long unsigned offCycle) {
@@ -255,14 +255,18 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		digitalWrite(m_txEnablePin, HIGH);
 #endif
 	}
+	// Stop bit level : LOW if inverted logic, otherwise HIGH
+#ifdef ALT_DIGITAL_WRITE
+	pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
+#else
+	digitalWrite(m_txPin, !m_invert);
+#endif
+	uint32_t dutyCycle = 0;
+	uint32_t offCycle = 0;
+	bool pb;
 	// Disable interrupts in order to get a clean transmit timing
 	noInterrupts();
 	m_periodDeadline = ESP.getCycleCount();
-	uint32_t dutyCycle = 0;
-	uint32_t offCycle = 0;
-	// Stop bit level : LOW if inverted logic, otherwise HIGH
-	if (!m_invert) ++dutyCycle;
-	bool pb;
 	for (int cnt = 0; cnt < size; ++cnt, ++buffer) {
 		// Start bit : HIGH if inverted logic, otherwise LOW
 		if (m_invert) dutyCycle += m_bitCycles; else offCycle += m_bitCycles;
@@ -284,6 +288,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		}
 		if (cnt == size - 1) {
 			writePeriod(dutyCycle, offCycle);
+			break;
 		}
 	}
 	interrupts();
