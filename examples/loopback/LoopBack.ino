@@ -11,7 +11,7 @@
 // or hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
 #define HWLOOPBACK 1
 
-constexpr int SWSERBITRATE = 19200;
+constexpr int SWSERBITRATE = 28800;
 
 constexpr int BLOCKSIZE = 16; // use fractions of 256
 
