@@ -4,7 +4,7 @@
 
 #include <SoftwareSerial.h>
 
-#define BAUD_RATE 56000
+#define BAUD_RATE 74880
 
 SoftwareSerial swSer(D5, D6);
 
