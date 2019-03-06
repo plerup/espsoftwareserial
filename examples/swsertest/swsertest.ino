@@ -6,7 +6,7 @@
 
 #define BAUD_RATE 74880
 
-SoftwareSerial swSer(D5, D6);
+SoftwareSerial swSer(D5, D6,false,93, 10);
 
 void setup() {
   Serial.begin(115200);

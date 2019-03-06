@@ -76,6 +76,7 @@ private:
 	void preciseDelay(long unsigned deadline);
 	void writePeriod(long unsigned dutyCycle, long unsigned offCycle);
 	bool isValidGPIOpin(int pin);
+	/* check m_rxValid that calling is safe */
 	void rxBits();
 
 	// Member variables
