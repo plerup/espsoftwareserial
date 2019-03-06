@@ -334,12 +334,12 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 		long unsigned delta = curCycle - m_lastCycle;
 		long unsigned expectedDelta = (11 - m_rxCurBit) * m_bitCycles;
 		if (delta > expectedDelta) {
-			// Store inverted stop bit and cycle in the buffer unless we have an overflow
+			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
 			// cycle's LSB is repurposed for the level bit
 			int next = (m_isrInPos + 1) % m_isrBufSize;
 			if (next != m_isrOutPos) {
 				long unsigned expectedCycle = m_lastCycle + expectedDelta;
-				m_isrBuffer[m_isrInPos] = (expectedCycle | 1) ^ m_invert;
+				m_isrBuffer[m_isrInPos] = (expectedCycle | 1) ^ !m_invert;
 				m_isrInPos = next;
 				++avail;
 			} else {
@@ -349,8 +349,9 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 	}
 
 	while (avail--) {
-		// error intruduced by inverted level in LSB is neglegible
+		// error introduced by edge value in LSB is neglegible
 		long unsigned isrCycle = m_isrBuffer[m_isrOutPos];
+		// extract inverted edge value
 		bool level = (isrCycle & 1) == m_invert;
 		m_isrOutPos = (m_isrOutPos + 1) % m_isrBufSize;
 		long cycles = (isrCycle - m_lastCycle) - m_bitCycles / 2;
@@ -407,7 +408,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
 	long unsigned curCycle = ESP.getCycleCount();
 	bool level = digitalRead(m_rxPin);
 
-	// Store inverted level & cycle in the buffer unless we have an overflow
+	// Store inverted edge value & cycle in the buffer unless we have an overflow
 	// cycle's LSB is repurposed for the level bit
 	int next = (m_isrInPos + 1) % m_isrBufSize;
 	if (next != m_isrOutPos) {
