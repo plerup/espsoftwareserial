@@ -10,6 +10,7 @@
 // SoftwareSerial loopback for remote source (loopback.ino),
 // or hardware loopback, connect source D5 to local D8 (tx), source D6 to local D7 (rx).
 #define HWLOOPBACK 1
+#define HALFDUPLEX 1
 
 constexpr int SWSERBITRATE = 28800;
 
@@ -56,6 +57,10 @@ void setup()
 
 void loop()
 {
+#ifdef HALFDUPLEX
+	unsigned char block[BLOCKSIZE];
+	int inCnt = 0;
+#endif
 	expected = -1;
 	while (repeater.available())
 	{
@@ -66,13 +71,21 @@ void loop()
 		{
 			expected = ++expected % 256;
 		}
+#if HALFDUPLEX
+		block[inCnt++] = expected;
+#else
 		repeater.write(expected);
+#endif
 		if (r != expected) {
 			++seqErrors;
 		}
 		++rxCount;
 		if (rxCount >= ReportInterval) break;
 	}
+
+#ifdef HALFDUPLEX
+	repeater.write(block, inCnt);
+#endif
 
 	if (rxCount >= ReportInterval) {
 		auto end = micros();
