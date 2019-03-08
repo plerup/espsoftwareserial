@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <SoftwareSerial.h>
 
+// signal quality in ALT_DIGITAL_WRITE is better or equal in all
+// tests so far (ESP8266 HW UART, SDS011 PM sensor, SoftwareSerial back-to-back).
 #define ALT_DIGITAL_WRITE 1
 
 #define MAX_PIN 15
@@ -94,6 +96,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 
 void SoftwareSerial::begin(long baud) {
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
+	m_intTxEnabled = true;
 	if (m_buffer != 0 && m_isrBuffer != 0) {
 		m_rxValid = true;
 		m_inPos = m_outPos = 0;
@@ -133,6 +136,10 @@ void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
 	} else {
 		m_txEnableValid = false;
 	}
+}
+
+void SoftwareSerial::enableIntTx(bool on) {
+	m_intTxEnabled = on;
 }
 
 void SoftwareSerial::enableTx(bool on) {
@@ -201,8 +208,6 @@ int SoftwareSerial::available() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(long unsigned deadline) {
-	// Enable interrupts for duplex receive
-	interrupts();
 	long micro_s = static_cast<long>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
 	if (micro_s > 8)
 	{
@@ -213,8 +218,6 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(long unsigned deadline) {
 		delayMicroseconds(micro_s - 1);
 	}
 	while (static_cast<long>(deadline - ESP.getCycleCount()) > 1) {}
-	// Disable interrupts again for precise timing
-	noInterrupts();
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(long unsigned dutyCycle, long unsigned offCycle) {
@@ -265,7 +268,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	uint32_t offCycle = 0;
 	bool pb;
 	// Disable interrupts in order to get a clean transmit timing
-	noInterrupts();
+	if (!m_intTxEnabled) noInterrupts();
 	m_periodDeadline = ESP.getCycleCount();
 	for (int cnt = 0; cnt < size; ++cnt, ++buffer) {
 		// Start bit : HIGH if inverted logic, otherwise LOW
@@ -291,7 +294,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 			break;
 		}
 	}
-	interrupts();
+	if (!m_intTxEnabled) interrupts();
 	if (m_txEnableValid) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txEnablePin, OUTPUT);

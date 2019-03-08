@@ -8,8 +8,10 @@ at a time - voiding any near-realtime behavior of the CPU - phase
 detection and byte assembly is done in the main code.
 
 Except at high bitrates, depending on other ongoing activity,
-interrupt handling in particular, this software serial adapter
-supports full duplex receive and send.
+interrupts in particular, this software serial adapter
+supports full duplex receive and send. At high bitrates (115200bps)
+send bit timing can be improved at the expense of blocking concurrent
+full duplex receives, with the SoftwareSerial::enableIntTx(false) function call.
 
 Same functionality is given as the corresponding AVR library but
 several instances can be active at the same time. Speed up to 115200 baud

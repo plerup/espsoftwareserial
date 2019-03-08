@@ -1,5 +1,5 @@
 // Runs at 160MHz CPU frequency and BAUD_RATE 115200.
-// Runs at 80MHz CPU frequency and BAUD_RATE 56000.
+// Runs at 80MHz CPU frequency and BAUD_RATE 74880.
 // Connect pin 12 to 14.
 
 #include <SoftwareSerial.h>

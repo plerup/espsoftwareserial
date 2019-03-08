@@ -9,7 +9,8 @@
 
 // local SoftwareSerial loopback, connect D5 to D6, or with repeater, connect crosswise.
 // or hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
-#define HWLOOPBACK 1
+//#define HWLOOPBACK 1
+//#define HALFDUPLEX 1
 
 constexpr int SWSERBITRATE = 28800;
 
@@ -43,12 +44,16 @@ void setup() {
 	Serial.begin(SWSERBITRATE);
 	Serial.setRxBufferSize(2 * BLOCKSIZE);
 	Serial.swap();
-	ssLogger.begin(9600);
+	ssLogger.begin(115200);
+	ssLogger.enableIntTx(false);
 #else
-	Serial.begin(9600);
+	Serial.begin(115200);
 #endif
 
 	swSerial.begin(SWSERBITRATE);
+#ifdef HALFDUPLEX
+	swSerial.enableIntTx(false);
+#endif
 	start = micros();
 	txCount = 0;
 	rxCount = 0;

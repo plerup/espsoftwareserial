@@ -43,6 +43,8 @@ public:
 	long baudRate();
 	// Transmit control pin
 	void setTransmitEnablePin(int transmitEnablePin);
+	// Enable or disable interrupts during tx
+	void enableIntTx(bool on);
 
 	bool overflow();
 
@@ -92,6 +94,7 @@ private:
 	bool m_overflow = false;
 	long m_bitCycles;
 	long unsigned m_periodDeadline;
+	bool m_intTxEnabled;
 	int m_inPos, m_outPos;
 	int m_bufSize = 0;
 	uint8_t *m_buffer = 0;

@@ -10,7 +10,7 @@
 // SoftwareSerial loopback for remote source (loopback.ino),
 // or hardware loopback, connect source D5 to local D8 (tx), source D6 to local D7 (rx).
 #define HWLOOPBACK 1
-#define HALFDUPLEX 1
+//#define HALFDUPLEX 1
 
 constexpr int SWSERBITRATE = 28800;
 
@@ -43,10 +43,14 @@ void setup()
 	Serial.begin(SWSERBITRATE);
 	Serial.setRxBufferSize(2 * BLOCKSIZE);
 	Serial.swap();
-	ssLogger.begin(9600);
+	ssLogger.begin(115200);
+	ssLogger.enableIntTx(false);
 #else
 	repeater.begin(SWSERBITRATE);
-	Serial.begin(9600);
+#ifdef HALFDUPLEX
+	repeater.enableIntTx(false);
+#endif
+	Serial.begin(115200);
 #endif
 
 	start = micros();
