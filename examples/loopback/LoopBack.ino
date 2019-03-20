@@ -7,16 +7,20 @@
 
 #include <SoftwareSerial.h>
 
-// local SoftwareSerial loopback, connect D5 to D6, or with repeater, connect crosswise.
+// local SoftwareSerial loopback, connect D5 (14) to D6 (12), or with repeater, connect crosswise.
 // or hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
 //#define HWLOOPBACK 1
 //#define HALFDUPLEX 1
 
+#ifdef ESP32
+constexpr int SWSERBITRATE = 38400;
+#else
 constexpr int SWSERBITRATE = 28800;
+#endif
 
 constexpr int BLOCKSIZE = 16; // use fractions of 256
 
-SoftwareSerial swSerial(D5, D6);
+SoftwareSerial swSerial(14, 12);
 
 unsigned long start;
 String effTxTxt("eff. tx: ");

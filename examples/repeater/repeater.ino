@@ -8,11 +8,15 @@
 #include <SoftwareSerial.h>
 
 // SoftwareSerial loopback for remote source (loopback.ino),
-// or hardware loopback, connect source D5 to local D8 (tx), source D6 to local D7 (rx).
-#define HWLOOPBACK 1
+// or hardware loopback, connect source D5 to local D8 (TX, 15), source D6 to local D7 (RX, 13).
+//#define HWLOOPBACK 1
 //#define HALFDUPLEX 1
 
+#ifdef ESP32
+constexpr int SWSERBITRATE = 38400;
+#else
 constexpr int SWSERBITRATE = 28800;
+#endif
 
 constexpr int BLOCKSIZE = 16; // use fractions of 256
 
@@ -29,7 +33,7 @@ Stream& repeater(Serial);
 SoftwareSerial ssLogger(RX, TX);
 Stream& logger(ssLogger);
 #else
-SoftwareSerial repeater(D7, D8);
+SoftwareSerial repeater(13, 15);
 Stream& logger(Serial);
 #endif
 
