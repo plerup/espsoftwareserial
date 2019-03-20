@@ -28,16 +28,28 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tests so far (ESP8266 HW UART, SDS011 PM sensor, SoftwareSerial back-to-back).
 #define ALT_DIGITAL_WRITE 1
 
-#define MAX_PIN 15
+#if defined(ESP8266)
+constexpr size_t MAX_PIN = 15;
+#elif defined(ESP32)
+constexpr size_t MAX_PIN = 35;
+#endif
 
 // As the Arduino attachInterrupt has no parameter, lists of objects
 // and callbacks corresponding to each possible GPIO pins have to be defined
 SoftwareSerial *ObjList[MAX_PIN + 1];
 
 void ICACHE_RAM_ATTR sws_isr_0() { ObjList[0]->rxRead(); };
+#ifdef ESP32
+// Pin 1 can not be used
+#else
 void ICACHE_RAM_ATTR sws_isr_1() { ObjList[1]->rxRead(); };
+#endif
 void ICACHE_RAM_ATTR sws_isr_2() { ObjList[2]->rxRead(); };
+#ifdef ESP32
+// Pin 3 can not be used
+#else
 void ICACHE_RAM_ATTR sws_isr_3() { ObjList[3]->rxRead(); };
+#endif
 void ICACHE_RAM_ATTR sws_isr_4() { ObjList[4]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };
 // Pin 6 to 11 can not be used
@@ -45,12 +57,39 @@ void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };
+#ifdef ESP32
+void ICACHE_RAM_ATTR sws_isr_16() { ObjList[16]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_17() { ObjList[17]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_18() { ObjList[18]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_19() { ObjList[19]->rxRead(); };
+// Pin 20 can not be used
+void ICACHE_RAM_ATTR sws_isr_21() { ObjList[21]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_22() { ObjList[22]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_23() { ObjList[23]->rxRead(); };
+// Pin 24 can not be used
+void ICACHE_RAM_ATTR sws_isr_25() { ObjList[25]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_26() { ObjList[26]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_27() { ObjList[27]->rxRead(); };
+// Pin 28 to 31 can not be used
+void ICACHE_RAM_ATTR sws_isr_32() { ObjList[32]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_33() { ObjList[33]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_34() { ObjList[34]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_35() { ObjList[35]->rxRead(); };
+#endif
 
 static void(*ISRList[MAX_PIN + 1])() = {
 	sws_isr_0,
+#ifdef ESP32
+	0,
+#else
 	sws_isr_1,
+#endif
 	sws_isr_2,
+#ifdef ESP32
+	0,
+#else
 	sws_isr_3,
+#endif
 	sws_isr_4,
 	sws_isr_5,
 	0,
@@ -62,7 +101,29 @@ static void(*ISRList[MAX_PIN + 1])() = {
 	sws_isr_12,
 	sws_isr_13,
 	sws_isr_14,
-	sws_isr_15
+	sws_isr_15,
+#ifdef ESP32
+	sws_isr_16,
+	sws_isr_17,
+	sws_isr_18,
+	sws_isr_19,
+	0,
+	sws_isr_21,
+	sws_isr_22,
+	sws_isr_23,
+	0,
+	sws_isr_25,
+	sws_isr_26,
+	sws_isr_27,
+	0,
+	0,
+	0,
+	0,
+	sws_isr_32,
+	sws_isr_33,
+	sws_isr_34,
+	sws_isr_35,
+#endif
 };
 
 SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, int bufSize, int isrBufSize) {
