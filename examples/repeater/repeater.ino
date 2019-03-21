@@ -10,10 +10,10 @@
 // SoftwareSerial loopback for remote source (loopback.ino),
 // or hardware loopback, connect source D5 to local D8 (TX, 15), source D6 to local D7 (RX, 13).
 //#define HWLOOPBACK 1
-//#define HALFDUPLEX 1
+#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int SWSERBITRATE = 38400;
+constexpr int SWSERBITRATE = 57600;
 #else
 constexpr int SWSERBITRATE = 28800;
 #endif
@@ -33,12 +33,11 @@ Stream& repeater(Serial);
 SoftwareSerial ssLogger(RX, TX);
 Stream& logger(ssLogger);
 #else
-SoftwareSerial repeater(13, 15);
+SoftwareSerial repeater(14, 12);
 Stream& logger(Serial);
 #endif
 
-void setup()
-{
+void setup() {
 	//WiFi.mode(WIFI_OFF);
 	//WiFi.forceSleepBegin();
 	//delay(1);
@@ -63,36 +62,33 @@ void setup()
 	expected = -1;
 }
 
-void loop()
-{
+void loop() {
 #ifdef HALFDUPLEX
 	unsigned char block[BLOCKSIZE];
 	int inCnt = 0;
 #endif
-	expected = -1;
-	while (repeater.available())
-	{
+	while (repeater.available()) {
 		int r = repeater.read();
 		if (r == -1) { logger.println("read() == -1"); }
-		if (expected == -1) expected = r;
-		else
-		{
+		if (expected == -1) { expected = r; }
+		else {
 			expected = ++expected % 256;
 		}
-#if HALFDUPLEX
-		block[inCnt++] = expected;
-#else
-		repeater.write(expected);
-#endif
 		if (r != expected) {
 			++seqErrors;
 		}
 		++rxCount;
-		if (rxCount >= ReportInterval) break;
+#if HALFDUPLEX
+		block[inCnt++] = expected;
+		if (inCnt >= BLOCKSIZE) { break; }
+#else
+		repeater.write(expected);
+#endif
 	}
 
 #ifdef HALFDUPLEX
-	repeater.write(block, inCnt);
+	for (int i = 0; i < inCnt; ++i) { repeater.write(block[i]); }
+	//repeater.write(block, inCnt);
 #endif
 
 	if (rxCount >= ReportInterval) {

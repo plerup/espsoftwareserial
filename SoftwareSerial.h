@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <inttypes.h>
 #include <Stream.h>
 #include <functional>
+#include <atomic>
 
 // If only one tx or rx wanted then use this as parameter for the unused pin
 constexpr int SW_SERIAL_UNUSED_PIN = -1;
@@ -41,8 +42,8 @@ public:
 	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, int bufSize = 64, int isrBufSize = 0);
 	virtual ~SoftwareSerial();
 
-	void begin(long baud);
-	long baudRate();
+	void begin(int32_t baud);
+	int32_t baudRate();
 	// Transmit control pin
 	void setTransmitEnablePin(int transmitEnablePin);
 	// Enable or disable interrupts during tx
@@ -77,8 +78,8 @@ public:
 	using Print::write;
 
 private:
-	void preciseDelay(long unsigned deadline);
-	void writePeriod(long unsigned dutyCycle, long unsigned offCycle);
+	void preciseDelay(uint32_t deadline);
+	void writePeriod(uint32_t dutyCycle, uint32_t offCycle);
 	bool isValidGPIOpin(int pin);
 	/* check m_rxValid that calling is safe */
 	void rxBits();
@@ -94,19 +95,19 @@ private:
 	bool m_txEnableValid = false;
 	bool m_invert;
 	bool m_overflow = false;
-	long m_bitCycles;
-	long unsigned m_periodDeadline;
+	int32_t m_bitCycles;
+	uint32_t m_periodDeadline;
 	bool m_intTxEnabled;
 	int m_inPos, m_outPos;
 	int m_bufSize = 0;
 	uint8_t *m_buffer = 0;
 	// the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
 	// 1 = positive including 0, 0 = negative.
-	volatile int m_isrInPos, m_isrOutPos;
+	std::atomic<int> m_isrInPos, m_isrOutPos;
 	int m_isrBufSize = 0;
-	volatile long unsigned *m_isrBuffer = 0;
-	volatile bool m_isrOverflow = false;
-	long unsigned m_lastCycle = 0;
+	std::atomic<uint32_t>* m_isrBuffer;
+	std::atomic<bool> m_isrOverflow;
+	std::atomic<uint32_t> m_isrLastCycle;
 	int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
 	uint8_t m_rxCurByte = 0;
 

@@ -10,10 +10,10 @@
 // local SoftwareSerial loopback, connect D5 (14) to D6 (12), or with repeater, connect crosswise.
 // or hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
 //#define HWLOOPBACK 1
-//#define HALFDUPLEX 1
+#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int SWSERBITRATE = 38400;
+constexpr int SWSERBITRATE = 57600;
 #else
 constexpr int SWSERBITRATE = 28800;
 #endif
@@ -71,32 +71,34 @@ void loop() {
 	unsigned char block[BLOCKSIZE];
 	for (int i = 0; i < BLOCKSIZE; ++i) {
 		block[i] = c;
-		swSerial.write(c);
+		//swSerial.write(c);
 		c = ++c % 256;
 		++txCount;
 #ifdef HWLOOPBACK
-		while (0 == (i % 8) && Serial.available()) Serial.write(Serial.read());
+		while (0 == (i % 8) && Serial.available()) { Serial.write(Serial.read()); }
 #endif
 	}
-	//swSerial.write(block, BLOCKSIZE);
+	swSerial.write(block, BLOCKSIZE);
 	if (swSerial.overflow()) { logger.println("overflow"); }
 
 #ifdef HWLOOPBACK
-	while (Serial.available()) Serial.write(Serial.read());
+	while (Serial.available()) { Serial.write(Serial.read()); }
 #endif
-
-	expected = -1;
-	while (swSerial.available()) {
-		int r = swSerial.read();
-		if (r == -1) { logger.println("read() == -1"); }
-		if (expected == -1) { expected = r; }
-		else {
-			expected = ++expected % 256;
+	delay(1000 * 10 * BLOCKSIZE / 2 / SWSERBITRATE);
+	int avail;
+	while (0 != (avail = swSerial.available())) {
+		for (int i = 0; i < avail; ++i) {
+			int r = swSerial.read();
+			if (r == -1) { logger.println("read() == -1"); }
+			if (expected == -1) { expected = r; }
+			else {
+				expected = ++expected % 256;
+			}
+			if (r != expected) {
+				++rxErrors;
+			}
+			++rxCount;
 		}
-		if (r != expected) {
-			++rxErrors;
-		}
-		++rxCount;
 	}
 
 	if (txCount >= ReportInterval) {
@@ -114,5 +116,10 @@ void loop() {
 		rxCount = 0;
 		rxErrors = 0;
 		expected = -1;
+	}
+	int rem;
+	if (0 != (rem = swSerial.available())) {
+		logger.print("swSerial.available() == ");
+		logger.println(rem);
 	}
 }
