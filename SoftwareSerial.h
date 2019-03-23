@@ -1,8 +1,9 @@
 /*
 SoftwareSerial.h
 
-SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
+SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266/ESP32.
 Copyright (c) 2015-2016 Peter Lerup. All rights reserved.
+Copyright (c) 2018-2019 Dirk O. Kaar. All rights reserved.
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
@@ -25,69 +26,92 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <inttypes.h>
 #include <Stream.h>
+#include <functional>
+#include <atomic>
 
+// If only one tx or rx wanted then use this as parameter for the unused pin
+constexpr int SW_SERIAL_UNUSED_PIN = -1;
 
 // This class is compatible with the corresponding AVR one,
 // the constructor however has an optional rx buffer size.
-// Speed up to 115200 can be used.
+// Baudrates up to 115200 can be used.
 
 
 class SoftwareSerial : public Stream {
 public:
-  SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
-  virtual ~SoftwareSerial();
+	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, int bufSize = 64, int isrBufSize = 0);
+	virtual ~SoftwareSerial();
 
-  void begin(long speed);
-  long baudRate();
-  // Transmit control pin
-  void setTransmitEnablePin(int transmitEnablePin);
-  // Enable or disable interrupts during tx
-  void enableIntTx(bool on);
+	void begin(int32_t baud);
+	int32_t baudRate();
+	// Transmit control pin
+	void setTransmitEnablePin(int transmitEnablePin);
+	// Enable or disable interrupts during tx
+	void enableIntTx(bool on);
 
-  bool overflow();
-  int peek();
+	bool overflow();
 
-  virtual size_t write(uint8_t byte);
-  virtual int read();
-  virtual int available();
-  virtual void flush();
-  operator bool() {return m_rxValid || m_txValid;}
+	int available() override;
+	int peek() override;
+	int read() override;
+	void flush() override;
+	size_t write(uint8_t byte) override;
+	size_t write(const uint8_t *buffer, size_t size) override;
+	operator bool() const { return m_rxValid || m_txValid; }
 
-  // Disable or enable interrupts on the rx pin
-  void enableRx(bool on);
-  // One wire control
-  void enableTx(bool on);
+	// Disable or enable interrupts on the rx pin
+	void enableRx(bool on);
+	// One wire control
+	void enableTx(bool on);
 
-  void rxRead();
+	void rxRead();
 
-  // AVR compatibility methods
-  bool listen() { enableRx(true); return true; }
-  void end() { stopListening(); }
-  bool isListening() { return m_rxEnabled; }
-  bool stopListening() { enableRx(false); return true; }
+	// AVR compatibility methods
+	bool listen() { enableRx(true); return true; }
+	void end() { stopListening(); }
+	bool isListening() { return m_rxEnabled; }
+	bool stopListening() { enableRx(false); return true; }
 
-  using Print::write;
+	void onReceive(std::function<void(int available)> handler);
+	void perform_work();
+
+	using Print::write;
 
 private:
-  bool isValidGPIOpin(int pin);
+	void preciseDelay(uint32_t deadline);
+	void writePeriod(uint32_t dutyCycle, uint32_t offCycle);
+	bool isValidGPIOpin(int pin);
+	/* check m_rxValid that calling is safe */
+	void rxBits();
 
-  // Member variables
-  bool m_oneWire;
-  int m_rxPin, m_txPin, m_txEnablePin;
-  bool m_rxValid, m_rxEnabled;
-  bool m_txValid, m_txEnableValid;
-  bool m_invert;
-  bool m_overflow;
-  unsigned long m_bitTime;
-  bool m_intTxEnabled;
-  unsigned int m_inPos, m_outPos;
-  int m_buffSize;
-  uint8_t *m_buffer;
+	// Member variables
+	bool m_oneWire;
+	int m_rxPin = SW_SERIAL_UNUSED_PIN;
+	int m_txPin = SW_SERIAL_UNUSED_PIN;
+	int m_txEnablePin = SW_SERIAL_UNUSED_PIN;
+	bool m_rxValid = false;
+	bool m_rxEnabled = false;
+	bool m_txValid = false;
+	bool m_txEnableValid = false;
+	bool m_invert;
+	bool m_overflow = false;
+	int32_t m_bitCycles;
+	uint32_t m_periodDeadline;
+	bool m_intTxEnabled;
+	int m_inPos, m_outPos;
+	int m_bufSize = 0;
+	uint8_t *m_buffer = 0;
+	// the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
+	// 1 = positive including 0, 0 = negative.
+	std::atomic<int> m_isrInPos, m_isrOutPos;
+	int m_isrBufSize = 0;
+	std::atomic<uint32_t>* m_isrBuffer;
+	std::atomic<bool> m_isrOverflow;
+	std::atomic<uint32_t> m_isrLastCycle;
+	int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
+	uint8_t m_rxCurByte = 0;
 
+	std::function<void(int available)> receiveHandler = 0;
 };
-
-// If only one tx or rx wanted then use this as parameter for the unused pin
-#define SW_SERIAL_UNUSED_PIN -1
-
 
 #endif
