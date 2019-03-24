@@ -41,8 +41,8 @@ class SoftwareSerial : public Stream {
 public:
 	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, int bufSize = 64, int isrBufSize = 0);
 	virtual ~SoftwareSerial();
-
-	void begin(int32_t baud);
+	// Returns false if more than MAX_SWS_INSTS instances are started
+	bool begin(int32_t baud);
 	int32_t baudRate();
 	// Transmit control pin
 	void setTransmitEnablePin(int transmitEnablePin);
@@ -68,7 +68,7 @@ public:
 
 	// AVR compatibility methods
 	bool listen() { enableRx(true); return true; }
-	void end() { stopListening(); }
+	void end();
 	bool isListening() { return m_rxEnabled; }
 	bool stopListening() { enableRx(false); return true; }
 
@@ -88,6 +88,7 @@ private:
 	bool m_oneWire;
 	int m_rxPin = SW_SERIAL_UNUSED_PIN;
 	int m_txPin = SW_SERIAL_UNUSED_PIN;
+	ssize_t m_swsInstsIdx = -1;
 	int m_txEnablePin = SW_SERIAL_UNUSED_PIN;
 	bool m_rxValid = false;
 	bool m_rxEnabled = false;

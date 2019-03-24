@@ -28,101 +28,68 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tests so far (ESP8266 HW UART, SDS011 PM sensor, SoftwareSerial back-to-back).
 #define ALT_DIGITAL_WRITE 1
 
+// Modify MAX_SWS_INSTS and comment out sws_isr_* trampolines and adapt the
+// ISRList initializer accordingly if reducing the footprint of these
+// data structures is desired.
 #if defined(ESP8266)
-constexpr size_t MAX_PIN = 15;
+constexpr size_t MAX_SWS_INSTS = 10;
 #elif defined(ESP32)
-constexpr size_t MAX_PIN = 35;
+constexpr size_t MAX_SWS_INSTS = 22;
 #endif
 
 // As the Arduino attachInterrupt has no parameter, lists of objects
 // and callbacks corresponding to each possible GPIO pins have to be defined
-SoftwareSerial *ObjList[MAX_PIN + 1];
+SoftwareSerial* ObjList[MAX_SWS_INSTS];
 
 void ICACHE_RAM_ATTR sws_isr_0() { ObjList[0]->rxRead(); };
-#ifdef ESP32
-// Pin 1 can not be used
-#else
 void ICACHE_RAM_ATTR sws_isr_1() { ObjList[1]->rxRead(); };
-#endif
 void ICACHE_RAM_ATTR sws_isr_2() { ObjList[2]->rxRead(); };
-#ifdef ESP32
-// Pin 3 can not be used
-#else
 void ICACHE_RAM_ATTR sws_isr_3() { ObjList[3]->rxRead(); };
-#endif
 void ICACHE_RAM_ATTR sws_isr_4() { ObjList[4]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };
-// Pin 6 to 11 can not be used
+void ICACHE_RAM_ATTR sws_isr_6() { ObjList[6]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_7() { ObjList[7]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_8() { ObjList[8]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_9() { ObjList[9]->rxRead(); };
+#ifdef ESP32
+void ICACHE_RAM_ATTR sws_isr_10() { ObjList[10]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_11() { ObjList[11]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };
-#ifdef ESP32
 void ICACHE_RAM_ATTR sws_isr_16() { ObjList[16]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_17() { ObjList[17]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_18() { ObjList[18]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_19() { ObjList[19]->rxRead(); };
-// Pin 20 can not be used
+void ICACHE_RAM_ATTR sws_isr_20() { ObjList[20]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_21() { ObjList[21]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_22() { ObjList[22]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_23() { ObjList[23]->rxRead(); };
-// Pin 24 can not be used
-void ICACHE_RAM_ATTR sws_isr_25() { ObjList[25]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_26() { ObjList[26]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_27() { ObjList[27]->rxRead(); };
-// Pin 28 to 31 can not be used
-void ICACHE_RAM_ATTR sws_isr_32() { ObjList[32]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_33() { ObjList[33]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_34() { ObjList[34]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_35() { ObjList[35]->rxRead(); };
 #endif
 
-static void (*ISRList[MAX_PIN + 1])() = {
+static void (*ISRList[MAX_SWS_INSTS])() = {
 	sws_isr_0,
-#ifdef ESP32
-	0,
-#else
 	sws_isr_1,
-#endif
 	sws_isr_2,
-#ifdef ESP32
-	0,
-#else
 	sws_isr_3,
-#endif
 	sws_isr_4,
 	sws_isr_5,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
+	sws_isr_6,
+	sws_isr_7,
+	sws_isr_8,
+	sws_isr_9,
+#ifdef ESP32
+	sws_isr_10,
+	sws_isr_11,
 	sws_isr_12,
 	sws_isr_13,
 	sws_isr_14,
 	sws_isr_15,
-#ifdef ESP32
 	sws_isr_16,
 	sws_isr_17,
 	sws_isr_18,
 	sws_isr_19,
-	0,
+	sws_isr_20,
 	sws_isr_21,
-	sws_isr_22,
-	sws_isr_23,
-	0,
-	sws_isr_25,
-	sws_isr_26,
-	sws_isr_27,
-	0,
-	0,
-	0,
-	0,
-	sws_isr_32,
-	sws_isr_33,
-	sws_isr_34,
-	sws_isr_35,
 #endif
 };
 
@@ -147,20 +114,36 @@ SoftwareSerial::SoftwareSerial(
 }
 
 SoftwareSerial::~SoftwareSerial() {
-	enableRx(false);
-	if (m_rxValid) {
-		ObjList[m_rxPin] = 0;
-	}
+	end();
 	if (m_buffer) {
 		free(m_buffer);
+	}
+	if (m_isrBuffer) {
+		free(m_isrBuffer);
 	}
 }
 
 bool SoftwareSerial::isValidGPIOpin(int pin) {
-	return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= MAX_PIN);
+#ifdef ESP8266
+	return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 15);
+#endif
+#ifdef ESP32
+	return pin == 0 || pin == 2 || (pin >= 4 && pin <= 5) || (pin >= 12 && pin <= 19) ||
+		(pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 35);
+#endif
 }
 
-void SoftwareSerial::begin(int32_t baud) {
+bool SoftwareSerial::begin(int32_t baud) {
+	if (m_swsInstsIdx < 0)
+		for (size_t i = 0; i < MAX_SWS_INSTS; ++i)
+		{
+			if (!ObjList[i]) {
+				ObjList[i] = this;
+				m_swsInstsIdx = i;
+				break;
+			}
+		}
+	if (m_swsInstsIdx < 0) return false;
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	m_intTxEnabled = true;
 	if (m_buffer != 0 && m_isrBuffer != 0) {
@@ -169,8 +152,6 @@ void SoftwareSerial::begin(int32_t baud) {
 		m_isrInPos.store(0);
 		m_isrOutPos.store(0);
 		pinMode(m_rxPin, INPUT_PULLUP);
-		if (this != ObjList[m_rxPin]) { delete ObjList[m_rxPin]; }
-		ObjList[m_rxPin] = this;
 	}
 	if (m_txValid && !m_oneWire) {
 #ifdef ALT_DIGITAL_WRITE
@@ -180,9 +161,19 @@ void SoftwareSerial::begin(int32_t baud) {
 		pinMode(m_txPin, OUTPUT);
 		digitalWrite(m_txPin, !m_invert);
 #endif
+		return true;
 	}
 
 	if (!m_rxEnabled) { enableRx(true); }
+}
+
+void SoftwareSerial::end()
+{
+	enableRx(false);
+	if (m_swsInstsIdx >= 0)	{
+		ObjList[m_swsInstsIdx] = 0;
+		m_swsInstsIdx = -1;
+	}
 }
 
 int32_t SoftwareSerial::baudRate() {
@@ -242,7 +233,7 @@ void SoftwareSerial::enableRx(bool on) {
 	if (m_rxValid) {
 		if (on) {
 			m_rxCurBit = 8;
-			attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_rxPin], CHANGE);
+			attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_swsInstsIdx], CHANGE);
 		} else {
 			detachInterrupt(digitalPinToInterrupt(m_rxPin));
 		}
