@@ -37,59 +37,38 @@ constexpr size_t MAX_SWS_INSTS = 10;
 constexpr size_t MAX_SWS_INSTS = 22;
 #endif
 
-// As the Arduino attachInterrupt has no parameter, lists of objects
-// and callbacks corresponding to each possible GPIO pins have to be defined
-SoftwareSerial* ObjList[MAX_SWS_INSTS];
+// As the ESP8266 Arduino attachInterrupt has no parameter, lists of objects
+// and callbacks corresponding to each possible list index have to be defined
+static ICACHE_RAM_ATTR SoftwareSerial* ObjList[MAX_SWS_INSTS];
 
-void ICACHE_RAM_ATTR sws_isr_0() { ObjList[0]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_1() { ObjList[1]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_2() { ObjList[2]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_3() { ObjList[3]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_4() { ObjList[4]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_6() { ObjList[6]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_7() { ObjList[7]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_8() { ObjList[8]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_9() { ObjList[9]->rxRead(); };
-#ifdef ESP32
-void ICACHE_RAM_ATTR sws_isr_10() { ObjList[10]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_11() { ObjList[11]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_16() { ObjList[16]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_17() { ObjList[17]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_18() { ObjList[18]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_19() { ObjList[19]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_20() { ObjList[20]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_21() { ObjList[21]->rxRead(); };
-#endif
+template<int I> void ICACHE_RAM_ATTR sws_isr() {
+	ObjList[I]->rxRead();
+}
 
-static void (*ISRList[MAX_SWS_INSTS])() = {
-	sws_isr_0,
-	sws_isr_1,
-	sws_isr_2,
-	sws_isr_3,
-	sws_isr_4,
-	sws_isr_5,
-	sws_isr_6,
-	sws_isr_7,
-	sws_isr_8,
-	sws_isr_9,
+static void (* const ISRList[MAX_SWS_INSTS])() = {
+	sws_isr<0>,
+	sws_isr<1>,
+	sws_isr<2>,
+	sws_isr<3>,
+	sws_isr<4>,
+	sws_isr<5>,
+	sws_isr<6>,
+	sws_isr<7>,
+	sws_isr<8>,
+	sws_isr<9>,
 #ifdef ESP32
-	sws_isr_10,
-	sws_isr_11,
-	sws_isr_12,
-	sws_isr_13,
-	sws_isr_14,
-	sws_isr_15,
-	sws_isr_16,
-	sws_isr_17,
-	sws_isr_18,
-	sws_isr_19,
-	sws_isr_20,
-	sws_isr_21,
+	sws_isr<10>,
+	sws_isr<11>,
+	sws_isr<12>,
+	sws_isr<13>,
+	sws_isr<14>,
+	sws_isr<15>,
+	sws_isr<16>,
+	sws_isr<17>,
+	sws_isr<18>,
+	sws_isr<19>,
+	sws_isr<20>,
+	sws_isr<21>,
 #endif
 };
 
@@ -138,8 +117,8 @@ bool SoftwareSerial::begin(int32_t baud) {
 		for (size_t i = 0; i < MAX_SWS_INSTS; ++i)
 		{
 			if (!ObjList[i]) {
-				ObjList[i] = this;
 				m_swsInstsIdx = i;
+				ObjList[m_swsInstsIdx] = this;
 				break;
 			}
 		}
@@ -161,10 +140,10 @@ bool SoftwareSerial::begin(int32_t baud) {
 		pinMode(m_txPin, OUTPUT);
 		digitalWrite(m_txPin, !m_invert);
 #endif
-		return true;
 	}
 
 	if (!m_rxEnabled) { enableRx(true); }
+	return true;
 }
 
 void SoftwareSerial::end()
