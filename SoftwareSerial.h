@@ -47,11 +47,18 @@ class SoftwareSerial : public Stream {
 public:
 	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, int bufSize = 64, int isrBufSize = 0);
 	virtual ~SoftwareSerial();
+#ifndef ESP32
 	// Returns false if more than SOFTWARESERIAL_MAX_INSTS instances are started
 	bool begin(int32_t baud) {
 		begin(baud, SWSERIAL_8N1);
 	}
 	bool begin(int32_t baud, SoftwareSerialConfig config);
+#else
+	void begin(int32_t baud) {
+		begin(baud, SWSERIAL_8N1);
+	}
+	void begin(int32_t baud, SoftwareSerialConfig config);
+#endif
 	int32_t baudRate();
 	// Transmit control pin
 	void setTransmitEnablePin(int transmitEnablePin);
@@ -73,7 +80,7 @@ public:
 	// One wire control
 	void enableTx(bool on);
 
-	void rxRead();
+	static void rxRead(SoftwareSerial* self);
 
 	// AVR compatibility methods
 	bool listen() { enableRx(true); return true; }
@@ -97,7 +104,9 @@ private:
 	bool m_oneWire;
 	int m_rxPin = SW_SERIAL_UNUSED_PIN;
 	int m_txPin = SW_SERIAL_UNUSED_PIN;
+#ifndef ESP32
 	ssize_t m_swsInstsIdx = -1;
+#endif
 	int m_txEnablePin = SW_SERIAL_UNUSED_PIN;
 	bool m_rxValid = false;
 	bool m_rxEnabled = false;

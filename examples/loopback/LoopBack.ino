@@ -13,7 +13,7 @@
 #define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int SWSERBITRATE = 57600;
+constexpr int SWSERBITRATE = 38400;
 #else
 constexpr int SWSERBITRATE = 28800;
 #endif

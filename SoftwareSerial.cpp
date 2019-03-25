@@ -28,12 +28,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tests so far (ESP8266 HW UART, SDS011 PM sensor, SoftwareSerial back-to-back).
 #define ALT_DIGITAL_WRITE 1
 
+#ifndef ESP32
 #ifndef SOFTWARESERIAL_MAX_INSTS
-#if defined(ESP8266)
 #define SOFTWARESERIAL_MAX_INSTS 10
-#elif defined(ESP32)
-#define SOFTWARESERIAL_MAX_INSTS 22
-#endif
 #endif
 
 // As the ESP8266 Arduino attachInterrupt has no parameter, lists of objects
@@ -41,7 +38,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 static ICACHE_RAM_ATTR SoftwareSerial* ObjList[SOFTWARESERIAL_MAX_INSTS];
 
 template<int I> void ICACHE_RAM_ATTR sws_isr() {
-	ObjList[I]->rxRead();
+	SoftwareSerial::rxRead(ObjList[I]);
 }
 
 template <int N, int I = N - 1> class ISRTable : public ISRTable<N, I - 1> {
@@ -63,6 +60,7 @@ template <int N> void (*ISRTable<N, -1>::array[N])();
 template class ISRTable<SOFTWARESERIAL_MAX_INSTS>;
 
 static void (*(*ISRList))() = ISRTable<SOFTWARESERIAL_MAX_INSTS>::array;
+#endif
 
 SoftwareSerial::SoftwareSerial(
 	int receivePin, int transmitPin, bool inverse_logic, int bufSize, int isrBufSize) {
@@ -104,6 +102,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 #endif
 }
 
+#ifndef ESP32
 bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 	if (m_swsInstsIdx < 0)
 		for (size_t i = 0; i < (sizeof ObjList / sizeof ObjList[0]); ++i)
@@ -115,6 +114,9 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 			}
 		}
 	if (m_swsInstsIdx < 0) return false;
+#else
+	void SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
+#endif
 	m_dataBits = 5 + (config % 4);
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	m_intTxEnabled = true;
@@ -136,16 +138,20 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 	}
 
 	if (!m_rxEnabled) { enableRx(true); }
+#ifndef ESP32
 	return true;
+#endif
 }
 
 void SoftwareSerial::end()
 {
 	enableRx(false);
+#ifndef ESP32
 	if (m_swsInstsIdx >= 0)	{
 		ObjList[m_swsInstsIdx] = 0;
 		m_swsInstsIdx = -1;
 	}
+#endif
 }
 
 int32_t SoftwareSerial::baudRate() {
@@ -205,7 +211,11 @@ void SoftwareSerial::enableRx(bool on) {
 	if (m_rxValid) {
 		if (on) {
 			m_rxCurBit = m_dataBits;
+#ifndef ESP32
 			attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_swsInstsIdx], CHANGE);
+#else
+			attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxRead), this, CHANGE);
+#endif
 		} else {
 			detachInterrupt(digitalPinToInterrupt(m_rxPin));
 		}
@@ -435,18 +445,18 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 	}
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead(SoftwareSerial* self) {
 	uint32_t curCycle = ESP.getCycleCount();
-	bool level = digitalRead(m_rxPin);
+	bool level = digitalRead(self->m_rxPin);
 
 	// Store inverted edge value & cycle in the buffer unless we have an overflow
 	// cycle's LSB is repurposed for the level bit
-	int next = (m_isrInPos.load() + 1) % m_isrBufSize;
-	if (next != m_isrOutPos.load()) {
-		m_isrBuffer[m_isrInPos.load()].store((curCycle | 1) ^ level);
-		m_isrInPos.store(next);
+	int next = (self->m_isrInPos.load() + 1) % self->m_isrBufSize;
+	if (next != self->m_isrOutPos.load()) {
+		self->m_isrBuffer[self->m_isrInPos.load()].store((curCycle | 1) ^ level);
+		self->m_isrInPos.store(next);
 	} else {
-		m_isrOverflow.store(true);
+		self->m_isrOverflow.store(true);
 	}
 }
 
