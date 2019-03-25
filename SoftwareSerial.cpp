@@ -389,7 +389,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 	}
 
 	while (avail--) {
-		// error introduced by edge value in LSB is neglegible
+		// error introduced by edge value in LSB is negligible
 		uint32_t isrCycle = m_isrBuffer[m_isrOutPos.load()].load();
 		// extract inverted edge value
 		bool level = (isrCycle & 1) == m_invert;
