@@ -32,17 +32,26 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // If only one tx or rx wanted then use this as parameter for the unused pin
 constexpr int SW_SERIAL_UNUSED_PIN = -1;
 
+enum SoftwareSerialConfig {
+	SWSERIAL_5N1 = 0,
+	SWSERIAL_6N1,
+	SWSERIAL_7N1,
+	SWSERIAL_8N1,
+};
+
 // This class is compatible with the corresponding AVR one,
 // the constructor however has an optional rx buffer size.
 // Baudrates up to 115200 can be used.
-
 
 class SoftwareSerial : public Stream {
 public:
 	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, int bufSize = 64, int isrBufSize = 0);
 	virtual ~SoftwareSerial();
-	// Returns false if more than MAX_SWS_INSTS instances are started
-	bool begin(int32_t baud);
+	// Returns false if more than SOFTWARESERIAL_MAX_INSTS instances are started
+	bool begin(int32_t baud) {
+		begin(baud, SWSERIAL_8N1);
+	}
+	bool begin(int32_t baud, SoftwareSerialConfig config);
 	int32_t baudRate();
 	// Transmit control pin
 	void setTransmitEnablePin(int transmitEnablePin);
@@ -96,6 +105,7 @@ private:
 	bool m_txEnableValid = false;
 	bool m_invert;
 	bool m_overflow = false;
+	int8_t m_dataBits;
 	int32_t m_bitCycles;
 	uint32_t m_periodDeadline;
 	bool m_intTxEnabled;

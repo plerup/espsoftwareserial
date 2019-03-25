@@ -18,6 +18,8 @@ constexpr int SWSERBITRATE = 57600;
 constexpr int SWSERBITRATE = 28800;
 #endif
 
+constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
+
 constexpr int BLOCKSIZE = 16; // use fractions of 256
 
 
@@ -49,7 +51,7 @@ void setup() {
 	ssLogger.begin(115200);
 	ssLogger.enableIntTx(false);
 #else
-	repeater.begin(SWSERBITRATE);
+	repeater.begin(SWSERBITRATE, swSerialConfig);
 #ifdef HALFDUPLEX
 	repeater.enableIntTx(false);
 #endif
@@ -74,7 +76,7 @@ void loop() {
 		else {
 			expected = ++expected % 256;
 		}
-		if (r != expected) {
+		if (r != (expected & ((1 << (5 + swSerialConfig % 4)) - 1))) {
 			++seqErrors;
 		}
 		++rxCount;

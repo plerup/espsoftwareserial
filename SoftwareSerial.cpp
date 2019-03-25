@@ -104,7 +104,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 #endif
 }
 
-bool SoftwareSerial::begin(int32_t baud) {
+bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 	if (m_swsInstsIdx < 0)
 		for (size_t i = 0; i < (sizeof ObjList / sizeof ObjList[0]); ++i)
 		{
@@ -115,6 +115,7 @@ bool SoftwareSerial::begin(int32_t baud) {
 			}
 		}
 	if (m_swsInstsIdx < 0) return false;
+	m_dataBits = 5 + (config % 4);
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	m_intTxEnabled = true;
 	if (m_buffer != 0 && m_isrBuffer != 0) {
@@ -203,7 +204,7 @@ void SoftwareSerial::enableTx(bool on) {
 void SoftwareSerial::enableRx(bool on) {
 	if (m_rxValid) {
 		if (on) {
-			m_rxCurBit = 8;
+			m_rxCurBit = m_dataBits;
 			attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_swsInstsIdx], CHANGE);
 		} else {
 			detachInterrupt(digitalPinToInterrupt(m_rxPin));
@@ -229,7 +230,7 @@ int SoftwareSerial::available() {
 	int avail = m_inPos - m_outPos;
 	if (avail < 0) { avail += m_bufSize; }
 	if (!avail) {
-		optimistic_yield(20 * m_bitCycles / ESP.getCpuFreqMHz());
+		optimistic_yield(2 * (m_dataBits + 2) * m_bitCycles / ESP.getCpuFreqMHz());
 		rxBits();
 		avail = m_inPos - m_outPos;
 		if (avail < 0) { avail += m_bufSize; }
@@ -303,10 +304,10 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		pb = m_invert;
 		uint8_t o = m_invert ? ~*buffer : *buffer;
 		bool b;
-		for (int i = 0; i < 9; ++i) {
+		for (int i = 0; i <= m_dataBits; ++i) {
 			// data bit
 			// or stop bit : LOW if inverted logic, otherwise HIGH
-			b = (i < 8) ? (o & 1) : !m_invert;
+			b = (i < m_dataBits) ? (o & 1) : !m_invert;
 			o >>= 1;
 			if (!pb && b) {
 				writePeriod(dutyCycle, offCycle);
@@ -359,9 +360,9 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 	// stop bit can go undetected if leading data bits are at same level
 	// and there was also no next start bit yet, so one byte may be pending.
 	// low-cost check first
-	if (avail == 0 && m_rxCurBit < 8 && m_isrInPos.load() == m_isrOutPos.load() && m_rxCurBit >= 0) {
+	if (avail == 0 && m_rxCurBit < m_dataBits && m_isrInPos.load() == m_isrOutPos.load() && m_rxCurBit >= 0) {
 		uint32_t delta = ESP.getCycleCount() - m_isrLastCycle.load();
-		uint32_t expectedDelta = (10 - m_rxCurBit) * m_bitCycles;
+		uint32_t expectedDelta = (m_dataBits + 2 - m_rxCurBit) * m_bitCycles;
 		if (delta >= expectedDelta) {
 			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
 			// cycle's LSB is repurposed for the level bit
@@ -388,11 +389,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 		m_isrLastCycle.store(isrCycle);
 		do {
 			// data bits
-			if (m_rxCurBit >= -1 && m_rxCurBit < 7) {
+			if (m_rxCurBit >= -1 && m_rxCurBit < (m_dataBits - 1)) {
 				if (cycles >= m_bitCycles) {
 					// preceding masked bits
 					int hiddenBits = cycles / m_bitCycles;
-					if (hiddenBits > 7 - m_rxCurBit) { hiddenBits = 7 - m_rxCurBit; }
+					if (hiddenBits >= m_dataBits - m_rxCurBit) { hiddenBits = (m_dataBits - 1) - m_rxCurBit; }
 					bool lastBit = m_rxCurByte & 0x80;
 					m_rxCurByte >>= hiddenBits;
 					// masked bits have same level as last unmasked bit
@@ -400,7 +401,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 					m_rxCurBit += hiddenBits;
 					cycles -= hiddenBits * m_bitCycles;
 				}
-				if (m_rxCurBit < 7) {
+				if (m_rxCurBit < (m_dataBits - 1)) {
 					++m_rxCurBit;
 					cycles -= m_bitCycles;
 					m_rxCurByte >>= 1;
@@ -408,13 +409,13 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 				}
 				continue;
 			}
-			if (m_rxCurBit == 7) {
-				m_rxCurBit = 8;
+			if (m_rxCurBit == (m_dataBits - 1)) {
+				++m_rxCurBit;
 				cycles -= m_bitCycles;
 				// Store the received value in the buffer unless we have an overflow
 				int next = (m_inPos + 1) % m_bufSize;
 				if (next != m_outPos) {
-					m_buffer[m_inPos] = m_rxCurByte;
+					m_buffer[m_inPos] = m_rxCurByte >> (8 - m_dataBits);
 					// reset to 0 is important for masked bit logic
 					m_rxCurByte = 0;
 					m_inPos = next;
@@ -423,7 +424,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 				}
 				continue;
 			}
-			if (m_rxCurBit == 8) {
+			if (m_rxCurBit >= m_dataBits) {
 				// start bit level is low
 				if (!level) {
 					m_rxCurBit = -1;

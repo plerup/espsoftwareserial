@@ -18,6 +18,8 @@ constexpr int SWSERBITRATE = 57600;
 constexpr int SWSERBITRATE = 28800;
 #endif
 
+constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
+
 constexpr int BLOCKSIZE = 16; // use fractions of 256
 
 SoftwareSerial swSerial(14, 12);
@@ -54,7 +56,7 @@ void setup() {
 	Serial.begin(115200);
 #endif
 
-	swSerial.begin(SWSERBITRATE);
+	swSerial.begin(SWSERBITRATE, swSerialConfig);
 #ifdef HALFDUPLEX
 	swSerial.enableIntTx(false);
 #endif
@@ -94,7 +96,7 @@ void loop() {
 			else {
 				expected = ++expected % 256;
 			}
-			if (r != expected) {
+			if (r != (expected & ((1 << (5 + swSerialConfig % 4)) - 1))) {
 				++rxErrors;
 			}
 			++rxCount;
