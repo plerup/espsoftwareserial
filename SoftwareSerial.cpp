@@ -371,14 +371,12 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 	// and there was also no next start bit yet, so one byte may be pending.
 	// low-cost check first
 	if (avail == 0 && m_rxCurBit < m_dataBits && m_isrInPos.load() == m_isrOutPos.load() && m_rxCurBit >= 0) {
-		uint32_t delta = ESP.getCycleCount() - m_isrLastCycle.load();
-		uint32_t expectedDelta = (m_dataBits + 2 - m_rxCurBit) * m_bitCycles;
-		if (delta >= expectedDelta) {
+		uint32_t expectedCycle = m_isrLastCycle.load() + (m_dataBits + 1 - m_rxCurBit) * m_bitCycles;
+		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
 			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
 			// cycle's LSB is repurposed for the level bit
 			int next = (m_isrInPos.load() + 1) % m_isrBufSize;
 			if (next != m_isrOutPos.load()) {
-				uint32_t expectedCycle = m_isrLastCycle.load() + expectedDelta;
 				m_isrBuffer[m_isrInPos.load()].store((expectedCycle | 1) ^ !m_invert);
 				m_isrInPos.store(next);
 				++avail;
@@ -394,7 +392,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
 		// extract inverted edge value
 		bool level = (isrCycle & 1) == m_invert;
 		m_isrOutPos.store((m_isrOutPos.load() + 1) % m_isrBufSize);
-		int32_t cycles = static_cast<int32_t>(isrCycle - m_isrLastCycle.load()) - (m_bitCycles / 2);
+		int32_t cycles = static_cast<int32_t>(isrCycle - m_isrLastCycle.load() - (m_bitCycles / 2));
 		if (cycles < 0) { continue; }
 		m_isrLastCycle.store(isrCycle);
 		do {
