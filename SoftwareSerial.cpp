@@ -28,49 +28,41 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tests so far (ESP8266 HW UART, SDS011 PM sensor, SoftwareSerial back-to-back).
 #define ALT_DIGITAL_WRITE 1
 
-// Modify MAX_SWS_INSTS and comment out sws_isr_* trampolines and adapt the
-// ISRList initializer accordingly if reducing the footprint of these
-// data structures is desired.
+#ifndef SOFTWARESERIAL_MAX_INSTS
 #if defined(ESP8266)
-constexpr size_t MAX_SWS_INSTS = 10;
+#define SOFTWARESERIAL_MAX_INSTS 10
 #elif defined(ESP32)
-constexpr size_t MAX_SWS_INSTS = 22;
+#define SOFTWARESERIAL_MAX_INSTS 22
+#endif
 #endif
 
 // As the ESP8266 Arduino attachInterrupt has no parameter, lists of objects
 // and callbacks corresponding to each possible list index have to be defined
-static ICACHE_RAM_ATTR SoftwareSerial* ObjList[MAX_SWS_INSTS];
+static ICACHE_RAM_ATTR SoftwareSerial* ObjList[SOFTWARESERIAL_MAX_INSTS];
 
 template<int I> void ICACHE_RAM_ATTR sws_isr() {
 	ObjList[I]->rxRead();
 }
 
-static void (* const ISRList[MAX_SWS_INSTS])() = {
-	sws_isr<0>,
-	sws_isr<1>,
-	sws_isr<2>,
-	sws_isr<3>,
-	sws_isr<4>,
-	sws_isr<5>,
-	sws_isr<6>,
-	sws_isr<7>,
-	sws_isr<8>,
-	sws_isr<9>,
-#ifdef ESP32
-	sws_isr<10>,
-	sws_isr<11>,
-	sws_isr<12>,
-	sws_isr<13>,
-	sws_isr<14>,
-	sws_isr<15>,
-	sws_isr<16>,
-	sws_isr<17>,
-	sws_isr<18>,
-	sws_isr<19>,
-	sws_isr<20>,
-	sws_isr<21>,
-#endif
+template <int N, int I = N - 1> class ISRTable : public ISRTable<N, I - 1> {
+public:
+	static const int dummy;
 };
+
+template <int N> class ISRTable<N, -1> {
+public:
+	static const int dummy;
+	static void (*array[N])();
+};
+
+template <int N, int I>	const int ISRTable<N, I>::dummy =
+	reinterpret_cast<int>(ISRTable<N, -1>::array[I] = sws_isr<I>) + 0 * ISRTable<N, I - 1>::dummy;
+
+template <int N> void (*ISRTable<N, -1>::array[N])();
+
+template class ISRTable<SOFTWARESERIAL_MAX_INSTS>;
+
+static void (*(*ISRList))() = ISRTable<SOFTWARESERIAL_MAX_INSTS>::array;
 
 SoftwareSerial::SoftwareSerial(
 	int receivePin, int transmitPin, bool inverse_logic, int bufSize, int isrBufSize) {
@@ -114,7 +106,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 
 bool SoftwareSerial::begin(int32_t baud) {
 	if (m_swsInstsIdx < 0)
-		for (size_t i = 0; i < MAX_SWS_INSTS; ++i)
+		for (size_t i = 0; i < (sizeof ObjList / sizeof ObjList[0]); ++i)
 		{
 			if (!ObjList[i]) {
 				m_swsInstsIdx = i;

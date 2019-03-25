@@ -67,3 +67,8 @@ The more frequently your code calls write or read functions, the greater the
 chances are that you can reduce the isrBufSize footprint without losing data,
 and each time you call read to fetch from the octet buffer, you reduce the
 need for space there.
+
+The size of the tables needed for interrupt dispatch can be adapted to the
+actual maximum number of SoftwareSerial instances in a sketch.
+To reduce the memory footprint of these tables, define SOFTWARESERIAL_MAX_INSTS
+to the total number of SoftwareSerial objects your sketch uses.
