@@ -10,10 +10,10 @@
 // local SoftwareSerial loopback, connect D5 (14) to D6 (12), or with repeater, connect crosswise.
 // or hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
 //#define HWLOOPBACK 1
-#define HALFDUPLEX 1
+//#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int SWSERBITRATE = 38400;
+constexpr int SWSERBITRATE = 28800;
 #else
 constexpr int SWSERBITRATE = 28800;
 #endif

@@ -1,14 +1,13 @@
 // On ESP8266:
-// Runs at 160MHz CPU frequency and BAUD_RATE 115200.
-// Runs at 80MHz CPU frequency and BAUD_RATE 74880.
+// Runs at both 80MHz and 160MHz CPU frequency at 56000bps without visible errors.
 // Connect pin 12 to 14.
 
 #include <SoftwareSerial.h>
 
 #ifdef ESP32
-#define BAUD_RATE 115200
+#define BAUD_RATE 56000
 #else
-#define BAUD_RATE 74880
+#define BAUD_RATE 56000
 #endif
 
 SoftwareSerial swSer(14, 12, false, 93, 10);

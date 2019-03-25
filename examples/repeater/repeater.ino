@@ -10,10 +10,10 @@
 // SoftwareSerial loopback for remote source (loopback.ino),
 // or hardware loopback, connect source D5 to local D8 (TX, 15), source D6 to local D7 (RX, 13).
 //#define HWLOOPBACK 1
-#define HALFDUPLEX 1
+//#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int SWSERBITRATE = 38400;
+constexpr int SWSERBITRATE = 28800;
 #else
 constexpr int SWSERBITRATE = 28800;
 #endif
