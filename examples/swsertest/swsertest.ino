@@ -10,7 +10,10 @@
 #define BAUD_RATE 56000
 #endif
 
-SoftwareSerial swSer(14, 12, false, 93, 10);
+// Reminder: the buffer size optimizations here, in particular the isrBufSize that only accommodates
+// a single 8N1 word, are on the basis that any char written to the loopback SoftwareSerial adapter gets read
+// before another write is performed. Block writes with a size greater than 1 would usually fail. 
+SoftwareSerial swSer(14, 12, false, 95, 10);
 
 void setup() {
   Serial.begin(115200);
