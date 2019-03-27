@@ -89,8 +89,8 @@ void loop() {
 	}
 
 #ifdef HALFDUPLEX
-	for (int i = 0; i < inCnt; ++i) { repeater.write(block[i]); }
-	//repeater.write(block, inCnt);
+	//for (int i = 0; i < inCnt; ++i) { repeater.write(block[i]); }
+	repeater.write(block, inCnt);
 #endif
 
 	if (rxCount >= ReportInterval) {

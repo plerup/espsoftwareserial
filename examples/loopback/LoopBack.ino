@@ -86,7 +86,9 @@ void loop() {
 #ifdef HWLOOPBACK
 	while (Serial.available()) { Serial.write(Serial.read()); }
 #endif
+#ifdef HALFDUPLEX
 	delay(1000 * 10 * BLOCKSIZE / 2 / SWSERBITRATE);
+#endif
 	int avail;
 	while (0 != (avail = swSerial.available())) {
 		for (int i = 0; i < avail; ++i) {
