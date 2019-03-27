@@ -7,7 +7,7 @@
 #ifdef ESP32
 #define BAUD_RATE 56000
 #else
-#define BAUD_RATE 56000
+#define BAUD_RATE 19200
 #endif
 
 // Reminder: the buffer size optimizations here, in particular the isrBufSize that only accommodates
