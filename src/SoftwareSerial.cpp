@@ -308,7 +308,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	// Disable interrupts in order to get a clean transmit timing
 	if (!m_intTxEnabled) { noInterrupts(); }
 	m_periodDeadline = ESP.getCycleCount();
-	for (int cnt = 0; cnt < size; ++cnt, ++buffer) {
+	for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
 		// Start bit : HIGH if inverted logic, otherwise LOW
 		if (m_invert) { dutyCycle += m_bitCycles; } else { offCycle += m_bitCycles; }
 		pb = m_invert;

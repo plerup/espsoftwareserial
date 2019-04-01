@@ -50,7 +50,7 @@ public:
 #ifndef ESP32
 	// Returns false if more than SOFTWARESERIAL_MAX_INSTS instances are started
 	bool begin(int32_t baud) {
-		begin(baud, SWSERIAL_8N1);
+		return begin(baud, SWSERIAL_8N1);
 	}
 	bool begin(int32_t baud, SoftwareSerialConfig config);
 #else
