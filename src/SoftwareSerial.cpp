@@ -248,16 +248,16 @@ int SoftwareSerial::available() {
 	return avail;
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool withStopBit) {
+void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool late) {
 	// Reenable interrupts while delaying to avoid other tasks piling up
-	if (!m_intTxEnabled && withStopBit) { interrupts(); }
+	if (late && !m_intTxEnabled) { interrupts(); }
 	int32_t micro_s = static_cast<int32_t>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
 	if (micro_s > 0) {
-		delayMicroseconds(micro_s);
+		if (late) optimistic_yield(micro_s); else delayMicroseconds(micro_s);
 	}
-	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) {}
+	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) { if (late) optimistic_yield(1); }
 	// Disable interrupts again
-	if (!m_intTxEnabled && withStopBit) {
+	if (late && !m_intTxEnabled) {
 		noInterrupts();
 		m_periodDeadline = ESP.getCycleCount();
 	}
@@ -265,21 +265,21 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool withSt
 
 void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(uint32_t dutyCycle, uint32_t offCycle, bool withStopBit) {
 	if (dutyCycle) {
-		m_periodDeadline += dutyCycle;
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txPin, INPUT_PULLUP);
 #else
 		digitalWrite(m_txPin, HIGH);
 #endif
+		m_periodDeadline += dutyCycle;
 		preciseDelay(m_periodDeadline, withStopBit && !m_invert);
 	}
 	if (offCycle) {
-		m_periodDeadline += offCycle;
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txPin, OUTPUT);
 #else
 		digitalWrite(m_txPin, LOW);
 #endif
+		m_periodDeadline += offCycle;
 		preciseDelay(m_periodDeadline, withStopBit && m_invert);
 	}
 }
@@ -315,11 +315,10 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		for (int i = 0; i <= m_dataBits; ++i) {
 			// data bit
 			// or stop bit : LOW if inverted logic, otherwise HIGH
-			bool dataBit = i < m_dataBits;
-			b = dataBit ? (o & 1) : !m_invert;
+			b = (i < m_dataBits) ? (o & 1) : !m_invert;
 			o >>= 1;
 			if (!pb && b) {
-				writePeriod(dutyCycle, offCycle, !dataBit);
+				writePeriod(dutyCycle, offCycle, i == 0);
 				dutyCycle = offCycle = 0;
 			}
 			if (b) { dutyCycle += m_bitCycles; } else { offCycle += m_bitCycles; }
