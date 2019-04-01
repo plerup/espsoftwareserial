@@ -248,19 +248,22 @@ int SoftwareSerial::available() {
 	return avail;
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline) {
+void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool withStopBit) {
+	// Reenable interrupts while delaying to avoid other tasks piling up
+	if (!m_intTxEnabled && withStopBit) { interrupts(); }
 	int32_t micro_s = static_cast<int32_t>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
-	if (micro_s > 51) {
-		// Reenable interrupts while delaying to avoid other tasks piling up
-		if (!m_intTxEnabled) { interrupts(); }
+	if (micro_s > 0) {
 		delayMicroseconds(micro_s);
-		// Disable interrupts again
-		if (!m_intTxEnabled) { noInterrupts(); }
 	}
 	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) {}
+	// Disable interrupts again
+	if (!m_intTxEnabled && withStopBit) {
+		noInterrupts();
+		m_periodDeadline = ESP.getCycleCount();
+	}
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(uint32_t dutyCycle, uint32_t offCycle) {
+void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(uint32_t dutyCycle, uint32_t offCycle, bool withStopBit) {
 	if (dutyCycle) {
 		m_periodDeadline += dutyCycle;
 #ifdef ALT_DIGITAL_WRITE
@@ -268,7 +271,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(uint32_t dutyCycle, uint32_t of
 #else
 		digitalWrite(m_txPin, HIGH);
 #endif
-		preciseDelay(m_periodDeadline);
+		preciseDelay(m_periodDeadline, withStopBit && !m_invert);
 	}
 	if (offCycle) {
 		m_periodDeadline += offCycle;
@@ -277,7 +280,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(uint32_t dutyCycle, uint32_t of
 #else
 		digitalWrite(m_txPin, LOW);
 #endif
-		preciseDelay(m_periodDeadline);
+		preciseDelay(m_periodDeadline, withStopBit && m_invert);
 	}
 }
 
@@ -297,13 +300,8 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 #endif
 	}
 	// Stop bit level : LOW if inverted logic, otherwise HIGH
-#ifdef ALT_DIGITAL_WRITE
-	pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-#else
-	digitalWrite(m_txPin, !m_invert);
-#endif
-	uint32_t dutyCycle = 0;
-	uint32_t offCycle = 0;
+	uint32_t dutyCycle = !m_invert;
+	uint32_t offCycle = m_invert;
 	bool pb;
 	// Disable interrupts in order to get a clean transmit timing
 	if (!m_intTxEnabled) { noInterrupts(); }
@@ -317,17 +315,18 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		for (int i = 0; i <= m_dataBits; ++i) {
 			// data bit
 			// or stop bit : LOW if inverted logic, otherwise HIGH
-			b = (i < m_dataBits) ? (o & 1) : !m_invert;
+			bool dataBit = i < m_dataBits;
+			b = dataBit ? (o & 1) : !m_invert;
 			o >>= 1;
 			if (!pb && b) {
-				writePeriod(dutyCycle, offCycle);
+				writePeriod(dutyCycle, offCycle, !dataBit);
 				dutyCycle = offCycle = 0;
 			}
 			if (b) { dutyCycle += m_bitCycles; } else { offCycle += m_bitCycles; }
 			pb = b;
 		}
 		if (cnt == size - 1) {
-			writePeriod(dutyCycle, offCycle);
+			writePeriod(dutyCycle, offCycle, true);
 			break;
 		}
 	}

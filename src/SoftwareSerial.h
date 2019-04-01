@@ -94,8 +94,11 @@ public:
 	using Print::write;
 
 private:
-	void preciseDelay(uint32_t deadline);
-	void writePeriod(uint32_t dutyCycle, uint32_t offCycle);
+	// If withStopBit is set, the period begins or ends on a stop bit, which allows
+	// relaxed timing on that cycle, for instance, enabling interrupts.
+	void preciseDelay(uint32_t deadline, bool withStopBit);
+	// If offCycle == 0, the level remains HIGH on return.
+	void writePeriod(uint32_t dutyCycle, uint32_t offCycle, bool withStopBit);
 	bool isValidGPIOpin(int pin);
 	/* check m_rxValid that calling is safe */
 	void rxBits();
