@@ -23,6 +23,7 @@ ongoing, there will be some inexactness in interrupt timings. This may
 lead to inevitable, but few, bit errors when having heavy data traffic
 at high baud rates.
 
+
 Resource optimization
 
 The memory footprint can be optimized to just fit the amount of expected
@@ -72,3 +73,26 @@ The size of the tables needed for interrupt dispatch can be adapted to the
 actual maximum number of SoftwareSerial instances in a sketch.
 To reduce the memory footprint of these tables, define SOFTWARESERIAL_MAX_INSTS
 to the total number of SoftwareSerial objects your sketch uses.
+
+
+Updating EspSoftwareSerial in the esp8266com/esp8266 Arduino build environment
+
+The EspSoftwareSerial is used as a Git submodule in the esp8266 source tree,
+specifically in .../esp8266/libraries/SoftwareSerial when using a Github
+repository clone in your Arduino sketchbook hardware directory.
+This supersedes any version of EspSoftwareSerial installed for instance via
+the Arduino library manager.
+
+The responsible maintainer of the esp8266 repository has kindly shared the
+following command line instructions:
+
+To update esp8266/arduino SoftwareSerial submodule to lastest master:
+
+(optional, clean it:)
+$ rm -rf libraries/SoftwareSerial
+$ git submodule update --init
+(now update it:)
+$ cd libraries/SoftwareSerial
+$ git checkout master
+$ git pull
+
