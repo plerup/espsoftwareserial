@@ -74,7 +74,7 @@ void loop() {
 		if (r == -1) { logger.println("read() == -1"); }
 		if (expected == -1) { expected = r; }
 		else {
-			expected = ++expected % 256;
+			expected = (expected + 1) % 256;
 		}
 		if (r != (expected & ((1 << (5 + swSerialConfig % 4)) - 1))) {
 			++seqErrors;
