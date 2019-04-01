@@ -250,14 +250,14 @@ int SoftwareSerial::available() {
 
 void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline) {
 	int32_t micro_s = static_cast<int32_t>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
-	// Reenable interrupts while delaying to avoid other tasks piling up
-	if (!m_intTxEnabled) { interrupts(); }
-	if (micro_s > 1) {
-		delayMicroseconds(micro_s - 1);
+	if (micro_s > 51) {
+		// Reenable interrupts while delaying to avoid other tasks piling up
+		if (!m_intTxEnabled) { interrupts(); }
+		delayMicroseconds(micro_s);
+		// Disable interrupts again
+		if (!m_intTxEnabled) { noInterrupts(); }
 	}
-	// Disable interrupts again
-	if (!m_intTxEnabled) { noInterrupts(); }
-	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 1) {}
+	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) {}
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(uint32_t dutyCycle, uint32_t offCycle) {
