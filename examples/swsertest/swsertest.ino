@@ -1,5 +1,5 @@
 // On ESP8266:
-// Runs at both 80MHz and 160MHz CPU frequency at 56000bps without visible errors.
+// Runs at both 80MHz and 160MHz CPU frequency at 56000bps with only intermittent errors.
 // Connect pin 12 to 14.
 
 #include <SoftwareSerial.h>
@@ -7,7 +7,7 @@
 #ifdef ESP32
 #define BAUD_RATE 56000
 #else
-#define BAUD_RATE 19200
+#define BAUD_RATE 56000
 #endif
 
 // Reminder: the buffer size optimizations here, in particular the isrBufSize that only accommodates

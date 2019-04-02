@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // signal quality in ALT_DIGITAL_WRITE is better or equal in all
 // tests so far (ESP8266 HW UART, SDS011 PM sensor, SoftwareSerial back-to-back).
-#define ALT_DIGITAL_WRITE 1
+//#define ALT_DIGITAL_WRITE 1
 
 #ifndef ESP32
 #ifndef SOFTWARESERIAL_MAX_INSTS
@@ -256,9 +256,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool late) 
 		if (late) optimistic_yield(micro_s); else delayMicroseconds(micro_s);
 	}
 	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) { if (late) optimistic_yield(1); }
-	// Disable interrupts again
-	if (late && !m_intTxEnabled) {
-		noInterrupts();
+	if (late) {
+		// Disable interrupts again
+		if (!m_intTxEnabled) {
+			noInterrupts();
+		}
 		m_periodDeadline = ESP.getCycleCount();
 	}
 }
@@ -318,17 +320,14 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 			b = (i < m_dataBits) ? (o & 1) : !m_invert;
 			o >>= 1;
 			if (!pb && b) {
-				writePeriod(dutyCycle, offCycle, i == 0);
+				writePeriod(dutyCycle, offCycle, 0 == i);
 				dutyCycle = offCycle = 0;
 			}
 			if (b) { dutyCycle += m_bitCycles; } else { offCycle += m_bitCycles; }
 			pb = b;
 		}
-		if (cnt == size - 1) {
-			writePeriod(dutyCycle, offCycle, true);
-			break;
-		}
 	}
+	writePeriod(dutyCycle, offCycle, true);
 	if (!m_intTxEnabled) { interrupts(); }
 	if (m_txEnableValid) {
 #ifdef ALT_DIGITAL_WRITE
