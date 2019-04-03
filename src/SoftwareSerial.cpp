@@ -24,10 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <SoftwareSerial.h>
 
-// signal quality in ALT_DIGITAL_WRITE is better or equal in all
-// tests so far (ESP8266 HW UART, SDS011 PM sensor, SoftwareSerial back-to-back).
-//#define ALT_DIGITAL_WRITE 1
-
 #ifndef ESP32
 #ifndef SOFTWARESERIAL_MAX_INSTS
 #define SOFTWARESERIAL_MAX_INSTS 10
@@ -128,11 +124,7 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 		pinMode(m_rxPin, INPUT);
 	}
 	if (m_txValid && !m_oneWire) {
-#ifdef ALT_DIGITAL_WRITE
-		pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-#else
 		pinMode(m_txPin, OUTPUT);
-#endif
 		digitalWrite(m_txPin, !m_invert);
 	}
 
@@ -176,21 +168,12 @@ void SoftwareSerial::enableTx(bool on) {
 	if (m_oneWire && m_txValid) {
 		if (on) {
 			enableRx(false);
-#ifdef ALT_DIGITAL_WRITE
-			pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-			pinMode(m_rxPin, m_invert ? OUTPUT : INPUT_PULLUP);
-#else
 			pinMode(m_txPin, OUTPUT);
 			pinMode(m_rxPin, OUTPUT);
-#endif
 			digitalWrite(m_txPin, !m_invert);
 			digitalWrite(m_rxPin, !m_invert);
 		} else {
-#ifdef ALT_DIGITAL_WRITE
-			pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-#else
 			pinMode(m_txPin, OUTPUT);
-#endif
 			digitalWrite(m_txPin, !m_invert);
 			pinMode(m_rxPin, INPUT);
 			enableRx(true);
@@ -258,17 +241,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool late) 
 
 void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(uint32_t dutyCycle, uint32_t offCycle, bool withStopBit) {
 	if (dutyCycle) {
-#ifdef ALT_DIGITAL_WRITE
-		pinMode(m_txPin, INPUT_PULLUP);
-#endif
 		digitalWrite(m_txPin, HIGH);
 		m_periodDeadline += dutyCycle;
 		preciseDelay(m_periodDeadline, withStopBit && !m_invert);
 	}
 	if (offCycle) {
-#ifdef ALT_DIGITAL_WRITE
-		pinMode(m_txPin, OUTPUT);
-#endif
 		digitalWrite(m_txPin, LOW);
 		m_periodDeadline += offCycle;
 		preciseDelay(m_periodDeadline, withStopBit && m_invert);
@@ -284,9 +261,6 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	if (!m_txValid) { return 0; }
 
 	if (m_txEnableValid) {
-#ifdef ALT_DIGITAL_WRITE
-		pinMode(m_txEnablePin, INPUT_PULLUP);
-#endif
 		digitalWrite(m_txEnablePin, HIGH);
 	}
 	// Stop bit level : LOW if inverted logic, otherwise HIGH
@@ -318,9 +292,6 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	writePeriod(dutyCycle, offCycle, true);
 	if (!m_intTxEnabled) { interrupts(); }
 	if (m_txEnableValid) {
-#ifdef ALT_DIGITAL_WRITE
-		pinMode(m_txEnablePin, OUTPUT);
-#endif
 		digitalWrite(m_txEnablePin, LOW);
 	}
 	return size;
