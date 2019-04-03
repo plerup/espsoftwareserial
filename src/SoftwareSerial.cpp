@@ -130,11 +130,10 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 	if (m_txValid && !m_oneWire) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-		digitalWrite(m_txPin, !m_invert);
 #else
 		pinMode(m_txPin, OUTPUT);
-		digitalWrite(m_txPin, !m_invert);
 #endif
+		digitalWrite(m_txPin, !m_invert);
 	}
 
 	if (!m_rxEnabled) { enableRx(true); }
@@ -162,13 +161,8 @@ void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
 	if (isValidGPIOpin(transmitEnablePin)) {
 		m_txEnableValid = true;
 		m_txEnablePin = transmitEnablePin;
-#ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txEnablePin, OUTPUT);
 		digitalWrite(m_txEnablePin, LOW);
-#else
-		pinMode(m_txEnablePin, OUTPUT);
-		digitalWrite(m_txEnablePin, LOW);
-#endif
 	} else {
 		m_txEnableValid = false;
 	}
@@ -184,23 +178,20 @@ void SoftwareSerial::enableTx(bool on) {
 			enableRx(false);
 #ifdef ALT_DIGITAL_WRITE
 			pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-			digitalWrite(m_txPin, !m_invert);
 			pinMode(m_rxPin, m_invert ? OUTPUT : INPUT_PULLUP);
-			digitalWrite(m_rxPin, !m_invert);
 #else
 			pinMode(m_txPin, OUTPUT);
-			digitalWrite(m_txPin, !m_invert);
 			pinMode(m_rxPin, OUTPUT);
-			digitalWrite(m_rxPin, !m_invert);
 #endif
+			digitalWrite(m_txPin, !m_invert);
+			digitalWrite(m_rxPin, !m_invert);
 		} else {
 #ifdef ALT_DIGITAL_WRITE
 			pinMode(m_txPin, m_invert ? OUTPUT : INPUT_PULLUP);
-			digitalWrite(m_txPin, !m_invert);
 #else
 			pinMode(m_txPin, OUTPUT);
-			digitalWrite(m_txPin, !m_invert);
 #endif
+			digitalWrite(m_txPin, !m_invert);
 			pinMode(m_rxPin, INPUT);
 			enableRx(true);
 		}
@@ -269,20 +260,16 @@ void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(uint32_t dutyCycle, uint32_t of
 	if (dutyCycle) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txPin, INPUT_PULLUP);
-		digitalWrite(m_txPin, HIGH);
-#else
-		digitalWrite(m_txPin, HIGH);
 #endif
+		digitalWrite(m_txPin, HIGH);
 		m_periodDeadline += dutyCycle;
 		preciseDelay(m_periodDeadline, withStopBit && !m_invert);
 	}
 	if (offCycle) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txPin, OUTPUT);
-		digitalWrite(m_txPin, LOW);
-#else
-		digitalWrite(m_txPin, LOW);
 #endif
+		digitalWrite(m_txPin, LOW);
 		m_periodDeadline += offCycle;
 		preciseDelay(m_periodDeadline, withStopBit && m_invert);
 	}
@@ -299,10 +286,8 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	if (m_txEnableValid) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txEnablePin, INPUT_PULLUP);
-		digitalWrite(m_txEnablePin, HIGH);
-#else
-		digitalWrite(m_txEnablePin, HIGH);
 #endif
+		digitalWrite(m_txEnablePin, HIGH);
 	}
 	// Stop bit level : LOW if inverted logic, otherwise HIGH
 	uint32_t dutyCycle = !m_invert;
@@ -335,10 +320,8 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	if (m_txEnableValid) {
 #ifdef ALT_DIGITAL_WRITE
 		pinMode(m_txEnablePin, OUTPUT);
-		digitalWrite(m_txEnablePin, LOW);
-#else
-		digitalWrite(m_txEnablePin, LOW);
 #endif
+		digitalWrite(m_txEnablePin, LOW);
 	}
 	return size;
 }
