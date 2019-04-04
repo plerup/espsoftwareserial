@@ -94,7 +94,7 @@ void loop() {
 		while (0 == (i % 8) && Serial.available()) {
 			int inCnt = Serial.readBytes(inBuf, min(BLOCKSIZE, Serial.availableForWrite()));
 			Serial.write(inBuf, inCnt);
-	}
+		}
 #endif
 	}
 	serialIUT.write(block, BLOCKSIZE);
@@ -159,8 +159,8 @@ void loop() {
 		const long rxCps = rxCount * (1000000.0 / interval);
 		const long errorCps = rxErrors * (1000000.0 / interval);
 		logger.println(effTxTxt + 10 * txCps + "bps, "
-					   + effRxTxt + 10 * rxCps + "bps, "
-					   + errorCps + "cps errors (" + 100.0 * rxErrors / rxCount + "%)");
+			+ effRxTxt + 10 * rxCps + "bps, "
+			+ errorCps + "cps errors (" + 100.0 * rxErrors / rxCount + "%)");
 		start = end;
 		txCount = 0;
 		rxCount = 0;

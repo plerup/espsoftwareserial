@@ -67,8 +67,8 @@ void setup() {
 
 void loop() {
 	expected = -1;
-	
-	#ifdef HALFDUPLEX
+
+#ifdef HALFDUPLEX
 	unsigned char block[BLOCKSIZE];
 	int inCnt = 0;
 	uint32_t deadline;
@@ -96,7 +96,7 @@ void loop() {
 		block[inCnt++] = expected;
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = ESP.getCycleCount() +  static_cast<uint32_t>(200 * 1000 * ESP.getCpuFreqMHz());
+		deadline = ESP.getCycleCount() + static_cast<uint32_t>(200 * 1000 * ESP.getCpuFreqMHz());
 #else
 		repeater.write(expected);
 #endif
