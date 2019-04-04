@@ -72,7 +72,12 @@ SoftwareSerial::SoftwareSerial(
 		m_isrBufSize = isrBufSize ? isrBufSize : 10 * bufSize;
 		m_isrBuffer = static_cast<std::atomic<uint32_t>*>(malloc(m_isrBufSize * sizeof(uint32_t)));
 	}
-	if (isValidGPIOpin(transmitPin) || (!m_oneWire && (transmitPin == 16))) {
+	if (isValidGPIOpin(transmitPin)
+#ifdef ESP8266
+		|| (!m_oneWire && (transmitPin == 16))) {
+#else
+		) {
+#endif
 		m_txValid = true;
 		m_txPin = transmitPin;
 	}
@@ -165,16 +170,12 @@ void SoftwareSerial::enableIntTx(bool on) {
 }
 
 void SoftwareSerial::enableTx(bool on) {
-	if (m_oneWire && m_txValid) {
+	if (m_txValid && m_oneWire) {
 		if (on) {
 			enableRx(false);
 			pinMode(m_txPin, OUTPUT);
-			pinMode(m_rxPin, OUTPUT);
 			digitalWrite(m_txPin, !m_invert);
-			digitalWrite(m_rxPin, !m_invert);
 		} else {
-			pinMode(m_txPin, OUTPUT);
-			digitalWrite(m_txPin, !m_invert);
 			pinMode(m_rxPin, INPUT);
 			enableRx(true);
 		}
