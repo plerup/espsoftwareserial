@@ -419,9 +419,9 @@ void SoftwareSerial::onReceive(std::function<void(int available)> handler) {
 }
 
 void SoftwareSerial::perform_work() {
+	if (!m_rxValid) { return; }
+	rxBits();
 	if (receiveHandler) {
-		if (!m_rxValid) { return; }
-		rxBits();
 		int avail = m_inPos - m_outPos;
 		if (avail < 0) { avail += m_bufSize; }
 		if (avail) { receiveHandler(avail); }
