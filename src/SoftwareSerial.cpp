@@ -223,15 +223,15 @@ int SoftwareSerial::available() {
 	return avail;
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool late) {
+void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool asyn) {
 	// Reenable interrupts while delaying to avoid other tasks piling up
-	if (late && !m_intTxEnabled) { interrupts(); }
+	if (asyn && !m_intTxEnabled) { interrupts(); }
 	int32_t micro_s = static_cast<int32_t>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
 	if (micro_s > 0) {
-		if (late) optimistic_yield(micro_s); else delayMicroseconds(micro_s);
+		if (asyn) optimistic_yield(micro_s); else delayMicroseconds(micro_s);
 	}
-	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) { if (late) optimistic_yield(1); }
-	if (late) {
+	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) { if (asyn) optimistic_yield(1); }
+	if (asyn) {
 		// Disable interrupts again
 		if (!m_intTxEnabled) {
 			noInterrupts();
@@ -264,30 +264,33 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	if (m_txEnableValid) {
 		digitalWrite(m_txEnablePin, HIGH);
 	}
-	// Stop bit level : LOW if inverted logic, otherwise HIGH
-	uint32_t dutyCycle = !m_invert;
-	uint32_t offCycle = m_invert;
-	bool pb;
 	// Disable interrupts in order to get a clean transmit timing
 	if (!m_intTxEnabled) { noInterrupts(); }
 	m_periodDeadline = ESP.getCycleCount();
+	// Stop bit level : LOW if inverted logic, otherwise HIGH
+	bool b = !m_invert;
+	uint32_t dutyCycle = b;
+	uint32_t offCycle = !b;
 	for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
+		// push LSB start-data-stop bit pattern into uint32_t
+		// Stop bit level : LOW if inverted logic, otherwise HIGH
+		uint32_t word = (-static_cast<uint32_t>(b)) << m_dataBits;
+		word |= b ? *buffer : ~*buffer;
+		word <<= 1;
 		// Start bit : HIGH if inverted logic, otherwise LOW
-		if (m_invert) { dutyCycle += m_bitCycles; } else { offCycle += m_bitCycles; }
-		pb = m_invert;
-		uint8_t o = m_invert ? ~*buffer : *buffer;
-		bool b;
-		for (int i = 0; i <= m_dataBits; ++i) {
-			// data bit
-			// or stop bit : LOW if inverted logic, otherwise HIGH
-			b = (i < m_dataBits) ? (o & 1) : !m_invert;
-			o >>= 1;
-			if (!pb && b) {
-				writePeriod(dutyCycle, offCycle, 0 == i);
-				dutyCycle = offCycle = 0;
+		word |= !b;
+		for (int i = 0; i <= m_dataBits + 1; ++i) {
+			bool pb = b;
+			b = m_dataBits & 1;
+			if (b) {
+				if (!pb) {
+					writePeriod(dutyCycle, offCycle, 0 == i);
+					dutyCycle = offCycle = 0;
+				}
+				dutyCycle += m_bitCycles;
+			} else {
+				offCycle += m_bitCycles;
 			}
-			if (b) { dutyCycle += m_bitCycles; } else { offCycle += m_bitCycles; }
-			pb = b;
 		}
 	}
 	writePeriod(dutyCycle, offCycle, true);

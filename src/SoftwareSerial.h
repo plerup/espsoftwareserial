@@ -94,9 +94,9 @@ public:
 	using Print::write;
 
 private:
-	// If late, its legal to exceed the deadline, for instance,
+	// If asyn, its legal to exceed the deadline, for instance,
 	// by enabling interrupts.
-	void preciseDelay(uint32_t deadline, bool late);
+	void preciseDelay(uint32_t deadline, bool asyn);
 	// If withStopBit is set, either cycle contains a stop bit.
 	// If dutyCycle == 0, the level is not forced to HIGH.
 	// If offCycle == 0, the level remains unchanged from dutyCycle.
