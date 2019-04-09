@@ -15,6 +15,13 @@
 #define HWLOOPBACK 1
 #define HALFDUPLEX 1
 
+#ifndef RX
+#define RX 13
+#endif
+#ifndef TX
+#define TX 15
+#endif
+
 #ifdef ESP32
 constexpr int IUTBITRATE = 28800;
 #else
