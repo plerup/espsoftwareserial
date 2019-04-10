@@ -264,29 +264,33 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	if (m_txEnableValid) {
 		digitalWrite(m_txEnablePin, HIGH);
 	}
-	// Stop bit level : LOW if inverted logic, otherwise HIGH
+	// Stop bit : LOW if inverted logic, otherwise HIGH
 	bool b = !m_invert;
+	// Force line level on entry
 	uint32_t dutyCycle = b;
 	uint32_t offCycle = m_invert;
 	// Disable interrupts in order to get a clean transmit timing
 	if (!m_intTxEnabled) { noInterrupts(); }
 	m_periodDeadline = ESP.getCycleCount();
+	const uint32_t dataMask = ((1UL << m_dataBits) - 1);
 	for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
+		bool withStopBit = true;
 		// push LSB start-data-stop bit pattern into uint32_t
-		// Stop bit level : LOW if inverted logic, otherwise HIGH
-		uint32_t word = static_cast<uint32_t>(!m_invert) << m_dataBits;
-		word |= m_invert ? ~*buffer : *buffer;
-		word <<= 1;
+		// Stop bit : LOW if inverted logic, otherwise HIGH
+		uint32_t word = (!m_invert) << m_dataBits;
+		word |= (m_invert ? ~*buffer : *buffer) & dataMask;
 		// Start bit : HIGH if inverted logic, otherwise LOW
+		word <<= 1;
 		word |= m_invert;
 		for (unsigned i = 0; i <= m_dataBits + 1; ++i) {
 			bool pb = b;
-			b = word & (1 << i);
+			b = (word >> i) & 1;
+			if (!pb && b) {
+				writePeriod(dutyCycle, offCycle, withStopBit);
+				withStopBit = false;
+				dutyCycle = offCycle = 0;
+			}
 			if (b) {
-				if (!pb) {
-					writePeriod(dutyCycle, offCycle, 0 == i);
-					dutyCycle = offCycle = 0;
-				}
 				dutyCycle += m_bitCycles;
 			} else {
 				offCycle += m_bitCycles;
