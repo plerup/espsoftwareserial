@@ -282,7 +282,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		// Start bit : HIGH if inverted logic, otherwise LOW
 		word <<= 1;
 		word |= m_invert;
-		for (unsigned i = 0; i <= m_dataBits + 1; ++i) {
+		for (int i = 0; i <= m_dataBits + 1; ++i) {
 			bool pb = b;
 			b = (word >> i) & 1;
 			if (!pb && b) {
