@@ -31,7 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // As the ESP8266 Arduino attachInterrupt has no parameter, lists of objects
 // and callbacks corresponding to each possible list index have to be defined
-static ICACHE_RAM_ATTR SoftwareSerial* ObjList[SOFTWARESERIAL_MAX_INSTS];
+static SoftwareSerial* ObjList[SOFTWARESERIAL_MAX_INSTS];
 
 template<int I> void ICACHE_RAM_ATTR sws_isr() {
 	SoftwareSerial::rxRead(ObjList[I]);
@@ -253,7 +253,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(uint32_t dutyCycle, uint32_t of
 	}
 }
 
-size_t ICACHE_RAM_ATTR SoftwareSerial::write(uint8_t b) {
+size_t SoftwareSerial::write(uint8_t b) {
 	return write(&b, 1);
 }
 
@@ -322,7 +322,7 @@ int SoftwareSerial::peek() {
 	return m_buffer[m_outPos];
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::rxBits() {
+void SoftwareSerial::rxBits() {
 	int avail = m_isrInPos.load() - m_isrOutPos.load();
 	if (avail < 0) { avail += m_isrBufSize; }
 	if (m_isrOverflow.load()) {
