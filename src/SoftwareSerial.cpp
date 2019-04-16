@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifndef ESP32
 #ifndef SOFTWARESERIAL_MAX_INSTS
-#define SOFTWARESERIAL_MAX_INSTS 10
+#define SOFTWARESERIAL_MAX_INSTS 8
 #endif
 
 // As the ESP8266 Arduino attachInterrupt has no parameter, lists of objects
