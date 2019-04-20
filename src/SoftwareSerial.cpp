@@ -135,7 +135,7 @@ void SoftwareSerial::enableRx(bool on) {
 		if (on) {
 			m_rxCurBit = m_dataBits;
 #ifdef ESP8266
-			attachInterrupt(digitalPinToInterrupt(m_rxPin), [this] { rxRead(this); }, CHANGE);
+			attachInterrupt(digitalPinToInterrupt(m_rxPin), [this]() ICACHE_RAM_ATTR { rxRead(this); }, CHANGE);
 #else
 			attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxRead), this, CHANGE);
 #endif
