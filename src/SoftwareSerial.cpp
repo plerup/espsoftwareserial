@@ -75,7 +75,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 }
 
 void SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
-	m_dataBits = 5 + (config % 4);
+	m_dataBits = 5 + config;
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	m_intTxEnabled = true;
 	if (m_buffer != 0 && m_isrBuffer != 0) {
