@@ -24,10 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <SoftwareSerial.h>
 
-#ifdef ESP8266
-#include <FunctionalInterrupt.h>
-#endif
-
 SoftwareSerial::SoftwareSerial(
 	int receivePin, int transmitPin, bool inverse_logic, int bufSize, int isrBufSize) {
 	m_isrBuffer = 0;
