@@ -108,7 +108,7 @@ private:
 	bool m_txEnableValid = false;
 	bool m_invert;
 	bool m_overflow = false;
-	int8_t m_dataBits;
+	uint8_t m_dataBits;
 	int32_t m_bitCycles;
 	uint32_t m_periodDeadline;
 	bool m_intTxEnabled;
