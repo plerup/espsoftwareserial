@@ -132,9 +132,9 @@ void loop() {
 
 #ifdef HWLOOPBACK
 	// starting deadline for the first bytes to become readable
-	deadline = millis() + static_cast<uint32_t>(1000 / IUTBITRATE * 10 * BLOCKSIZE);
+	deadline = micros() + static_cast<uint32_t>(1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	inCnt = 0;
-	while (static_cast<int32_t>(deadline - millis()) > 0) {
+	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		if (!Serial.available()) {
 			delay(100);
 			continue;
@@ -142,15 +142,15 @@ void loop() {
 		inCnt += Serial.readBytes(&inBuf[inCnt], min(BLOCKSIZE - inCnt, Serial.availableForWrite()));
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = millis() + 200U;
+		deadline = micros() + 200000U;
 	}
 	Serial.write(inBuf, inCnt);
 #endif
 
 	// starting deadline for the first bytes to come in
-	deadline = millis() + static_cast<uint32_t>(2 * 1000 / IUTBITRATE * 10 * BLOCKSIZE);
+	deadline = micros() + static_cast<uint32_t>(2 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	inCnt = 0;
-	while (static_cast<int32_t>(deadline - millis()) > 0) {
+	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		int avail;
 		if (0 == (avail = serialIUT.available())) {
 			delay(100);
@@ -171,7 +171,7 @@ void loop() {
 		}
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = millis() + 200U;
+		deadline = micros() + 200000U;
 	}
 
 	if (txCount >= ReportInterval) {
