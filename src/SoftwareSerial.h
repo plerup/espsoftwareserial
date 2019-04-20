@@ -47,18 +47,10 @@ class SoftwareSerial : public Stream {
 public:
 	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, int bufSize = 64, int isrBufSize = 0);
 	virtual ~SoftwareSerial();
-#ifndef ESP32
-	// Returns false if more than SOFTWARESERIAL_MAX_INSTS instances are started
-	bool begin(int32_t baud) {
-		return begin(baud, SWSERIAL_8N1);
-	}
-	bool begin(int32_t baud, SoftwareSerialConfig config);
-#else
 	void begin(int32_t baud) {
 		begin(baud, SWSERIAL_8N1);
 	}
 	void begin(int32_t baud, SoftwareSerialConfig config);
-#endif
 	int32_t baudRate();
 	// Transmit control pin
 	void setTransmitEnablePin(int transmitEnablePin);
@@ -72,7 +64,7 @@ public:
 	int read() override;
 	void flush() override;
 	size_t write(uint8_t byte) override;
-	size_t write(const uint8_t *buffer, size_t size) override;
+	size_t write(const uint8_t* buffer, size_t size) override;
 	operator bool() const { return m_rxValid || m_txValid; }
 
 	// Disable or enable interrupts on the rx pin
@@ -109,9 +101,6 @@ private:
 	bool m_oneWire;
 	int m_rxPin = SW_SERIAL_UNUSED_PIN;
 	int m_txPin = SW_SERIAL_UNUSED_PIN;
-#ifndef ESP32
-	ssize_t m_swsInstsIdx = -1;
-#endif
 	int m_txEnablePin = SW_SERIAL_UNUSED_PIN;
 	bool m_rxValid = false;
 	bool m_rxEnabled = false;
@@ -125,7 +114,7 @@ private:
 	bool m_intTxEnabled;
 	int m_inPos, m_outPos;
 	int m_bufSize = 0;
-	uint8_t *m_buffer = 0;
+	uint8_t* m_buffer = 0;
 	// the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
 	// 1 = positive including 0, 0 = negative.
 	std::atomic<int> m_isrInPos, m_isrOutPos;

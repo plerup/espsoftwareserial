@@ -24,38 +24,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <SoftwareSerial.h>
 
-#ifndef ESP32
-#ifndef SOFTWARESERIAL_MAX_INSTS
-#define SOFTWARESERIAL_MAX_INSTS 8
-#endif
-
-// As the ESP8266 Arduino attachInterrupt has no parameter, lists of objects
-// and callbacks corresponding to each possible list index have to be defined
-static SoftwareSerial* ObjList[SOFTWARESERIAL_MAX_INSTS];
-
-template<int I> void ICACHE_RAM_ATTR sws_isr() {
-	SoftwareSerial::rxRead(ObjList[I]);
-}
-
-template <int N, int I = N - 1> class ISRTable : public ISRTable<N, I - 1> {
-public:
-	static const int dummy;
-};
-
-template <int N> class ISRTable<N, -1> {
-public:
-	static const int dummy;
-	static void (*array[N])();
-};
-
-template <int N, int I>	const int ISRTable<N, I>::dummy =
-	reinterpret_cast<int>(ISRTable<N, -1>::array[I] = sws_isr<I>) + 0 * ISRTable<N, I - 1>::dummy;
-
-template <int N> void (*ISRTable<N, -1>::array[N])();
-
-template class ISRTable<SOFTWARESERIAL_MAX_INSTS>;
-
-static void (*(*ISRList))() = ISRTable<SOFTWARESERIAL_MAX_INSTS>::array;
+#ifdef ESP8266
+#include <FunctionalInterrupt.h>
 #endif
 
 SoftwareSerial::SoftwareSerial(
@@ -94,30 +64,17 @@ SoftwareSerial::~SoftwareSerial() {
 }
 
 bool SoftwareSerial::isValidGPIOpin(int pin) {
-#ifdef ESP8266
+#if defined(ESP8266)
 	return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 15);
-#endif
-#ifdef ESP32
+#elif defined(ESP32)
 	return pin == 0 || pin == 2 || (pin >= 4 && pin <= 5) || (pin >= 12 && pin <= 19) ||
 		(pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 35);
+#else
+	return true;
 #endif
 }
 
-#ifndef ESP32
-bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
-	if (m_swsInstsIdx < 0)
-		for (size_t i = 0; i < (sizeof ObjList / sizeof ObjList[0]); ++i)
-		{
-			if (!ObjList[i]) {
-				m_swsInstsIdx = i;
-				ObjList[m_swsInstsIdx] = this;
-				break;
-			}
-		}
-	if (m_swsInstsIdx < 0) return false;
-#else
-	void SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
-#endif
+void SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 	m_dataBits = 5 + (config % 4);
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	m_intTxEnabled = true;
@@ -134,20 +91,11 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 	}
 
 	if (!m_rxEnabled) { enableRx(true); }
-#ifndef ESP32
-	return true;
-#endif
 }
 
 void SoftwareSerial::end()
 {
 	enableRx(false);
-#ifndef ESP32
-	if (m_swsInstsIdx >= 0)	{
-		ObjList[m_swsInstsIdx] = 0;
-		m_swsInstsIdx = -1;
-	}
-#endif
 }
 
 int32_t SoftwareSerial::baudRate() {
@@ -186,8 +134,8 @@ void SoftwareSerial::enableRx(bool on) {
 	if (m_rxValid) {
 		if (on) {
 			m_rxCurBit = m_dataBits;
-#ifndef ESP32
-			attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_swsInstsIdx], CHANGE);
+#ifdef ESP8266
+			attachInterrupt(digitalPinToInterrupt(m_rxPin), [this] { rxRead(this); }, CHANGE);
 #else
 			attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxRead), this, CHANGE);
 #endif
