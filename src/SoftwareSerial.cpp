@@ -292,12 +292,11 @@ void SoftwareSerial::rxBits() {
 			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
 			// cycle's LSB is repurposed for the level bit
 			int next = (m_isrInPos.load() + 1) % m_isrBufSize;
+			// if m_isrBuffer is full, leave undetected stop bit pending, no actual overflow yet
 			if (next != m_isrOutPos.load()) {
 				m_isrBuffer[m_isrInPos.load()].store((expectedCycle | 1) ^ !m_invert);
 				m_isrInPos.store(next);
 				++isrAvail;
-			} else {
-				m_isrOverflow.store(true);
 			}
 		}
 	}
@@ -345,7 +344,7 @@ void SoftwareSerial::rxBits() {
 					m_rxCurByte = 0;
 					m_inPos = next;
 				} else {
-					// no space in m_buffer, leave pending value in m_rxCurByte
+					// no space in m_buffer, leave pending value in m_rxCurByte, no actual overflow yet
 					return;
 				}
 				continue;
