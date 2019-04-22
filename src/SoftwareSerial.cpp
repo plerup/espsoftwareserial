@@ -276,8 +276,8 @@ int SoftwareSerial::peek() {
 }
 
 void SoftwareSerial::rxBits() {
-	int avail = m_isrInPos.load() - m_isrOutPos.load();
-	if (avail < 0) { avail += m_isrBufSize; }
+	int isrAvail = m_isrInPos.load() - m_isrOutPos.load();
+	if (isrAvail < 0) { isrAvail += m_isrBufSize; }
 	if (m_isrOverflow.load()) {
 		m_overflow = true;
 		m_isrOverflow.store(false);
@@ -286,7 +286,7 @@ void SoftwareSerial::rxBits() {
 	// stop bit can go undetected if leading data bits are at same level
 	// and there was also no next start bit yet, so one byte may be pending.
 	// low-cost check first
-	if (avail == 0 && m_rxCurBit < m_dataBits && m_isrInPos.load() == m_isrOutPos.load() && m_rxCurBit >= 0) {
+	if (isrAvail == 0 && m_rxCurBit < m_dataBits && m_isrInPos.load() == m_isrOutPos.load() && m_rxCurBit >= 0) {
 		uint32_t expectedCycle = m_isrLastCycle.load() + (m_dataBits + 1 - m_rxCurBit) * m_bitCycles;
 		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
 			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
@@ -295,14 +295,14 @@ void SoftwareSerial::rxBits() {
 			if (next != m_isrOutPos.load()) {
 				m_isrBuffer[m_isrInPos.load()].store((expectedCycle | 1) ^ !m_invert);
 				m_isrInPos.store(next);
-				++avail;
+				++isrAvail;
 			} else {
 				m_isrOverflow.store(true);
 			}
 		}
 	}
 
-	while (avail--) {
+	while (isrAvail--) {
 		// error introduced by edge value in LSB is negligible
 		uint32_t isrCycle = m_isrBuffer[m_isrOutPos.load()].load();
 		// extract inverted edge value
@@ -334,18 +334,19 @@ void SoftwareSerial::rxBits() {
 				continue;
 			}
 			if (m_rxCurBit == (m_dataBits - 1)) {
-				++m_rxCurBit;
-				cycles -= m_bitCycles;
 				// Store the received value in the buffer unless we have an overflow
 				if (m_inPos == m_outPos) m_inPos = m_outPos = 0;
 				int next = (m_inPos + 1) % m_bufSize;
 				if (next != m_outPos) {
+					++m_rxCurBit;
+					cycles -= m_bitCycles;
 					m_buffer[m_inPos] = m_rxCurByte >> (8 - m_dataBits);
 					// reset to 0 is important for masked bit logic
 					m_rxCurByte = 0;
 					m_inPos = next;
 				} else {
-					m_overflow = true;
+					// no space in m_buffer, leave pending value in m_rxCurByte
+					return;
 				}
 				continue;
 			}
