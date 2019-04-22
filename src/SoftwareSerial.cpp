@@ -153,13 +153,12 @@ int SoftwareSerial::available() {
 	if (!m_rxValid) { return 0; }
 	rxBits();
 	int avail = m_inPos - m_outPos;
-	if (avail < 0) { avail += m_bufSize; }
 	if (!avail) {
 		optimistic_yield(2 * (m_dataBits + 2) * m_bitCycles / ESP.getCpuFreqMHz());
 		rxBits();
 		avail = m_inPos - m_outPos;
-		if (avail < 0) { avail += m_bufSize; }
 	}
+	if (avail < 0) { avail += m_bufSize; }
 	return avail;
 }
 
@@ -258,7 +257,11 @@ bool SoftwareSerial::overflow() {
 }
 
 int SoftwareSerial::peek() {
-	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { return -1; }
+	if (!m_rxValid) { return -1; }
+	if (m_inPos == m_outPos) {
+		rxBits();
+		if (m_inPos == m_outPos) { return -1; }
+	}
 	return m_buffer[m_outPos];
 }
 
@@ -324,6 +327,7 @@ void SoftwareSerial::rxBits() {
 				++m_rxCurBit;
 				cycles -= m_bitCycles;
 				// Store the received value in the buffer unless we have an overflow
+				if (m_inPos == m_outPos) m_inPos = m_outPos = 0;
 				int next = (m_inPos + 1) % m_bufSize;
 				if (next != m_outPos) {
 					m_buffer[m_inPos] = m_rxCurByte >> (8 - m_dataBits);
