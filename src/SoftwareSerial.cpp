@@ -149,6 +149,16 @@ int SoftwareSerial::read() {
 	return ch;
 }
 
+size_t SoftwareSerial::readBytes(char* buffer, size_t size) {
+	size_t cnt;
+	for (cnt = 0; cnt < size; ++cnt) {
+		int rd = read();
+		if (rd < 0) break;
+		*buffer++ = rd;
+	}
+	return cnt;
+}
+
 int SoftwareSerial::available() {
 	if (!m_rxValid) { return 0; }
 	rxBits();
