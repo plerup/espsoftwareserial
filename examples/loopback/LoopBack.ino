@@ -156,9 +156,9 @@ void loop() {
 			delay(100);
 			continue;
 		}
+		avail = serialIUT.readBytes(inBuf, min(avail, BLOCKSIZE));
 		for (int i = 0; i < avail; ++i) {
-			int r = serialIUT.read();
-			if (r == -1) { logger.println("read() == -1"); }
+			unsigned char r = inBuf[i];
 			if (expected == -1) { expected = r; }
 			else {
 				expected = (expected + 1) % 256;
