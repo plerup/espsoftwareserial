@@ -1,6 +1,6 @@
 # EspSoftwareSerial
 
-Implementation of the Arduino software serial library for the ESP8266
+Implementation of the Arduino software serial library for the ESP8266 / ESP32
 
 This fork implements interrupt service routine best practice.
 In the receive interrupt, instead of blocking for whole bytes
