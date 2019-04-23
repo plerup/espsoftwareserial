@@ -40,12 +40,13 @@ enum SoftwareSerialConfig {
 };
 
 // This class is compatible with the corresponding AVR one,
-// the constructor however has an optional rx buffer size.
+// the constructor however has optional rx buffer capacity arguments
+// for byte buffer and ISR bit buffer.
 // Baudrates up to 115200 can be used.
 
 class SoftwareSerial : public Stream {
 public:
-	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, int bufSize = 64, int isrBufSize = 0);
+	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, int bufCapacity = 64, int isrBufCapacity = 0);
 	virtual ~SoftwareSerial();
 	void begin(int32_t baud) {
 		begin(baud, SWSERIAL_8N1);
