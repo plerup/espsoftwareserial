@@ -28,7 +28,7 @@ constexpr uint8_t BYTE_MSB_SET = 1 << (sizeof(uint8_t) * 8 - 1);
 constexpr uint8_t BYTE_ALL_BITS_SET = ~static_cast<uint8_t>(0);
 
 SoftwareSerial::SoftwareSerial(
-	int receivePin, int transmitPin, bool inverse_logic, int bufSize, int isrBufSize) {
+	int receivePin, int transmitPin, bool inverse_logic, int bufCapacity, int isrBufCapacity) {
 	m_isrBuffer = 0;
 	m_isrOverflow = false;
 	m_isrLastCycle = 0;
@@ -36,9 +36,9 @@ SoftwareSerial::SoftwareSerial(
 	m_invert = inverse_logic;
 	if (isValidGPIOpin(receivePin)) {
 		m_rxPin = receivePin;
-		m_bufSize = bufSize;
+		m_bufSize = bufCapacity + 1;
 		m_buffer = (uint8_t*)malloc(m_bufSize);
-		m_isrBufSize = isrBufSize ? isrBufSize : (sizeof(uint8_t) * 8 + 2) * bufSize;
+		m_isrBufSize = isrBufCapacity ? isrBufCapacity + 1 : (sizeof(uint8_t) * 8 + 2) * bufCapacity + 1;
 		m_isrBuffer = static_cast<std::atomic<uint32_t>*>(malloc(m_isrBufSize * sizeof(uint32_t)));
 	}
 	if (isValidGPIOpin(transmitPin)
