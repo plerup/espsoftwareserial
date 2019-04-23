@@ -9,7 +9,7 @@
 
 // On ESP8266:
 // Local SoftwareSerial loopback, connect D5 (14) to D6 (12), or with repeater, connect crosswise.
-// or hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
+// or hardware loopback, connect D5 (14) to D8 (tx, 15), D6 (12) to D7 (rx, 13).
 // Hint: The logger is run at 9600bps such that enableIntTx(true) can remain unchanged. Blocking
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
@@ -17,16 +17,9 @@
 // runs at 80MHz with 28800bps, and at 160MHz CPU frequency with 38400bps with no errors.
 
 // Pick only one of HWLOOPBACK OR HWSENDNSINK
-//#define HWLOOPBACK 1
+#define HWLOOPBACK 1
 //#define HWSENDNSINK 1
 //#define HALFDUPLEX 1
-
-#ifndef RX
-#define RX 13
-#endif
-#ifndef TX
-#define TX 15
-#endif
 
 #ifdef ESP32
 constexpr int IUTBITRATE = 38400;
@@ -52,8 +45,13 @@ int rxErrors;
 constexpr int ReportInterval = IUTBITRATE / 20;
 
 #if defined(HWLOOPBACK) || defined(HWSENDNSINK)
-SoftwareSerial ssLogger(RX, TX);
-Stream& logger(ssLogger);
+#if defined(ESP8266)
+SoftwareSerial logger(RX, TX);
+HardwareSerial& hwLoopback(Serial);
+#elif defined(ESP32)
+Stream& logger(Serial);
+HardwareSerial& hwLoopback(Serial1);
+#endif
 #else
 Stream& logger(Serial);
 #endif
@@ -73,14 +71,18 @@ void setup() {
 	//delay(1);
 
 #if defined(HWLOOPBACK) || defined(HWSENDNSINK)
-	Serial.begin(IUTBITRATE);
-#if defined(ESP8266) || defined(ESP32)
-	Serial.setRxBufferSize(4 * BLOCKSIZE);
-#endif
 #if defined(ESP8266)
+	Serial.begin(IUTBITRATE);
+	Serial.setRxBufferSize(4 * BLOCKSIZE);
 	Serial.swap();
+	logger.begin(9600);
+#elif defined(ESP32)
+	Serial.begin(9600);
+	Serial1.begin(IUTBITRATE, SERIAL_8N1, 13, 15, false, 200);
+	Serial1.setRxBufferSize(4 * BLOCKSIZE);
+#else
+	Serial.begin(9600);
 #endif
-	ssLogger.begin(9600);
 #else
 	Serial.begin(9600);
 #endif
@@ -112,9 +114,11 @@ void loop() {
 		++txCount;
 		//serialIUT.write(c);
 #if defined(HWLOOPBACK) && !defined(HALFDUPLEX)
-		while (0 == (i % 8) && Serial.available()) {
-			int inCnt = Serial.readBytes(inBuf, min(BLOCKSIZE, Serial.availableForWrite()));
-			Serial.write(inBuf, inCnt);
+		int avail = hwLoopback.available();
+		while ((0 == (i % 8)) && avail > 0) {
+			int inCnt = hwLoopback.readBytes(inBuf, min(avail, min(BLOCKSIZE, hwLoopback.availableForWrite())));
+			hwLoopback.write(inBuf, inCnt);
+			avail -= inCnt;
 		}
 #endif
 	}
@@ -135,16 +139,16 @@ void loop() {
 	deadline = micros() + static_cast<uint32_t>(1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	inCnt = 0;
 	while (static_cast<int32_t>(deadline - micros()) > 0) {
-		if (!Serial.available()) {
-			delay(100);
+		int avail = hwLoopback.available();
+		if (0 >= avail) {
 			continue;
 		}
-		inCnt += Serial.readBytes(&inBuf[inCnt], min(BLOCKSIZE - inCnt, Serial.availableForWrite()));
+		inCnt += hwLoopback.readBytes(&inBuf[inCnt], min(avail, min(BLOCKSIZE - inCnt, hwLoopback.availableForWrite())));
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
 		deadline = micros() + 200000U;
 	}
-	Serial.write(inBuf, inCnt);
+	hwLoopback.write(inBuf, inCnt);
 #endif
 
 	// starting deadline for the first bytes to come in
@@ -153,7 +157,6 @@ void loop() {
 	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		int avail;
 		if (0 == (avail = serialIUT.available())) {
-			delay(100);
 			continue;
 		}
 		avail = serialIUT.readBytes(inBuf, BLOCKSIZE);
