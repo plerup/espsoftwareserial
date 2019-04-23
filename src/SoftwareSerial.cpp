@@ -150,13 +150,24 @@ int SoftwareSerial::read() {
 }
 
 size_t SoftwareSerial::readBytes(char* buffer, size_t size) {
-	size_t cnt;
-	for (cnt = 0; cnt < size; ++cnt) {
-		int rd = read();
-		if (rd < 0) break;
-		*buffer++ = rd;
+	if (!m_rxValid) { return -1; }
+	size_t avail = m_inPos - m_outPos;
+	if (!avail) {
+		rxBits();
+		avail = m_inPos - m_outPos;
+		if (!avail) { return -1; }
 	}
-	return cnt;
+	if (avail < 0) { avail += m_bufSize; }
+
+	size = avail = min(size, avail);
+	size_t n = min(avail, static_cast<size_t>(m_bufSize - m_outPos));
+	buffer = std::copy_n(m_buffer + m_outPos, n, buffer);
+	avail -= n;
+	if (0 < avail) {
+		buffer = std::copy_n(m_buffer, avail, buffer);
+	}
+	m_outPos = (m_outPos + size) % m_bufSize;
+	return size;
 }
 
 int SoftwareSerial::available() {
