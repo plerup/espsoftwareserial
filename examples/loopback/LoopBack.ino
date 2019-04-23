@@ -14,7 +14,7 @@
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
 // By default (no HWLOOPBACK, no HALFDUPLEX),
-// runs at 80MHz with 22800bps, and at 160MHz CPU frequency with 57600bps with no errors.
+// runs at 80MHz with 28800bps, and at 160MHz CPU frequency with 38400bps with no errors.
 
 // Pick only one of HWLOOPBACK OR HWSENDNSINK
 //#define HWLOOPBACK 1
@@ -29,9 +29,9 @@
 #endif
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 28800;
+constexpr int IUTBITRATE = 38400;
 #else
-constexpr int IUTBITRATE = 2400;
+constexpr int IUTBITRATE = 28800;
 #endif
 
 #if defined(ESP8266) || defined(ESP32)
@@ -156,7 +156,7 @@ void loop() {
 			delay(100);
 			continue;
 		}
-		avail = serialIUT.readBytes(inBuf, min(avail, BLOCKSIZE));
+		avail = serialIUT.readBytes(inBuf, BLOCKSIZE);
 		for (int i = 0; i < avail; ++i) {
 			unsigned char r = inBuf[i];
 			if (expected == -1) { expected = r; }
