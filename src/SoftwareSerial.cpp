@@ -24,6 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <SoftwareSerial.h>
 
+constexpr uint8_t BYTE_MSB_SET = 1 << (sizeof(uint8_t) * 8 - 1);
+constexpr uint8_t BYTE_ALL_BITS_SET = ~static_cast<uint8_t>(0);
+
 SoftwareSerial::SoftwareSerial(
 	int receivePin, int transmitPin, bool inverse_logic, int bufSize, int isrBufSize) {
 	m_isrBuffer = 0;
@@ -328,10 +331,10 @@ void SoftwareSerial::rxBits() {
 					// preceding masked bits
 					int hiddenBits = cycles / m_bitCycles;
 					if (hiddenBits >= m_dataBits - m_rxCurBit) { hiddenBits = (m_dataBits - 1) - m_rxCurBit; }
-					bool lastBit = m_rxCurByte & 0x80;
+					bool lastBit = m_rxCurByte & BYTE_MSB_SET;
 					m_rxCurByte >>= hiddenBits;
 					// masked bits have same level as last unmasked bit
-					if (lastBit) { m_rxCurByte |= 0xff << (8 - hiddenBits); }
+					if (lastBit) { m_rxCurByte |= BYTE_ALL_BITS_SET << (sizeof(uint8_t) * 8 - hiddenBits); }
 					m_rxCurBit += hiddenBits;
 					cycles -= hiddenBits * m_bitCycles;
 				}
@@ -339,7 +342,7 @@ void SoftwareSerial::rxBits() {
 					++m_rxCurBit;
 					cycles -= m_bitCycles;
 					m_rxCurByte >>= 1;
-					if (level) { m_rxCurByte |= 0x80; }
+					if (level) { m_rxCurByte |= BYTE_MSB_SET; }
 				}
 				continue;
 			}
@@ -350,7 +353,7 @@ void SoftwareSerial::rxBits() {
 				if (next != m_outPos) {
 					++m_rxCurBit;
 					cycles -= m_bitCycles;
-					m_buffer[m_inPos] = m_rxCurByte >> (8 - m_dataBits);
+					m_buffer[m_inPos] = m_rxCurByte >> (sizeof(uint8_t) * 8 - m_dataBits);
 					// reset to 0 is important for masked bit logic
 					m_rxCurByte = 0;
 					m_inPos = next;
