@@ -1,7 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <SoftwareSerial.h>
 
-SoftwareSerial swSer(12, 12, false, 256);
+SoftwareSerial swSer;
 
 byte buf[10] = {0xFA, 0xAF,0x00,0x00,0x00, 0x00, 0x00, 0x00, 0x00, 0xED};
 byte cmd[10] = {0xFA, 0xAF,0x00,0x00,0x00, 0x00, 0x00, 0x00, 0x00, 0xED};
@@ -12,7 +12,7 @@ void setup() {
     delay(2000);
     Serial.begin(115200);
     Serial.println("\nAlpha 1S Servo Tester");
-    swSer.begin(115200);
+	swSer.begin(115200, 12, 12, SWSERIAL_8N1, false, 256);
 }
 
 void loop() {

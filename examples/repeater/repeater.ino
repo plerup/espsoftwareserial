@@ -42,10 +42,9 @@ constexpr int ReportInterval = IUTBITRATE / 20;
 
 #ifdef HWLOOPBACK
 Stream& repeater(Serial);
-SoftwareSerial ssLogger(RX, TX);
-Stream& logger(ssLogger);
+SoftwareSerial logger;
 #else
-SoftwareSerial repeater(14, 12, false, 2 * BLOCKSIZE);
+SoftwareSerial repeater;
 Stream& logger(Serial);
 #endif
 
@@ -58,9 +57,9 @@ void setup() {
 	Serial.begin(IUTBITRATE);
 	Serial.setRxBufferSize(2 * BLOCKSIZE);
 	Serial.swap();
-	ssLogger.begin(9600);
+	logger.begin(9600, RX, TX);
 #else
-	repeater.begin(IUTBITRATE, swSerialConfig);
+	repeater.begin(IUTBITRATE, 14, 12, swSerialConfig, false, 2 * BLOCKSIZE);
 #ifdef HALFDUPLEX
 	repeater.enableIntTx(false);
 #endif
