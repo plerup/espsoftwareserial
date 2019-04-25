@@ -31,7 +31,7 @@ SoftwareSerial::SoftwareSerial(
 	int receivePin, int transmitPin, bool inverse_logic, int bufCapacity, int isrBufCapacity) {
 	m_isrBuffer = 0;
 	m_isrOverflow = false;
-	m_isrLastTC_us = 0;
+	m_isrLastCycle = 0;
 	m_oneWire = (receivePin == transmitPin);
 	m_invert = inverse_logic;
 	if (isValidGPIOpin(receivePin)) {
@@ -75,7 +75,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 
 void SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 	m_dataBits = 5 + config;
-	m_bitCycle_us = 1000000 / baud;
+	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	m_intTxEnabled = true;
 	if (m_buffer != 0 && m_isrBuffer != 0) {
 		m_rxValid = true;
@@ -98,7 +98,7 @@ void SoftwareSerial::end()
 }
 
 int32_t SoftwareSerial::baudRate() {
-	return 1000000 / m_bitCycle_us;
+	return ESP.getCpuFreqMHz() * 1000000 / m_bitCycles;
 }
 
 void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
@@ -178,7 +178,7 @@ int SoftwareSerial::available() {
 	rxBits();
 	int avail = m_inPos - m_outPos;
 	if (!avail) {
-		optimistic_yield(2 * (m_dataBits + 2) * m_bitCycle_us);
+		optimistic_yield(2 * (m_dataBits + 2) * m_bitCycles / ESP.getCpuFreqMHz());
 		rxBits();
 		avail = m_inPos - m_outPos;
 	}
@@ -189,17 +189,17 @@ int SoftwareSerial::available() {
 void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool asyn) {
 	// Reenable interrupts while delaying to avoid other tasks piling up
 	if (asyn && !m_intTxEnabled) { interrupts(); }
-	int32_t micro_s = static_cast<int32_t>(deadline - micros());
+	int32_t micro_s = static_cast<int32_t>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
 	if (micro_s > 0) {
 		if (asyn) optimistic_yield(micro_s); else delayMicroseconds(micro_s);
 	}
-	while (static_cast<int32_t>(deadline - micros()) > 0) { if (asyn) optimistic_yield(1); }
+	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) { if (asyn) optimistic_yield(1); }
 	if (asyn) {
 		// Disable interrupts again
 		if (!m_intTxEnabled) {
 			noInterrupts();
 		}
-		m_periodDeadline = micros();
+		m_periodDeadline = ESP.getCycleCount();
 	}
 }
 
@@ -234,7 +234,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	uint32_t offCycle = m_invert;
 	// Disable interrupts in order to get a clean transmit timing
 	if (!m_intTxEnabled) { noInterrupts(); }
-	m_periodDeadline = micros();
+	m_periodDeadline = ESP.getCycleCount();
 	const uint32_t dataMask = ((1UL << m_dataBits) - 1);
 	for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
 		bool withStopBit = true;
@@ -254,9 +254,9 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 				dutyCycle = offCycle = 0;
 			}
 			if (b) {
-				dutyCycle += m_bitCycle_us;
+				dutyCycle += m_bitCycles;
 			} else {
-				offCycle += m_bitCycle_us;
+				offCycle += m_bitCycles;
 			}
 		}
 	}
@@ -301,14 +301,14 @@ void SoftwareSerial::rxBits() {
 	// and there was also no next start bit yet, so one byte may be pending.
 	// low-cost check first
 	if (isrAvail == 0 && m_rxCurBit < m_dataBits && m_isrInPos.load() == m_isrOutPos.load() && m_rxCurBit >= 0) {
-		uint32_t expectedTC_us = m_isrLastTC_us.load() + (m_dataBits + 1 - m_rxCurBit) * m_bitCycle_us;
-		if (static_cast<int32_t>(micros() - expectedTC_us) > m_bitCycle_us) {
-			// Store inverted stop bit edge and time code in the buffer unless we have an overflow
-			// time code's LSB is repurposed for the level bit
+		uint32_t expectedCycle = m_isrLastCycle.load() + (m_dataBits + 1 - m_rxCurBit) * m_bitCycles;
+		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
+			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
+			// cycle's LSB is repurposed for the level bit
 			int next = (m_isrInPos.load() + 1) % m_isrBufSize;
 			// if m_isrBuffer is full, leave undetected stop bit pending, no actual overflow yet
 			if (next != m_isrOutPos.load()) {
-				m_isrBuffer[m_isrInPos.load()].store((expectedTC_us | 1) ^ !m_invert);
+				m_isrBuffer[m_isrInPos.load()].store((expectedCycle | 1) ^ !m_invert);
 				m_isrInPos.store(next);
 				++isrAvail;
 			}
@@ -317,30 +317,30 @@ void SoftwareSerial::rxBits() {
 
 	while (isrAvail--) {
 		// error introduced by edge value in LSB is negligible
-		uint32_t isrTC_us = m_isrBuffer[m_isrOutPos.load()].load();
+		uint32_t isrCycle = m_isrBuffer[m_isrOutPos.load()].load();
 		// extract inverted edge value
-		bool level = (isrTC_us & 1) == m_invert;
+		bool level = (isrCycle & 1) == m_invert;
 		m_isrOutPos.store((m_isrOutPos.load() + 1) % m_isrBufSize);
-		int32_t cycle_us = static_cast<int32_t>(isrTC_us - m_isrLastTC_us.load() - (m_bitCycle_us / 2));
-		if (cycle_us < 0) { continue; }
-		m_isrLastTC_us.store(isrTC_us);
+		int32_t cycles = static_cast<int32_t>(isrCycle - m_isrLastCycle.load() - (m_bitCycles / 2));
+		if (cycles < 0) { continue; }
+		m_isrLastCycle.store(isrCycle);
 		do {
 			// data bits
 			if (m_rxCurBit >= -1 && m_rxCurBit < (m_dataBits - 1)) {
-				if (cycle_us >= m_bitCycle_us) {
+				if (cycles >= m_bitCycles) {
 					// preceding masked bits
-					int hiddenBits = cycle_us / m_bitCycle_us;
+					int hiddenBits = cycles / m_bitCycles;
 					if (hiddenBits >= m_dataBits - m_rxCurBit) { hiddenBits = (m_dataBits - 1) - m_rxCurBit; }
 					bool lastBit = m_rxCurByte & BYTE_MSB_SET;
 					m_rxCurByte >>= hiddenBits;
 					// masked bits have same level as last unmasked bit
 					if (lastBit) { m_rxCurByte |= BYTE_ALL_BITS_SET << (sizeof(uint8_t) * 8 - hiddenBits); }
 					m_rxCurBit += hiddenBits;
-					cycle_us -= hiddenBits * m_bitCycle_us;
+					cycles -= hiddenBits * m_bitCycles;
 				}
 				if (m_rxCurBit < (m_dataBits - 1)) {
 					++m_rxCurBit;
-					cycle_us -= m_bitCycle_us;
+					cycles -= m_bitCycles;
 					m_rxCurByte >>= 1;
 					if (level) { m_rxCurByte |= BYTE_MSB_SET; }
 				}
@@ -352,7 +352,7 @@ void SoftwareSerial::rxBits() {
 				int next = (m_inPos + 1) % m_bufSize;
 				if (next != m_outPos) {
 					++m_rxCurBit;
-					cycle_us -= m_bitCycle_us;
+					cycles -= m_bitCycles;
 					m_buffer[m_inPos] = m_rxCurByte >> (sizeof(uint8_t) * 8 - m_dataBits);
 					// reset to 0 is important for masked bit logic
 					m_rxCurByte = 0;
@@ -370,19 +370,19 @@ void SoftwareSerial::rxBits() {
 				}
 			}
 			break;
-		} while (cycle_us >= 0);
+		} while (cycles >= 0);
 	}
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead(SoftwareSerial* self) {
-	uint32_t curTC_us = micros();
+	uint32_t curCycle = ESP.getCycleCount();
 	bool level = digitalRead(self->m_rxPin);
 
-	// Store inverted edge value & time code in the buffer unless we have an overflow
-	// time code's LSB is repurposed for the level bit
+	// Store inverted edge value & cycle in the buffer unless we have an overflow
+	// cycle's LSB is repurposed for the level bit
 	int next = (self->m_isrInPos.load() + 1) % self->m_isrBufSize;
 	if (next != self->m_isrOutPos.load()) {
-		self->m_isrBuffer[self->m_isrInPos.load()].store((curTC_us | 1) ^ level);
+		self->m_isrBuffer[self->m_isrInPos.load()].store((curCycle | 1) ^ level);
 		self->m_isrInPos.store(next);
 	} else {
 		self->m_isrOverflow.store(true);
