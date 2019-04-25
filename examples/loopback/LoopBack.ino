@@ -46,7 +46,7 @@ constexpr int ReportInterval = IUTBITRATE / 20;
 
 #if defined(HWLOOPBACK) || defined(HWSENDNSINK)
 #if defined(ESP8266)
-SoftwareSerial logger(RX, TX);
+SoftwareSerial logger;
 HardwareSerial& hwLoopback(Serial);
 #elif defined(ESP32)
 Stream& logger(Serial);
@@ -59,7 +59,7 @@ Stream& logger(Serial);
 #ifdef HWSENDNSINK
 Stream& serialIUT(Serial);
 #elif defined(ESP8266) || defined(ESP32)
-SoftwareSerial serialIUT(14, 12, false, 2 * BLOCKSIZE);
+SoftwareSerial serialIUT;
 #else
 SoftwareSerial serialIUT(14, 12);
 #endif
@@ -75,7 +75,7 @@ void setup() {
 	Serial.begin(IUTBITRATE);
 	Serial.setRxBufferSize(4 * BLOCKSIZE);
 	Serial.swap();
-	logger.begin(9600);
+	logger.begin(9600, RX, TX);
 #elif defined(ESP32)
 	Serial.begin(9600);
 	Serial1.begin(IUTBITRATE, SERIAL_8N1, 13, 15, false, 200);
@@ -89,7 +89,7 @@ void setup() {
 
 #if !defined(HWSENDNSINK)
 #if defined(ESP8266) || defined(ESP32)
-	serialIUT.begin(IUTBITRATE, swSerialConfig);
+	serialIUT.begin(IUTBITRATE, 14, 12, swSerialConfig, false, 2 * BLOCKSIZE);
 #else
 	serialIUT.begin(IUTBITRATE);
 #endif

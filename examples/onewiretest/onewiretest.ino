@@ -1,16 +1,16 @@
 #include <ESP8266WiFi.h>
 #include "SoftwareSerial.h"
 
-SoftwareSerial swSer1(12, 12, false, 256);
-SoftwareSerial swSer2(14, 14, false, 256);
+SoftwareSerial swSer1;
+SoftwareSerial swSer2;
 
 void setup() {
     delay(2000);
     Serial.begin(115200);
     Serial.println("\nOne Wire Half Duplex Serial Tester");
-    swSer1.begin(115200);
+	swSer1.begin(115200, 12, 12, SWSERIAL_8N1, false, 256);
     swSer1.enableIntTx(true);
-    swSer2.begin(115200);
+	swSer2.begin(115200, 14, 14, SWSERIAL_8N1, false, 256);
     swSer2.enableIntTx(true);
 }
 

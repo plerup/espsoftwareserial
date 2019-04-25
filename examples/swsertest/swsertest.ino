@@ -13,11 +13,11 @@
 // Reminder: the buffer size optimizations here, in particular the isrBufSize that only accommodates
 // a single 8N1 word, are on the basis that any char written to the loopback SoftwareSerial adapter gets read
 // before another write is performed. Block writes with a size greater than 1 would usually fail. 
-SoftwareSerial swSer(14, 12, false, 95, 10);
+SoftwareSerial swSer;
 
 void setup() {
 	Serial.begin(115200);
-	swSer.begin(BAUD_RATE);
+	swSer.begin(BAUD_RATE, 14, 12, SWSERIAL_8N1, false, 95, 10);
 
 	// ESP8266 internal cache RAM needs warm up - allow write and ISR to load
 	swSer.write(static_cast<uint8_t>(0));
