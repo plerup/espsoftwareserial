@@ -46,15 +46,14 @@ enum SoftwareSerialConfig {
 
 class SoftwareSerial : public Stream {
 public:
-	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, int bufCapacity = 64, int isrBufCapacity = 0);
+	SoftwareSerial();
 	virtual ~SoftwareSerial();
-	void begin(int32_t baud) {
-		begin(baud, SWSERIAL_8N1);
-	}
-	void begin(int32_t baud, SoftwareSerialConfig config);
+	void begin(int32_t baud, int8_t rxPin = -1, int8_t txPin = -1,
+		SoftwareSerialConfig config = SWSERIAL_8N1,
+		bool invert = false, int bufCapacity = 64, int isrBufCapacity = 0);
 	int32_t baudRate();
 	// Transmit control pin
-	void setTransmitEnablePin(int transmitEnablePin);
+	void setTransmitEnablePin(int8_t txEnablePin);
 	// Enable or disable interrupts during tx
 	void enableIntTx(bool on);
 
@@ -99,15 +98,15 @@ private:
 	// If dutyCycle == 0, the level is not forced to HIGH.
 	// If offCycle == 0, the level remains unchanged from dutyCycle.
 	void writePeriod(uint32_t dutyCycle, uint32_t offCycle, bool withStopBit);
-	bool isValidGPIOpin(int pin);
+	bool isValidGPIOpin(int8_t pin);
 	/* check m_rxValid that calling is safe */
 	void rxBits();
 
 	// Member variables
 	bool m_oneWire;
-	int m_rxPin = SW_SERIAL_UNUSED_PIN;
-	int m_txPin = SW_SERIAL_UNUSED_PIN;
-	int m_txEnablePin = SW_SERIAL_UNUSED_PIN;
+	int8_t m_rxPin = SW_SERIAL_UNUSED_PIN;
+	int8_t m_txPin = SW_SERIAL_UNUSED_PIN;
+	int8_t m_txEnablePin = SW_SERIAL_UNUSED_PIN;
 	bool m_rxValid = false;
 	bool m_rxEnabled = false;
 	bool m_txValid = false;
