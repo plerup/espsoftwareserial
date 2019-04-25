@@ -27,42 +27,17 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 constexpr uint8_t BYTE_MSB_SET = 1 << (sizeof(uint8_t) * 8 - 1);
 constexpr uint8_t BYTE_ALL_BITS_SET = ~static_cast<uint8_t>(0);
 
-SoftwareSerial::SoftwareSerial(
-	int receivePin, int transmitPin, bool inverse_logic, int bufCapacity, int isrBufCapacity) {
+SoftwareSerial::SoftwareSerial() {
 	m_isrBuffer = 0;
 	m_isrOverflow = false;
 	m_isrLastCycle = 0;
-	m_oneWire = (receivePin == transmitPin);
-	m_invert = inverse_logic;
-	if (isValidGPIOpin(receivePin)) {
-		m_rxPin = receivePin;
-		m_bufSize = bufCapacity + 1;
-		m_buffer = (uint8_t*)malloc(m_bufSize);
-		m_isrBufSize = isrBufCapacity ? isrBufCapacity + 1 : (sizeof(uint8_t) * 8 + 2) * bufCapacity + 1;
-		m_isrBuffer = static_cast<std::atomic<uint32_t>*>(malloc(m_isrBufSize * sizeof(uint32_t)));
-	}
-	if (isValidGPIOpin(transmitPin)
-#ifdef ESP8266
-		|| (!m_oneWire && (transmitPin == 16))) {
-#else
-		) {
-#endif
-		m_txValid = true;
-		m_txPin = transmitPin;
-	}
 }
 
 SoftwareSerial::~SoftwareSerial() {
 	end();
-	if (m_buffer) {
-		free(m_buffer);
-	}
-	if (m_isrBuffer) {
-		free(m_isrBuffer);
-	}
 }
 
-bool SoftwareSerial::isValidGPIOpin(int pin) {
+bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 #if defined(ESP8266)
 	return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 15);
 #elif defined(ESP32)
@@ -73,38 +48,66 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 #endif
 }
 
-void SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
+void SoftwareSerial::begin(int32_t baud, int8_t rxPin, int8_t txPin,
+	SoftwareSerialConfig config, bool invert, int bufCapacity, int isrBufCapacity) {
+	m_oneWire = (rxPin == txPin);
+	m_invert = invert;
+	if (isValidGPIOpin(rxPin)) {
+		m_rxPin = rxPin;
+		m_bufSize = bufCapacity + 1;
+		m_buffer = (uint8_t*)malloc(m_bufSize);
+		m_isrBufSize = isrBufCapacity ? isrBufCapacity + 1 : (sizeof(uint8_t) * 8 + 2) * bufCapacity + 1;
+		m_isrBuffer = static_cast<std::atomic<uint32_t>*>(malloc(m_isrBufSize * sizeof(uint32_t)));
+		if (m_buffer != 0 && m_isrBuffer != 0) {
+			m_rxValid = true;
+			m_inPos = m_outPos = 0;
+			m_isrInPos.store(0);
+			m_isrOutPos.store(0);
+			pinMode(m_rxPin, INPUT);
+		}
+	}
+	if (isValidGPIOpin(txPin)
+#ifdef ESP8266
+		|| (!m_oneWire && (txPin == 16))) {
+#else
+		) {
+#endif
+		m_txValid = true;
+		m_txPin = txPin;
+		if (!m_oneWire) {
+			pinMode(m_txPin, OUTPUT);
+			digitalWrite(m_txPin, !m_invert);
+		}
+	}
+
 	m_dataBits = 5 + config;
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	m_intTxEnabled = true;
-	if (m_buffer != 0 && m_isrBuffer != 0) {
-		m_rxValid = true;
-		m_inPos = m_outPos = 0;
-		m_isrInPos.store(0);
-		m_isrOutPos.store(0);
-		pinMode(m_rxPin, INPUT);
-	}
-	if (m_txValid && !m_oneWire) {
-		pinMode(m_txPin, OUTPUT);
-		digitalWrite(m_txPin, !m_invert);
-	}
-
 	if (!m_rxEnabled) { enableRx(true); }
 }
 
 void SoftwareSerial::end()
 {
 	enableRx(false);
+	m_txValid = false;
+	if (m_buffer) {
+		free(m_buffer);
+		m_buffer = 0;
+	}
+	if (m_isrBuffer) {
+		free(m_isrBuffer);
+		m_isrBuffer = static_cast<std::atomic<uint32_t>*>(0);
+	}
 }
 
 int32_t SoftwareSerial::baudRate() {
 	return ESP.getCpuFreqMHz() * 1000000 / m_bitCycles;
 }
 
-void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
-	if (isValidGPIOpin(transmitEnablePin)) {
+void SoftwareSerial::setTransmitEnablePin(int8_t txEnablePin) {
+	if (isValidGPIOpin(txEnablePin)) {
 		m_txEnableValid = true;
-		m_txEnablePin = transmitEnablePin;
+		m_txEnablePin = txEnablePin;
 		pinMode(m_txEnablePin, OUTPUT);
 		digitalWrite(m_txEnablePin, LOW);
 	} else {
