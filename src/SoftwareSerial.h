@@ -115,7 +115,7 @@ private:
 	bool m_invert;
 	bool m_overflow = false;
 	uint8_t m_dataBits;
-	int32_t m_bitCycle_us;
+	int32_t m_bitCycles;
 	uint32_t m_periodDeadline;
 	bool m_intTxEnabled;
 	int m_inPos, m_outPos;
@@ -127,7 +127,7 @@ private:
 	int m_isrBufSize = 0;
 	std::atomic<uint32_t>* m_isrBuffer;
 	std::atomic<bool> m_isrOverflow;
-	std::atomic<uint32_t> m_isrLastTC_us;
+	std::atomic<uint32_t> m_isrLastCycle;
 	int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
 	uint8_t m_rxCurByte = 0;
 
