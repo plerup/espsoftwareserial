@@ -17,7 +17,7 @@
 // runs at 80MHz with 28800bps, and at 160MHz CPU frequency with 38400bps with no errors.
 
 // Pick only one of HWLOOPBACK OR HWSENDNSINK
-#define HWLOOPBACK 1
+//#define HWLOOPBACK 1
 //#define HWSENDNSINK 1
 //#define HALFDUPLEX 1
 
