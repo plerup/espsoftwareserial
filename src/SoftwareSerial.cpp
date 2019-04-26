@@ -110,7 +110,8 @@ void SoftwareSerial::setTransmitEnablePin(int8_t txEnablePin) {
 		m_txEnablePin = txEnablePin;
 		pinMode(m_txEnablePin, OUTPUT);
 		digitalWrite(m_txEnablePin, LOW);
-	} else {
+	}
+	else {
 		m_txEnableValid = false;
 	}
 }
@@ -125,7 +126,8 @@ void SoftwareSerial::enableTx(bool on) {
 			enableRx(false);
 			pinMode(m_txPin, OUTPUT);
 			digitalWrite(m_txPin, !m_invert);
-		} else {
+		}
+		else {
 			pinMode(m_rxPin, INPUT);
 			enableRx(true);
 		}
@@ -137,7 +139,8 @@ void SoftwareSerial::enableRx(bool on) {
 		if (on) {
 			m_rxCurBit = m_dataBits;
 			attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxRead), this, CHANGE);
-		} else {
+		}
+		else {
 			detachInterrupt(digitalPinToInterrupt(m_rxPin));
 		}
 		m_rxEnabled = on;
@@ -223,7 +226,7 @@ size_t SoftwareSerial::write(uint8_t b) {
 	return write(&b, 1);
 }
 
-size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size) {
+size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size) {
 	if (m_rxValid) { rxBits(); }
 	if (!m_txValid) { return 0; }
 
@@ -258,7 +261,8 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 			}
 			if (b) {
 				dutyCycle += m_bitCycles;
-			} else {
+			}
+			else {
 				offCycle += m_bitCycles;
 			}
 		}
@@ -360,7 +364,8 @@ void SoftwareSerial::rxBits() {
 					// reset to 0 is important for masked bit logic
 					m_rxCurByte = 0;
 					m_inPos = next;
-				} else {
+				}
+				else {
 					// no space in m_buffer, leave pending value in m_rxCurByte, no actual overflow yet
 					return;
 				}
@@ -377,7 +382,7 @@ void SoftwareSerial::rxBits() {
 	}
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead(SoftwareSerial* self) {
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead(SoftwareSerial * self) {
 	uint32_t curCycle = ESP.getCycleCount();
 	bool level = digitalRead(self->m_rxPin);
 
@@ -387,7 +392,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead(SoftwareSerial* self) {
 	if (next != self->m_isrOutPos.load()) {
 		self->m_isrBuffer[self->m_isrInPos.load()].store((curCycle | 1) ^ level);
 		self->m_isrInPos.store(next);
-	} else {
+	}
+	else {
 		self->m_isrOverflow.store(true);
 	}
 }
