@@ -54,10 +54,10 @@ void SoftwareSerial::begin(int32_t baud, int8_t rxPin, int8_t txPin,
 	m_invert = invert;
 	if (isValidGPIOpin(rxPin)) {
 		m_rxPin = rxPin;
-		m_bufSize = bufCapacity + 1;
-		m_buffer = (uint8_t*)malloc(m_bufSize);
-		m_isrBufSize = isrBufCapacity ? isrBufCapacity + 1 : (sizeof(uint8_t) * 8 + 2) * bufCapacity + 1;
-		m_isrBuffer = static_cast<std::atomic<uint32_t>*>(malloc(m_isrBufSize * sizeof(uint32_t)));
+		m_bufSize = (bufCapacity > 0) ? bufCapacity + 1 : 64 + 1;
+		m_buffer = std::unique_ptr<uint8_t[] >(new uint8_t[m_bufSize]);
+		m_isrBufSize = (isrBufCapacity > 0) ? isrBufCapacity + 1 : (sizeof(uint8_t) * 8 + 2) * bufCapacity + 1;
+		m_isrBuffer = std::unique_ptr<std::atomic<uint32_t>[] >(new std::atomic<uint32_t>[m_isrBufSize]);
 		if (m_buffer != 0 && m_isrBuffer != 0) {
 			m_rxValid = true;
 			m_inPos = m_outPos = 0;
@@ -91,12 +91,10 @@ void SoftwareSerial::end()
 	enableRx(false);
 	m_txValid = false;
 	if (m_buffer) {
-		free(m_buffer);
-		m_buffer = 0;
+		m_buffer.reset();
 	}
 	if (m_isrBuffer) {
-		free(m_isrBuffer);
-		m_isrBuffer = static_cast<std::atomic<uint32_t>*>(0);
+		m_isrBuffer.reset();
 	}
 }
 
@@ -170,10 +168,10 @@ size_t SoftwareSerial::readBytes(char* buffer, size_t size) {
 
 	size = avail = min(size, avail);
 	size_t n = min(avail, static_cast<size_t>(m_bufSize - m_outPos));
-	buffer = std::copy_n(m_buffer + m_outPos, n, buffer);
+	buffer = std::copy_n(m_buffer.get() + m_outPos, n, buffer);
 	avail -= n;
 	if (0 < avail) {
-		buffer = std::copy_n(m_buffer, avail, buffer);
+		buffer = std::copy_n(m_buffer.get(), avail, buffer);
 	}
 	m_outPos = (m_outPos + size) % m_bufSize;
 	return size;
