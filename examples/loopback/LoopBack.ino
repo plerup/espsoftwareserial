@@ -8,13 +8,20 @@
 #include <SoftwareSerial.h>
 
 // On ESP8266:
-// Local SoftwareSerial loopback, connect D5 (14) to D6 (12), or with repeater, connect crosswise.
-// or hardware loopback, connect D5 (14) to D8 (tx, 15), D6 (12) to D7 (rx, 13).
+// Local SoftwareSerial loopback, connect D5 to D6, or with repeater, connect crosswise.
+// or hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
 // Hint: The logger is run at 9600bps such that enableIntTx(true) can remain unchanged. Blocking
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
 // By default (no HWLOOPBACK, no HALFDUPLEX),
 // runs at 80MHz with 28800bps, and at 160MHz CPU frequency with 38400bps with no errors.
+
+#if defined(ESP32) && !defined(ARDUINO_D1_MINI32)
+#define D5 (14)
+#define D6 (12)
+#define D7 (13)
+#define D8 (15)
+#endif
 
 // Pick only one of HWLOOPBACK OR HWSENDNSINK
 //#define HWLOOPBACK 1
@@ -78,7 +85,7 @@ void setup() {
 	logger.begin(9600, RX, TX);
 #elif defined(ESP32)
 	Serial.begin(9600);
-	Serial1.begin(IUTBITRATE, SERIAL_8N1, 13, 15, false, 200);
+	Serial1.begin(IUTBITRATE, SERIAL_8N1, D7, D8, false, 200);
 	Serial1.setRxBufferSize(4 * BLOCKSIZE);
 #else
 	Serial.begin(9600);
@@ -89,7 +96,7 @@ void setup() {
 
 #if !defined(HWSENDNSINK)
 #if defined(ESP8266) || defined(ESP32)
-	serialIUT.begin(IUTBITRATE, 14, 12, swSerialConfig, false, 2 * BLOCKSIZE);
+	serialIUT.begin(IUTBITRATE, D5, D6, swSerialConfig, false, 2 * BLOCKSIZE);
 #else
 	serialIUT.begin(IUTBITRATE);
 #endif
