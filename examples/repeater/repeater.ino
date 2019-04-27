@@ -1,26 +1,20 @@
-//#ifdef ESP8266
-//#include <ESP8266WiFi.h>
-//#endif
-//#ifdef ESP32
-//#include "WiFi.h"
-//#endif
-
 #include <SoftwareSerial.h>
 
 // SoftwareSerial loopback for remote source (loopback.ino),
-// or hardware loopback, connect source D5 to local D8 (TX, 15), source D6 to local D7 (RX, 13).
+// or hardware loopback, connect source D5 to local D8 (tx), source D6 to local D7 (rx).
 // Hint: The logger is run at 9600bps such that enableIntTx(true) can remain unchanged. Blocking
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
+
+#if defined(ESP32) && !defined(ARDUINO_D1_MINI32)
+#define D5 (14)
+#define D6 (12)
+#define D7 (13)
+#define D8 (15)
+#endif
+
 #define HWLOOPBACK 1
 #define HALFDUPLEX 1
-
-#ifndef RX
-#define RX 13
-#endif
-#ifndef TX
-#define TX 15
-#endif
 
 #ifdef ESP32
 constexpr int IUTBITRATE = 28800;
@@ -49,17 +43,13 @@ Stream& logger(Serial);
 #endif
 
 void setup() {
-	//WiFi.mode(WIFI_OFF);
-	//WiFi.forceSleepBegin();
-	//delay(1);
-
 #ifdef HWLOOPBACK
 	Serial.begin(IUTBITRATE);
 	Serial.setRxBufferSize(2 * BLOCKSIZE);
 	Serial.swap();
 	logger.begin(9600, RX, TX);
 #else
-	repeater.begin(IUTBITRATE, 14, 12, swSerialConfig, false, 2 * BLOCKSIZE);
+	repeater.begin(IUTBITRATE, D5, D6, swSerialConfig, false, 2 * BLOCKSIZE);
 #ifdef HALFDUPLEX
 	repeater.enableIntTx(false);
 #endif
