@@ -1,10 +1,14 @@
 #include <SoftwareSerial.h>
 
-// SoftwareSerial loopback for remote source (loopback.ino),
-// or hardware loopback, connect source D5 to local D8 (tx), source D6 to local D7 (rx).
+// On ESP8266:
+// SoftwareSerial loopback for remote source (loopback.ino), or hardware loopback.
+// Connect source D5 to local D8 (tx), source D6 to local D7 (rx).
 // Hint: The logger is run at 9600bps such that enableIntTx(true) can remain unchanged. Blocking
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
+// On ESP32:
+// Hardware Serial2 defaults to D4 (rx), D3 (tx).
+// Connect source D5 to local D3 (tx), source D6 to local D4 (rx).
 
 #if defined(ESP32) && !defined(ARDUINO_D1_MINI32)
 #define D5 (14)
@@ -17,9 +21,9 @@
 #define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 28800;
+constexpr int IUTBITRATE = 19200;
 #else
-constexpr int IUTBITRATE = 2400;
+constexpr int IUTBITRATE = 19200;
 #endif
 
 constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
@@ -35,21 +39,36 @@ int expected;
 constexpr int ReportInterval = IUTBITRATE / 20;
 
 #ifdef HWLOOPBACK
-Stream& repeater(Serial);
+#if defined(ESP8266)
+HardwareSerial& repeater(Serial);
 SoftwareSerial logger;
+#elif defined(ESP32)
+HardwareSerial& repeater(Serial2);
+HardwareSerial& logger(Serial);
+#endif
 #else
 SoftwareSerial repeater;
-Stream& logger(Serial);
+HardwareSerial& logger(Serial);
 #endif
 
 void setup() {
 #ifdef HWLOOPBACK
+#if defined(ESP8266)
 	Serial.begin(IUTBITRATE);
 	Serial.setRxBufferSize(2 * BLOCKSIZE);
 	Serial.swap();
 	logger.begin(9600, RX, TX);
+#elif defined(ESP32)
+	Serial2.begin(IUTBITRATE);
+	Serial2.setRxBufferSize(2 * BLOCKSIZE);
+	logger.begin(9600);
+#endif
 #else
-	repeater.begin(IUTBITRATE, D5, D6, swSerialConfig, false, 2 * BLOCKSIZE);
+#if defined(ESP8266)
+	repeater.begin(IUTBITRATE, D7, D8, swSerialConfig, false, 2 * BLOCKSIZE);
+#elif defined(ESP32)
+	repeater.begin(IUTBITRATE, D4, D3, swSerialConfig, false, 2 * BLOCKSIZE);
+#endif
 #ifdef HALFDUPLEX
 	repeater.enableIntTx(false);
 #endif

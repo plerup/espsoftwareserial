@@ -9,12 +9,15 @@
 
 // On ESP8266:
 // Local SoftwareSerial loopback, connect D5 to D6, or with repeater, connect crosswise.
-// or hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
+// For hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
 // Hint: The logger is run at 9600bps such that enableIntTx(true) can remain unchanged. Blocking
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
 // By default (no HWLOOPBACK, no HALFDUPLEX),
 // runs at 80MHz with 28800bps, and at 160MHz CPU frequency with 38400bps with no errors.
+// On ESP32:
+// Hardware Serial2 defaults to D4 (rx), D3 (tx).
+// For hardware loopback, connect D5 to D3 (tx), D6 to D4 (rx).
 
 #if defined(ESP32) && !defined(ARDUINO_D1_MINI32)
 #define D5 (14)
@@ -29,9 +32,9 @@
 //#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 38400;
+constexpr int IUTBITRATE = 19200;
 #else
-constexpr int IUTBITRATE = 28800;
+constexpr int IUTBITRATE = 19200;
 #endif
 
 #if defined(ESP8266) || defined(ESP32)
@@ -51,30 +54,31 @@ int expected;
 int rxErrors;
 constexpr int ReportInterval = IUTBITRATE / 20;
 
-#if defined(HWLOOPBACK) || defined(HWSENDNSINK)
 #if defined(ESP8266)
+#if defined(HWLOOPBACK)
 HardwareSerial& hwLoopback(Serial);
+SoftwareSerial serialIUT;
 SoftwareSerial logger;
-#elif defined(ESP32)
-HardwareSerial& hwLoopback(Serial1);
+#elif defined(HWSENDNSINK)
+HardwareSerial& serialIUT(Serial);
+SoftwareSerial logger;
+#else
+SoftwareSerial serialIUT;
 HardwareSerial& logger(Serial);
 #endif
-#else
-Stream& logger(Serial);
-#endif
-
-#if defined(ESP8266) || defined(ESP32)
-#ifdef HWSENDNSINK
-#if defined(ESP8266)
-Stream& serialIUT(Serial);
 #elif defined(ESP32)
-Stream& serialIUT(Serial1);
-#endif
+#if defined(HWLOOPBACK)
+HardwareSerial& hwLoopback(Serial2);
+SoftwareSerial serialIUT;
+#elif defined(HWSENDNSINK)
+HardwareSerial& serialIUT(Serial2);
 #else
 SoftwareSerial serialIUT;
 #endif
+HardwareSerial& logger(Serial);
 #else
 SoftwareSerial serialIUT(14, 12);
+HardwareSerial& logger(Serial);
 #endif
 
 void setup() {
@@ -83,18 +87,26 @@ void setup() {
 	//WiFi.forceSleepBegin();
 	//delay(1);
 
-#if defined(HWLOOPBACK) || defined(HWSENDNSINK)
 #if defined(ESP8266)
+#if defined(HWLOOPBACK) || defined(HWSENDNSINK)
 	Serial.begin(IUTBITRATE);
 	Serial.swap();
 	Serial.setRxBufferSize(4 * BLOCKSIZE);
 	logger.begin(9600, RX, TX);
-#elif defined(ESP32)
-	Serial1.begin(IUTBITRATE, SERIAL_8N1, D7, D8, false, 200);
-	Serial1.setRxBufferSize(4 * BLOCKSIZE);
-	logger.begin(9600);
 #else
 	Serial.begin(9600);
+#endif
+#elif defined(ESP32)
+#if defined(HWLOOPBACK)
+	Serial2.begin(IUTBITRATE);
+	Serial2.setRxBufferSize(4 * BLOCKSIZE);
+	logger.begin(9600);
+#elif defined(HWSENDNSINK)
+	Serial2.begin(IUTBITRATE, SERIAL_8N1, D5, D6);
+	Serial2.setRxBufferSize(4 * BLOCKSIZE);
+	logger.begin(9600);
+#else
+Serial.begin(9600);
 #endif
 #else
 	Serial.begin(9600);
@@ -112,6 +124,8 @@ void setup() {
 	txCount = 0;
 	rxCount = 0;
 	rxErrors = 0;
+
+	logger.println("Loopback example for EspSoftwareSerial");
 }
 
 unsigned char c = 0;
