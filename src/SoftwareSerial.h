@@ -50,9 +50,10 @@ public:
 	SoftwareSerial(const SoftwareSerial&) = delete;
 	SoftwareSerial& operator= (const SoftwareSerial&) = delete;
 	virtual ~SoftwareSerial();
-	void begin(int32_t baud, int8_t rxPin = -1, int8_t txPin = -1,
+	void begin(int32_t baud, int8_t rxPin, int8_t txPin = -1,
 		SoftwareSerialConfig config = SWSERIAL_8N1,
 		bool invert = false, int bufCapacity = 64, int isrBufCapacity = 0);
+	void begin(int32_t baud, SoftwareSerialConfig config) = delete;
 	int32_t baudRate();
 	// Transmit control pin
 	void setTransmitEnablePin(int8_t txEnablePin);
