@@ -1,10 +1,3 @@
-//#ifdef ESP8266
-//#include <ESP8266WiFi.h>
-//#endif
-//#ifdef ESP32
-//#include "WiFi.h"
-//#endif
-
 #include <SoftwareSerial.h>
 
 // On ESP8266:
@@ -29,12 +22,12 @@
 // Pick only one of HWLOOPBACK OR HWSENDNSINK
 //#define HWLOOPBACK 1
 //#define HWSENDNSINK 1
-//#define HALFDUPLEX 1
+#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 19200;
+constexpr int IUTBITRATE = 38400;
 #else
-constexpr int IUTBITRATE = 19200;
+constexpr int IUTBITRATE = 38400;
 #endif
 
 #if defined(ESP8266) || defined(ESP32)
@@ -52,7 +45,7 @@ int txCount;
 int rxCount;
 int expected;
 int rxErrors;
-constexpr int ReportInterval = IUTBITRATE / 20;
+constexpr int ReportInterval = IUTBITRATE / 16;
 
 #if defined(ESP8266)
 #if defined(HWLOOPBACK)
@@ -82,11 +75,6 @@ HardwareSerial& logger(Serial);
 #endif
 
 void setup() {
-
-	//WiFi.mode(WIFI_OFF);
-	//WiFi.forceSleepBegin();
-	//delay(1);
-
 #if defined(ESP8266)
 #if defined(HWLOOPBACK) || defined(HWSENDNSINK)
 	Serial.begin(IUTBITRATE);
@@ -102,8 +90,8 @@ void setup() {
 	Serial2.setRxBufferSize(4 * BLOCKSIZE);
 	logger.begin(9600);
 #elif defined(HWSENDNSINK)
-	Serial2.begin(IUTBITRATE, SERIAL_8N1, D5, D6);
-	Serial2.setRxBufferSize(4 * BLOCKSIZE);
+	serialIUT.begin(IUTBITRATE, SERIAL_8N1, D5, D6);
+	serialIUT.setRxBufferSize(4 * BLOCKSIZE);
 	logger.begin(9600);
 #else
 Serial.begin(9600);
@@ -115,6 +103,9 @@ Serial.begin(9600);
 #if !defined(HWSENDNSINK)
 #if defined(ESP8266) || defined(ESP32)
 	serialIUT.begin(IUTBITRATE, D5, D6, swSerialConfig, false, 2 * BLOCKSIZE);
+#ifdef HALFDUPLEX
+	serialIUT.enableIntTx(false);
+#endif
 #else
 	serialIUT.begin(IUTBITRATE);
 #endif
@@ -139,8 +130,9 @@ void loop() {
 		block[i] = c;
 		c = (c + 1) % 256;
 		++txCount;
-		//serialIUT.write(c);
-#if defined(HWLOOPBACK) && !defined(HALFDUPLEX)
+#ifndef HALFDUPLEX
+		serialIUT.write(c);
+#ifdef HWLOOPBACK
 		int avail = hwLoopback.available();
 		while ((0 == (i % 8)) && avail > 0) {
 			int inCnt = hwLoopback.readBytes(inBuf, min(avail, min(BLOCKSIZE, hwLoopback.availableForWrite())));
@@ -149,7 +141,10 @@ void loop() {
 		}
 #endif
 	}
+#else
+	}
 	serialIUT.write(block, BLOCKSIZE);
+#endif
 #ifdef HWSENDNSINK
 #if defined(ESP8266)
 	if (Serial.hasOverrun()) { logger.println("Serial::overrun"); }
@@ -163,27 +158,29 @@ void loop() {
 
 #ifdef HWLOOPBACK
 	// starting deadline for the first bytes to become readable
-	deadline = micros() + static_cast<uint32_t>(1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+	deadline = micros() + static_cast<uint32_t>(8 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	inCnt = 0;
 	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		int avail = hwLoopback.available();
 		if (0 >= avail) {
+			delay(1);
 			continue;
 		}
 		inCnt += hwLoopback.readBytes(&inBuf[inCnt], min(avail, min(BLOCKSIZE - inCnt, hwLoopback.availableForWrite())));
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = micros() + 200000U;
+		deadline = micros() + static_cast<uint32_t>(1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	}
 	hwLoopback.write(inBuf, inCnt);
 #endif
 
 	// starting deadline for the first bytes to come in
-	deadline = micros() + static_cast<uint32_t>(2 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+	deadline = micros() + static_cast<uint32_t>(128 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	inCnt = 0;
 	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		int avail;
-		if (0 == (avail = serialIUT.available())) {
+		if (0 >= (avail = serialIUT.available())) {
+			delay(1);
 			continue;
 		}
 		avail = serialIUT.readBytes(inBuf, BLOCKSIZE);
@@ -201,7 +198,11 @@ void loop() {
 		}
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = micros() + 200000U;
+		deadline = micros() + static_cast<uint32_t>(128 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+	}
+
+	if (inCnt != BLOCKSIZE) {
+		logger.print("Got "); logger.print(inCnt); logger.println(" bytes during block loopback interval");
 	}
 
 	if (txCount >= ReportInterval) {
