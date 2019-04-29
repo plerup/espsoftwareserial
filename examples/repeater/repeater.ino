@@ -17,13 +17,13 @@
 #define D8 (15)
 #endif
 
-#define HWLOOPBACK 1
+//#define HWLOOPBACK 1
 #define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 19200;
+constexpr int IUTBITRATE = 38400;
 #else
-constexpr int IUTBITRATE = 19200;
+constexpr int IUTBITRATE = 38400;
 #endif
 
 constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
@@ -36,7 +36,7 @@ String bitRateTxt("Effective data rate: ");
 int rxCount;
 int seqErrors;
 int expected;
-constexpr int ReportInterval = IUTBITRATE / 20;
+constexpr int ReportInterval = IUTBITRATE / 16;
 
 #ifdef HWLOOPBACK
 #if defined(ESP8266)
@@ -88,14 +88,14 @@ void loop() {
 	int inCnt = 0;
 	uint32_t deadline;
 	// starting deadline for the first bytes to come in
-	deadline = ESP.getCycleCount() + static_cast<uint32_t>(4 * 1000000 / IUTBITRATE * ESP.getCpuFreqMHz() * 10 * BLOCKSIZE);
-	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) {
-		if (!repeater.available()) {
-			delay(100);
+	deadline = micros() + static_cast<uint32_t>(1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+	while (static_cast<int32_t>(deadline - micros()) > 0) {
+		if (0 >= repeater.available()) {
+			delay(1);
 			continue;
 		}
 #else
-	while (repeater.available()) {
+	while (0 < repeater.available()) {
 #endif
 		int r = repeater.read();
 		if (r == -1) { logger.println("read() == -1"); }
@@ -111,7 +111,7 @@ void loop() {
 		block[inCnt++] = expected;
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = ESP.getCycleCount() + static_cast<uint32_t>(200 * 1000 * ESP.getCpuFreqMHz());
+		deadline = micros() + static_cast<uint32_t>(1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 #else
 		repeater.write(expected);
 #endif
@@ -121,6 +121,7 @@ void loop() {
 	if (inCnt != 0 && inCnt != BLOCKSIZE) {
 		logger.print("Got "); logger.print(inCnt); logger.println(" bytes during buffer interval");
 	}
+
 	repeater.write(block, inCnt);
 #endif
 

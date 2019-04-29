@@ -181,12 +181,10 @@ int SoftwareSerial::available() {
 	if (!m_rxValid) { return 0; }
 	rxBits();
 	int avail = m_inPos - m_outPos;
-	if (!avail) {
-		optimistic_yield(2 * (m_dataBits + 2) * m_bitCycles / ESP.getCpuFreqMHz());
-		rxBits();
-		avail = m_inPos - m_outPos;
-	}
 	if (avail < 0) { avail += m_bufSize; }
+	if (!avail) {
+		optimistic_yield(10000);
+	}
 	return avail;
 }
 
@@ -195,9 +193,9 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool asyn) 
 	if (asyn && !m_intTxEnabled) { interrupts(); }
 	int32_t micro_s = static_cast<int32_t>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
 	if (micro_s > 0) {
-		if (asyn) optimistic_yield(micro_s); else delayMicroseconds(micro_s);
+		if (asyn) delay(micro_s / 1000); else delayMicroseconds(micro_s);
 	}
-	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) { if (asyn) optimistic_yield(1); }
+	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) { if (asyn) optimistic_yield(10000); }
 	if (asyn) {
 		// Disable interrupts again
 		if (!m_intTxEnabled) {
