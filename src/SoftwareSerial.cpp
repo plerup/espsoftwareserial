@@ -68,7 +68,7 @@ void SoftwareSerial::begin(int32_t baud, int8_t rxPin, int8_t txPin,
 	}
 	if (isValidGPIOpin(txPin)
 #ifdef ESP8266
-		|| (!m_oneWire && (txPin == 16))) {
+		|| ((txPin == 16) && !m_oneWire)) {
 #else
 		) {
 #endif
@@ -226,7 +226,7 @@ size_t SoftwareSerial::write(uint8_t b) {
 
 size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size) {
 	if (m_rxValid) { rxBits(); }
-	if (!m_txValid) { return 0; }
+	if (!m_txValid) { return -1; }
 
 	if (m_txEnableValid) {
 		digitalWrite(m_txEnablePin, HIGH);
