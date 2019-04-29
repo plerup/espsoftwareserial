@@ -47,6 +47,8 @@ enum SoftwareSerialConfig {
 class SoftwareSerial : public Stream {
 public:
 	SoftwareSerial();
+	SoftwareSerial(const SoftwareSerial&) = delete;
+	SoftwareSerial& operator= (const SoftwareSerial&) = delete;
 	virtual ~SoftwareSerial();
 	void begin(int32_t baud, int8_t rxPin = -1, int8_t txPin = -1,
 		SoftwareSerialConfig config = SWSERIAL_8N1,
