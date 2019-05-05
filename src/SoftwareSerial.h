@@ -100,7 +100,9 @@ private:
 	// If withStopBit is set, either cycle contains a stop bit.
 	// If dutyCycle == 0, the level is not forced to HIGH.
 	// If offCycle == 0, the level remains unchanged from dutyCycle.
-	void writePeriod(uint32_t dutyCycle, uint32_t offCycle, bool withStopBit);
+	// returns the latest saved interrupt state.
+	uint32_t writePeriod(
+		uint32_t dutyCycle, uint32_t offCycle, bool withStopBit, uint32_t savedPS);
 	bool isValidGPIOpin(int8_t pin);
 	/* check m_rxValid that calling is safe */
 	void rxBits();
