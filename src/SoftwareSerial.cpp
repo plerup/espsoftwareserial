@@ -33,7 +33,6 @@ constexpr uint8_t BYTE_MSB_SET = 1 << (sizeof(uint8_t) * 8 - 1);
 constexpr uint8_t BYTE_ALL_BITS_SET = ~static_cast<uint8_t>(0);
 
 SoftwareSerial::SoftwareSerial() {
-	m_isrBuffer = 0;
 	m_isrOverflow = false;
 	m_isrLastCycle = 0;
 }
@@ -59,15 +58,12 @@ void SoftwareSerial::begin(int32_t baud, int8_t rxPin, int8_t txPin,
 	m_invert = invert;
 	if (isValidGPIOpin(rxPin)) {
 		m_rxPin = rxPin;
-		m_bufSize = (bufCapacity > 0) ? bufCapacity + 1 : 64 + 1;
-		m_buffer = std::unique_ptr<uint8_t[] >(new uint8_t[m_bufSize]);
-		m_isrBufSize = (isrBufCapacity > 0) ? isrBufCapacity + 1 : (sizeof(uint8_t) * 8 + 2) * bufCapacity + 1;
-		m_isrBuffer = std::unique_ptr<std::atomic<uint32_t>[] >(new std::atomic<uint32_t>[m_isrBufSize]);
+		std::unique_ptr<CircularQueue<uint8_t> > buffer(new CircularQueue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
+		m_buffer = move(buffer);
+		std::unique_ptr<CircularQueue<uint32_t> > isrBuffer(new CircularQueue<uint32_t>((isrBufCapacity > 0) ? isrBufCapacity : (sizeof(uint8_t) * 8 + 2) * bufCapacity));
+		m_isrBuffer = move(isrBuffer);
 		if (m_buffer != 0 && m_isrBuffer != 0) {
 			m_rxValid = true;
-			m_inPos = m_outPos = 0;
-			m_isrInPos.store(0);
-			m_isrOutPos.store(0);
 			pinMode(m_rxPin, INPUT);
 		}
 	}
@@ -152,41 +148,25 @@ void SoftwareSerial::enableRx(bool on) {
 
 int SoftwareSerial::read() {
 	if (!m_rxValid) { return -1; }
-	if (m_inPos == m_outPos) {
+	if (!m_buffer->available()) {
 		rxBits();
-		if (m_inPos == m_outPos) { return -1; }
+		if (!m_buffer->available()) { return -1; }
 	}
-	uint8_t ch = m_buffer[m_outPos];
-	m_outPos = (m_outPos + 1) % m_bufSize;
-	return ch;
+	return m_buffer->pop();
 }
 
-size_t SoftwareSerial::readBytes(char* buffer, size_t size) {
+size_t SoftwareSerial::readBytes(uint8_t* buffer, size_t size) {
 	if (!m_rxValid) { return -1; }
-	size_t avail = m_inPos - m_outPos;
-	if (!avail) {
-		rxBits();
-		avail = m_inPos - m_outPos;
-		if (!avail) { return -1; }
-	}
-	if (avail < 0) { avail += m_bufSize; }
-
-	size = avail = min(size, avail);
-	size_t n = min(avail, static_cast<size_t>(m_bufSize - m_outPos));
-	buffer = std::copy_n(m_buffer.get() + m_outPos, n, buffer);
-	avail -= n;
-	if (0 < avail) {
-		buffer = std::copy_n(m_buffer.get(), avail, buffer);
-	}
-	m_outPos = (m_outPos + size) % m_bufSize;
-	return size;
+	if (0 != (size = m_buffer->pop_n(buffer, size))) return size;
+	rxBits();
+	size = m_buffer->pop_n(buffer, size);
+	return (size == 0) ? -1 : size;
 }
 
 int SoftwareSerial::available() {
 	if (!m_rxValid) { return 0; }
 	rxBits();
-	int avail = m_inPos - m_outPos;
-	if (avail < 0) { avail += m_bufSize; }
+	int avail = m_buffer->available();
 	if (!avail) {
 		optimistic_yield(10000);
 	}
@@ -287,9 +267,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
 }
 
 void SoftwareSerial::flush() {
-	m_inPos = m_outPos = 0;
-	m_isrInPos.store(0);
-	m_isrOutPos.store(0);
+	m_buffer->flush();
 }
 
 bool SoftwareSerial::overflow() {
@@ -300,16 +278,15 @@ bool SoftwareSerial::overflow() {
 
 int SoftwareSerial::peek() {
 	if (!m_rxValid) { return -1; }
-	if (m_inPos == m_outPos) {
+	if (!m_buffer->available()) {
 		rxBits();
-		if (m_inPos == m_outPos) { return -1; }
+		if (!m_buffer->available()) return -1;
 	}
-	return m_buffer[m_outPos];
+	return m_buffer->peek();
 }
 
 void SoftwareSerial::rxBits() {
-	int isrAvail = m_isrInPos.load() - m_isrOutPos.load();
-	if (isrAvail < 0) { isrAvail += m_isrBufSize; }
+	int isrAvail = m_isrBuffer->available();
 	if (m_isrOverflow.load()) {
 		m_overflow = true;
 		m_isrOverflow.store(false);
@@ -318,27 +295,21 @@ void SoftwareSerial::rxBits() {
 	// stop bit can go undetected if leading data bits are at same level
 	// and there was also no next start bit yet, so one byte may be pending.
 	// low-cost check first
-	if (isrAvail == 0 && m_rxCurBit < m_dataBits && m_isrInPos.load() == m_isrOutPos.load() && m_rxCurBit >= 0) {
+	if (isrAvail == 0 && m_rxCurBit < m_dataBits && m_rxCurBit >= 0) {
 		uint32_t expectedCycle = m_isrLastCycle.load() + (m_dataBits + 1 - m_rxCurBit) * m_bitCycles;
 		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
 			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
 			// cycle's LSB is repurposed for the level bit
-			int next = (m_isrInPos.load() + 1) % m_isrBufSize;
 			// if m_isrBuffer is full, leave undetected stop bit pending, no actual overflow yet
-			if (next != m_isrOutPos.load()) {
-				m_isrBuffer[m_isrInPos.load()].store((expectedCycle | 1) ^ !m_invert);
-				m_isrInPos.store(next);
-				++isrAvail;
-			}
+			if (m_isrBuffer->push((expectedCycle | 1) ^ !m_invert)) ++isrAvail;
 		}
 	}
 
 	while (isrAvail--) {
 		// error introduced by edge value in LSB is negligible
-		uint32_t isrCycle = m_isrBuffer[m_isrOutPos.load()].load();
+		uint32_t isrCycle = m_isrBuffer->pop();
 		// extract inverted edge value
 		bool level = (isrCycle & 1) == m_invert;
-		m_isrOutPos.store((m_isrOutPos.load() + 1) % m_isrBufSize);
 		int32_t cycles = static_cast<int32_t>(isrCycle - m_isrLastCycle.load() - (m_bitCycles / 2));
 		if (cycles < 0) { continue; }
 		m_isrLastCycle.store(isrCycle);
@@ -366,15 +337,12 @@ void SoftwareSerial::rxBits() {
 			}
 			if (m_rxCurBit == (m_dataBits - 1)) {
 				// Store the received value in the buffer unless we have an overflow
-				if (m_inPos == m_outPos) m_inPos = m_outPos = 0;
-				int next = (m_inPos + 1) % m_bufSize;
-				if (next != m_outPos) {
+				if (m_buffer->push(m_rxCurByte >> (sizeof(uint8_t) * 8 - m_dataBits)))
+				{
 					++m_rxCurBit;
 					cycles -= m_bitCycles;
-					m_buffer[m_inPos] = m_rxCurByte >> (sizeof(uint8_t) * 8 - m_dataBits);
 					// reset to 0 is important for masked bit logic
 					m_rxCurByte = 0;
-					m_inPos = next;
 				}
 				else {
 					// no space in m_buffer, leave pending value in m_rxCurByte, no actual overflow yet
@@ -399,14 +367,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead(SoftwareSerial * self) {
 
 	// Store inverted edge value & cycle in the buffer unless we have an overflow
 	// cycle's LSB is repurposed for the level bit
-	int next = (self->m_isrInPos.load() + 1) % self->m_isrBufSize;
-	if (next != self->m_isrOutPos.load()) {
-		self->m_isrBuffer[self->m_isrInPos.load()].store((curCycle | 1) ^ level);
-		self->m_isrInPos.store(next);
-	}
-	else {
-		self->m_isrOverflow.store(true);
-	}
+	if (!self->m_isrBuffer->push((curCycle | 1) ^ level)) self->m_isrOverflow.store(true);
 }
 
 void SoftwareSerial::onReceive(std::function<void(int available)> handler) {
@@ -417,8 +378,7 @@ void SoftwareSerial::perform_work() {
 	if (!m_rxValid) { return; }
 	rxBits();
 	if (receiveHandler) {
-		int avail = m_inPos - m_outPos;
-		if (avail < 0) { avail += m_bufSize; }
+		int avail = m_buffer->available();
 		if (avail) { receiveHandler(avail); }
 	}
 }
