@@ -41,8 +41,7 @@ public:
 	CircularQueue& operator=(const CircularQueue&) = delete;
 
 	void flush() {
-		m_inPos.store(0);
-		m_outPos.store(0);
+		m_outPos.store(m_inPos.load());
 	}
 
 	size_t available()
@@ -54,14 +53,16 @@ public:
 
 	T peek()
 	{
-		return (m_inPos.load() == m_outPos.load()) ? 0 : m_buffer[m_outPos.load()].load();
+		auto outPos = m_outPos.load();
+		return (m_inPos.load() == outPos) ? defaultValue : m_buffer[outPos].load();
 	}
 
 	bool ICACHE_RAM_ATTR push(T val)
 	{
-		int next = (m_inPos.load() + 1) % m_bufSize;
+		auto inPos = m_inPos.load();
+		int next = (inPos + 1) % m_bufSize;
 		if (next != m_outPos.load()) {
-			m_buffer[m_inPos.load()].store(val);
+			m_buffer[inPos].store(val);
 			m_inPos.store(next);
 			return true;
 		}
@@ -70,26 +71,29 @@ public:
 
 	T pop()
 	{
-		if (m_inPos.load() == m_outPos.load()) return 0;
-		auto val = m_buffer[m_outPos.load()].load();
-		m_outPos.store((m_outPos.load() + 1) % m_bufSize);
+		auto outPos = m_outPos.load();
+		if (m_inPos.load() == outPos) return defaultValue;
+		auto val = m_buffer[outPos].load();
+		m_outPos.store((outPos + 1) % m_bufSize);
 		return val;
 	}
 
 	size_t pop_n(T* buffer, size_t size) {
 		size_t avail = size = min(size, available());
 		if (!avail) return 0;
-		size_t n = min(avail, static_cast<size_t>(m_bufSize - m_outPos.load()));
-		buffer = std::copy_n(m_buffer.get() + m_outPos.load(), n, buffer);
+		auto outPos = m_outPos.load();
+		size_t n = min(avail, static_cast<size_t>(m_bufSize - outPos));
+		buffer = std::copy_n(m_buffer.get() + outPos, n, buffer);
 		avail -= n;
 		if (0 < avail) {
 			buffer = std::copy_n(m_buffer.get(), avail, buffer);
 		}
-		m_outPos.store((m_outPos.load() + size) % m_bufSize);
+		m_outPos.store((outPos + size) % m_bufSize);
 		return size;
 	}
 
 protected:
+	const T defaultValue = {};
 	int m_bufSize;
 	std::unique_ptr<std::atomic<T>[] > m_buffer;
 	std::atomic<int> m_inPos;
