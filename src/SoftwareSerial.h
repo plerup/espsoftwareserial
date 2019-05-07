@@ -24,10 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef SoftwareSerial_h
 #define SoftwareSerial_h
 
+#include "CircularQueue.h"
 #include <Stream.h>
 #include <functional>
-#include <atomic>
-#include <memory>
 
 // If only one tx or rx wanted then use this as parameter for the unused pin
 constexpr int SW_SERIAL_UNUSED_PIN = -1;
@@ -66,9 +65,9 @@ public:
 	int peek() override;
 	int read() override;
 	// The readBytes functions are non-waiting, there is no timeout.
-	size_t readBytes(char* buffer, size_t size) override;
-	size_t readBytes(uint8_t* buffer, size_t size) override {
-		return readBytes((char*)buffer, size);
+	size_t readBytes(uint8_t* buffer, size_t size) override;
+	size_t readBytes(char* buffer, size_t size) override {
+		return readBytes((uint8_t*)buffer, size);
 	}
 	void flush() override;
 	size_t write(uint8_t byte) override;
@@ -122,14 +121,10 @@ private:
 	int32_t m_bitCycles;
 	uint32_t m_periodDeadline;
 	bool m_intTxEnabled;
-	int m_inPos, m_outPos;
-	int m_bufSize = 0;
-	std::unique_ptr<uint8_t[] > m_buffer;
+	std::unique_ptr<CircularQueue<uint8_t> > m_buffer;
 	// the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
 	// 1 = positive including 0, 0 = negative.
-	std::atomic<int> m_isrInPos, m_isrOutPos;
-	int m_isrBufSize = 0;
-	std::unique_ptr<std::atomic<uint32_t>[] > m_isrBuffer;
+	std::unique_ptr<CircularQueue<uint32_t> > m_isrBuffer;
 	std::atomic<bool> m_isrOverflow;
 	std::atomic<uint32_t> m_isrLastCycle;
 	int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
