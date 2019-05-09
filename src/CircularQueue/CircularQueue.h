@@ -53,6 +53,14 @@ public:
 		return avail;
 	}
 
+	size_t availableForWrite()
+	{
+		ssize_t avail = (m_outPos.load() - m_inPosL.load() - 1);
+		if (avail < 0) avail += m_bufSize;
+		return avail;
+	}
+
+
 	T peek()
 	{
 		auto outPos = m_outPos.load();
