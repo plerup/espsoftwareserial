@@ -25,9 +25,9 @@
 #define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 38400;
+constexpr int IUTBITRATE = 57600;
 #else
-constexpr int IUTBITRATE = 38400;
+constexpr int IUTBITRATE = 57600;
 #endif
 
 #if defined(ESP8266) || defined(ESP32)
