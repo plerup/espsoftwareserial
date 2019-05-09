@@ -73,8 +73,11 @@ public:
 		uint32_t savedPS = xt_rsil(15);
 		auto inPos = m_inPosT.load();
 		int next = (inPos + 1) % m_bufSize;
-		if (next == m_outPos.load()) return false;
-		m_inPosL.store(next);
+		if (next == m_outPos.load()) {
+			xt_wsr_ps(savedPS);
+			return false;
+		}
+		m_inPosT.store(next);
 
 		m_buffer[inPos].store(val);
 
