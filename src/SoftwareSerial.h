@@ -24,7 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef SoftwareSerial_h
 #define SoftwareSerial_h
 
-#include "CircularQueue.h"
+#include "CircularQueue/CircularQueue.h"
 #include <Stream.h>
 #include <functional>
 
@@ -62,6 +62,10 @@ public:
 	bool overflow();
 
 	int available() override;
+	int availableForWrite() {
+		if (!m_txValid) return 0;
+		return 1;
+	}
 	int peek() override;
 	int read() override;
 	// The readBytes functions are non-waiting, there is no timeout.
