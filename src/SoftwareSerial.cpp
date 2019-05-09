@@ -82,7 +82,8 @@ void SoftwareSerial::begin(int32_t baud, int8_t rxPin, int8_t txPin,
 	}
 
 	m_dataBits = 5 + config;
-	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
+	m_bit_us = (1000000 + baud / 2) / baud;
+	m_bitCycles = (ESP.getCpuFreqMHz() * 1000000 + baud / 2) / baud;
 	m_intTxEnabled = true;
 	if (!m_rxEnabled) { enableRx(true); }
 }
@@ -175,8 +176,11 @@ int SoftwareSerial::available() {
 
 void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool asyn) {
 	int32_t micro_s = static_cast<int32_t>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
-	if (micro_s > 0) {
-		if (asyn) delay(micro_s / 1000); else delayMicroseconds(micro_s);
+	if (asyn) {
+		if (micro_s > 0) delay(micro_s / 1000);
+	} else
+	{
+		if (micro_s > m_bit_us) delayMicroseconds(micro_s - m_bit_us);
 	}
 	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) { if (asyn) optimistic_yield(10000); }
 	if (asyn) m_periodDeadline = ESP.getCycleCount();

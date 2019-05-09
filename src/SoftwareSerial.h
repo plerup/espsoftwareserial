@@ -122,6 +122,7 @@ private:
 	bool m_invert;
 	bool m_overflow = false;
 	uint8_t m_dataBits;
+	int32_t m_bit_us;
 	int32_t m_bitCycles;
 	uint32_t m_periodDeadline;
 	bool m_intTxEnabled;
