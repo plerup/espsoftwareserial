@@ -2,13 +2,13 @@
 
 // On ESP8266:
 // SoftwareSerial loopback for remote source (loopback.ino), or hardware loopback.
-// Connect source D5 to local D8 (tx), source D6 to local D7 (rx).
+// Connect source D5 (rx) to local D8 (tx), source D6 (tx) to local D7 (rx).
 // Hint: The logger is run at 9600bps such that enableIntTx(true) can remain unchanged. Blocking
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
 // On ESP32:
 // Hardware Serial2 defaults to D4 (rx), D3 (tx).
-// Connect source D5 to local D3 (tx), source D6 to local D4 (rx).
+// For software or hardware loopback, connect source rx to local D3 (tx), source tx to local D4 (rx).
 
 #if defined(ESP32) && !defined(ARDUINO_D1_MINI32)
 #define D5 (14)
@@ -54,20 +54,20 @@ HardwareSerial& logger(Serial);
 void setup() {
 #ifdef HWLOOPBACK
 #if defined(ESP8266)
-	Serial.begin(IUTBITRATE);
-	Serial.setRxBufferSize(2 * BLOCKSIZE);
-	Serial.swap();
+	repeater.begin(IUTBITRATE);
+	repeater.setRxBufferSize(2 * BLOCKSIZE);
+	repeater.swap();
 	logger.begin(9600, RX, TX);
 #elif defined(ESP32)
-	Serial2.begin(IUTBITRATE);
-	Serial2.setRxBufferSize(2 * BLOCKSIZE);
+	repeater.begin(IUTBITRATE, SERIAL_8N1, D7, D8);
+	repeater.setRxBufferSize(2 * BLOCKSIZE);
 	logger.begin(9600);
 #endif
 #else
 #if defined(ESP8266)
 	repeater.begin(IUTBITRATE, D7, D8, swSerialConfig, false, 2 * BLOCKSIZE);
 #elif defined(ESP32)
-	repeater.begin(IUTBITRATE, D4, D3, swSerialConfig, false, 2 * BLOCKSIZE);
+	repeater.begin(IUTBITRATE, D7, D8, swSerialConfig, false, 2 * BLOCKSIZE);
 #endif
 #ifdef HALFDUPLEX
 	repeater.enableIntTx(false);
@@ -85,18 +85,15 @@ void loop() {
 
 #ifdef HALFDUPLEX
 	unsigned char block[BLOCKSIZE];
+#endif
 	int inCnt = 0;
-	uint32_t deadline;
 	// starting deadline for the first bytes to come in
-	deadline = micros() + static_cast<uint32_t>(1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+	uint32_t deadline = micros() + static_cast<uint32_t>(32 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		if (0 >= repeater.available()) {
 			delay(1);
 			continue;
 		}
-#else
-	while (0 < repeater.available()) {
-#endif
 		int r = repeater.read();
 		if (r == -1) { logger.println("read() == -1"); }
 		if (expected == -1) { expected = r; }
@@ -107,23 +104,23 @@ void loop() {
 			++seqErrors;
 		}
 		++rxCount;
-#if HALFDUPLEX
-		block[inCnt++] = expected;
-		if (inCnt >= BLOCKSIZE) { break; }
-		// wait for more outstanding bytes to trickle in
-		deadline = micros() + static_cast<uint32_t>(1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+#ifdef HALFDUPLEX
+		block[inCnt] = expected;
 #else
 		repeater.write(expected);
 #endif
+		if (++inCnt >= BLOCKSIZE) { break; }
+		// wait for more outstanding bytes to trickle in
+		deadline = micros() + static_cast<uint32_t>(32 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	}
 
 #ifdef HALFDUPLEX
+	repeater.write(block, inCnt);
+#endif
+
 	if (inCnt != 0 && inCnt != BLOCKSIZE) {
 		logger.print("Got "); logger.print(inCnt); logger.println(" bytes during buffer interval");
 	}
-
-	repeater.write(block, inCnt);
-#endif
 
 	if (rxCount >= ReportInterval) {
 		auto end = micros();
