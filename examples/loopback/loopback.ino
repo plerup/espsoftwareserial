@@ -1,7 +1,7 @@
 #include <SoftwareSerial.h>
 
 // On ESP8266:
-// Local SoftwareSerial loopback, connect D5 to D6, or with repeater, connect crosswise.
+// Local SoftwareSerial loopback, connect D5 (rx) to D6 (tx), or with repeater, connect crosswise.
 // For hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
 // Hint: The logger is run at 9600bps such that enableIntTx(true) can remain unchanged. Blocking
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
@@ -9,6 +9,7 @@
 // By default (no HWLOOPBACK, no HALFDUPLEX),
 // runs at 80MHz with 28800bps, and at 160MHz CPU frequency with 38400bps with no errors.
 // On ESP32:
+// For SoftwareSerial or hardware send/sink, connect D5 (rx) and D6 (tx).
 // Hardware Serial2 defaults to D4 (rx), D3 (tx).
 // For hardware loopback, connect D5 to D3 (tx), D6 to D4 (rx).
 
@@ -102,7 +103,7 @@ Serial.begin(9600);
 
 #if !defined(HWSENDNSINK)
 #if defined(ESP8266) || defined(ESP32)
-	serialIUT.begin(IUTBITRATE, D5, D6, swSerialConfig, false, 2 * BLOCKSIZE);
+	serialIUT.begin(IUTBITRATE, D5, D6, swSerialConfig, false, 4 * BLOCKSIZE);
 #ifdef HALFDUPLEX
 	serialIUT.enableIntTx(false);
 #endif
@@ -201,9 +202,11 @@ void loop() {
 		deadline = micros() + static_cast<uint32_t>(128 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	}
 
+#ifdef HALFDUPLEX
 	if (inCnt != BLOCKSIZE) {
 		logger.print("Got "); logger.print(inCnt); logger.println(" bytes during block loopback interval");
 	}
+#endif
 
 	if (txCount >= ReportInterval) {
 		logger.println(String("tx/rx: ") + txCount + "/" + rxCount);
