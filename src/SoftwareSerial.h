@@ -131,7 +131,7 @@ private:
 	// 1 = positive including 0, 0 = negative.
 	std::unique_ptr<CircularQueue<uint32_t> > m_isrBuffer;
 	std::atomic<bool> m_isrOverflow;
-	std::atomic<uint32_t> m_isrLastCycle;
+	uint32_t m_isrLastCycle;
 	int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
 	uint8_t m_rxCurByte = 0;
 

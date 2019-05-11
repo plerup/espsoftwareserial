@@ -34,7 +34,6 @@ constexpr uint8_t BYTE_ALL_BITS_SET = ~static_cast<uint8_t>(0);
 
 SoftwareSerial::SoftwareSerial() {
 	m_isrOverflow = false;
-	m_isrLastCycle = 0;
 }
 
 SoftwareSerial::~SoftwareSerial() {
@@ -138,6 +137,8 @@ void SoftwareSerial::enableRx(bool on) {
 	if (m_rxValid) {
 		if (on) {
 			m_rxCurBit = m_dataBits;
+			// Init to inverted stop bit edge and current cycle
+			m_isrLastCycle = (ESP.getCycleCount() | 1) ^ !m_invert;
 			attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxRead), this, CHANGE);
 		}
 		else {
@@ -291,16 +292,15 @@ int SoftwareSerial::peek() {
 
 void SoftwareSerial::rxBits() {
 	int isrAvail = m_isrBuffer->available();
-	if (m_isrOverflow.load()) {
+	if (m_isrOverflow.exchange(false)) {
 		m_overflow = true;
-		m_isrOverflow.store(false);
 	}
 
 	// stop bit can go undetected if leading data bits are at same level
 	// and there was also no next start bit yet, so one byte may be pending.
 	// low-cost check first
-	if (isrAvail == 0 && m_rxCurBit < m_dataBits && m_rxCurBit >= 0) {
-		uint32_t expectedCycle = m_isrLastCycle.load() + (m_dataBits + 1 - m_rxCurBit) * m_bitCycles;
+	if (isrAvail == 0 && m_rxCurBit >= 0 && m_rxCurBit < m_dataBits) {
+		uint32_t expectedCycle = m_isrLastCycle + (m_dataBits + 1 - m_rxCurBit) * m_bitCycles;
 		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
 			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
 			// cycle's LSB is repurposed for the level bit
@@ -314,10 +314,9 @@ void SoftwareSerial::rxBits() {
 		uint32_t isrCycle = m_isrBuffer->pop();
 		// extract inverted edge value
 		bool level = (isrCycle & 1) == m_invert;
-		int32_t cycles = static_cast<int32_t>(isrCycle - m_isrLastCycle.load() - (m_bitCycles / 2));
-		if (cycles < 0) { continue; }
-		m_isrLastCycle.store(isrCycle);
-		do {
+		int32_t cycles = static_cast<int32_t>(isrCycle - m_isrLastCycle - m_bitCycles / 2);
+		m_isrLastCycle = isrCycle;
+		while (cycles >= 0) {
 			// data bits
 			if (m_rxCurBit >= -1 && m_rxCurBit < (m_dataBits - 1)) {
 				if (cycles >= m_bitCycles) {
@@ -361,7 +360,7 @@ void SoftwareSerial::rxBits() {
 				}
 			}
 			break;
-		} while (cycles >= 0);
+		}
 	}
 }
 
