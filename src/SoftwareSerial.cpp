@@ -302,18 +302,22 @@ void SoftwareSerial::rxBits() {
 	if (isrAvail == 0 && m_rxCurBit >= 0 && m_rxCurBit < m_dataBits) {
 		uint32_t expectedCycle = m_isrLastCycle + (m_dataBits + 1 - m_rxCurBit) * m_bitCycles;
 		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
-			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
-			// cycle's LSB is repurposed for the level bit
+			uint32_t expectedCycleRS1 = expectedCycle >> 1;
+			// Stop bit level equals signedness bit, cycle value is right shifted by 1.
+			// Store in the queue unless we have an overflow.
 			// if m_isrBuffer is full, leave undetected stop bit pending, no actual overflow yet
-			if (m_isrBuffer->push((expectedCycle | 1) ^ !m_invert)) ++isrAvail;
+			if (m_isrBuffer->push(!m_invert ? -expectedCycleRS1 : expectedCycleRS1)) ++isrAvail;
 		}
 	}
 
 	while (isrAvail--) {
-		// error introduced by edge value in LSB is negligible
-		uint32_t isrCycle = m_isrBuffer->pop();
-		// extract inverted edge value
-		bool level = (isrCycle & 1) == m_invert;
+		// error introduced by right shift is negligible
+		int32_t isrCycleRS1 = m_isrBuffer->pop();
+		// extract inverted edge value and real cycle value
+		bool level = (isrCycleRS1 < 0);
+		uint32_t isrCycle = static_cast<uint32_t>(level ? -isrCycleRS1 : isrCycleRS1) << 1;
+		level ^= m_invert;
+
 		int32_t cycles = static_cast<int32_t>(isrCycle - m_isrLastCycle - m_bitCycles / 2);
 		m_isrLastCycle = isrCycle;
 		while (cycles >= 0) {
@@ -365,12 +369,12 @@ void SoftwareSerial::rxBits() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead(SoftwareSerial * self) {
-	uint32_t curCycle = ESP.getCycleCount();
+	uint32_t curCycleRS1 = ESP.getCycleCount() >> 1;
 	bool level = digitalRead(self->m_rxPin);
 
-	// Store inverted edge value & cycle in the buffer unless we have an overflow
-	// cycle's LSB is repurposed for the level bit
-	if (!self->m_isrBuffer->push((curCycle | 1) ^ level)) self->m_isrOverflow.store(true);
+	// Level equals signedness bit, cycle value is right shifted by 1.
+	// Store in the queue unless we have an overflow.
+	if (!self->m_isrBuffer->push(level ? -curCycleRS1 : curCycleRS1)) self->m_isrOverflow.store(true);
 }
 
 void SoftwareSerial::onReceive(std::function<void(int available)> handler) {
