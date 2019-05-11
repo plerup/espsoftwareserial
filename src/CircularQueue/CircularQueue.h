@@ -83,7 +83,11 @@ public:
 		auto outPos = m_outPos.load();
 		if (m_inPosT.load() == outPos) return defaultValue;
 		auto val = m_buffer[outPos].load();
+#ifdef ESP8266
+		m_outPos.store((outPos + 1) % m_bufSize);
+#else
 		m_outPos.exchange((outPos + 1) % m_bufSize);
+#endif
 		return val;
 	}
 
@@ -97,7 +101,11 @@ public:
 		if (0 < avail) {
 			buffer = std::copy_n(m_buffer.get(), avail, buffer);
 		}
+#ifdef ESP8266
+		m_outPos.store((outPos + size) % m_bufSize);
+#else
 		m_outPos.exchange((outPos + size) % m_bufSize);
+#endif
 		return size;
 	}
 
@@ -134,15 +142,15 @@ public:
 #ifdef ESP8266
 	{
 		uint32_t savedPS = xt_rsil(15);
-		auto inPos = m_inPosT.load();
-		int next = (inPos + 1) % m_bufSize;
-		if (next == m_outPos.load()) {
+		auto inPos = CircularQueue<T>::m_inPosT.load();
+		int next = (inPos + 1) % CircularQueue<T>::m_bufSize;
+		if (next == CircularQueue<T>::m_outPos.load()) {
 			xt_wsr_ps(savedPS);
 			return false;
 		}
-		m_inPosT.store(next);
+		CircularQueue<T>::m_inPosT.store(next);
 
-		m_buffer[inPos].store(val);
+		CircularQueue<T>::m_buffer[inPos].store(val);
 
 		xt_wsr_ps(savedPS);
 		return true;
