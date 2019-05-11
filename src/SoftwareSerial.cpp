@@ -292,9 +292,16 @@ int SoftwareSerial::peek() {
 
 void SoftwareSerial::rxBits() {
 	int isrAvail = m_isrBuffer->available();
+#ifdef ESP8266
+	if (m_isrOverflow.load()) {
+		m_overflow = true;
+		m_isrOverflow.store(false);
+	}
+#else
 	if (m_isrOverflow.exchange(false)) {
 		m_overflow = true;
 	}
+#endif
 
 	// stop bit can go undetected if leading data bits are at same level
 	// and there was also no next start bit yet, so one byte may be pending.
