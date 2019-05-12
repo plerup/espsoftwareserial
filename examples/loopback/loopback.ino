@@ -7,7 +7,7 @@
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
 // By default (no HWLOOPBACK, no HALFDUPLEX),
-// runs at 80MHz with 28800bps, and at 160MHz CPU frequency with 38400bps with no errors.
+// runs at 80MHz with 38400bps, and at 160MHz CPU frequency with 57600bps with nearly no errors.
 // On ESP32:
 // For SoftwareSerial or hardware send/sink, connect D5 (rx) and D6 (tx).
 // Hardware Serial2 defaults to D4 (rx), D3 (tx).
@@ -23,10 +23,10 @@
 // Pick only one of HWLOOPBACK OR HWSENDNSINK
 //#define HWLOOPBACK 1
 //#define HWSENDNSINK 1
-#define HALFDUPLEX 1
+//#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 57600;
+constexpr int IUTBITRATE = 38400;
 #else
 constexpr int IUTBITRATE = 57600;
 #endif
@@ -102,7 +102,12 @@ Serial.begin(9600);
 #endif
 
 #if !defined(HWSENDNSINK)
-#if defined(ESP8266) || defined(ESP32)
+#if defined(ESP8266)
+	serialIUT.begin(IUTBITRATE, D7, D8, swSerialConfig, false, 4 * BLOCKSIZE);
+#ifdef HALFDUPLEX
+	serialIUT.enableIntTx(false);
+#endif
+#elif defined(ESP32)
 	serialIUT.begin(IUTBITRATE, D5, D6, swSerialConfig, false, 4 * BLOCKSIZE);
 #ifdef HALFDUPLEX
 	serialIUT.enableIntTx(false);

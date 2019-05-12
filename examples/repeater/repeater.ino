@@ -18,10 +18,10 @@
 #endif
 
 //#define HWLOOPBACK 1
-#define HALFDUPLEX 1
+//#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 57600;
+constexpr int IUTBITRATE = 38400;
 #else
 constexpr int IUTBITRATE = 57600;
 #endif
@@ -127,7 +127,8 @@ void loop() {
 		unsigned long interval = end - start;
 		long cps = rxCount * (1000000.0 / interval);
 		long seqErrorsps = seqErrors * (1000000.0 / interval);
-		logger.println(bitRateTxt + 10 * cps + "bps, " + seqErrorsps + "cps seq. errors");
+		logger.println(bitRateTxt + 10 * cps + "bps, "
+			+ seqErrorsps + "cps seq. errors (" + 100.0 * seqErrors / rxCount + "%)");
 		start = end;
 		rxCount = 0;
 		seqErrors = 0;
