@@ -29,7 +29,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define xt_wsr_ps(a)
 #endif
 
-constexpr uint8_t BYTE_MSB_SET = 1 << (sizeof(uint8_t) * 8 - 1);
 constexpr uint8_t BYTE_ALL_BITS_SET = ~static_cast<uint8_t>(0);
 
 SoftwareSerial::SoftwareSerial() {
@@ -137,8 +136,9 @@ void SoftwareSerial::enableRx(bool on) {
 	if (m_rxValid) {
 		if (on) {
 			m_rxCurBit = m_dataBits;
-			// Init to inverted stop bit edge and current cycle
-			m_isrLastCycle = (ESP.getCycleCount() | 1) ^ !m_invert;
+			// Init to stop bit level and current cycle
+			m_isrLastCycleRS1 = ESP.getCycleCount() >> 1;
+			if (!m_invert) m_isrLastCycleRS1 = -m_isrLastCycleRS1;
 			attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxRead), this, CHANGE);
 		}
 		else {
@@ -303,72 +303,67 @@ void SoftwareSerial::rxBits() {
 	}
 #endif
 
+	uint32_t lastIsrCycle = static_cast<uint32_t>(m_isrLastCycleRS1 >= 0 ? m_isrLastCycleRS1 : -m_isrLastCycleRS1) << 1;
+
 	// stop bit can go undetected if leading data bits are at same level
 	// and there was also no next start bit yet, so one byte may be pending.
 	// low-cost check first
-	if (isrAvail == 0 && m_rxCurBit >= 0 && m_rxCurBit < m_dataBits) {
-		uint32_t expectedCycle = m_isrLastCycle + (m_dataBits + 1 - m_rxCurBit) * m_bitCycles;
+	if (isrAvail == 0 && m_rxCurBit >= -1 && m_rxCurBit < m_dataBits) {
+		uint32_t expectedCycle = lastIsrCycle + (m_dataBits - m_rxCurBit) * m_bitCycles;
 		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
-			uint32_t expectedCycleRS1 = expectedCycle >> 1;
-			// Stop bit level equals signedness bit, cycle value is right shifted by 1.
+			// Stop bit level equals sign bit, cycle value is right shifted by 1.
 			// Store in the queue unless we have an overflow.
 			// if m_isrBuffer is full, leave undetected stop bit pending, no actual overflow yet
-			if (m_isrBuffer->push(!m_invert ? -expectedCycleRS1 : expectedCycleRS1)) ++isrAvail;
+			uint32_t expectedCycleRS1 = expectedCycle >> 1;
+			if (m_isrBuffer->push(m_invert ? expectedCycleRS1 : -expectedCycleRS1)) ++isrAvail;
 		}
 	}
 
 	while (isrAvail--) {
-		// error introduced by right shift is negligible
-		int32_t isrCycleRS1 = m_isrBuffer->pop();
-		// extract inverted edge value and real cycle value
-		bool level = (isrCycleRS1 < 0);
-		uint32_t isrCycle = static_cast<uint32_t>(level ? -isrCycleRS1 : isrCycleRS1) << 1;
-		level ^= m_invert;
+		bool level = (m_isrLastCycleRS1 < 0) ^ m_invert;
 
-		int32_t cycles = static_cast<int32_t>(isrCycle - m_isrLastCycle - m_bitCycles / 2);
-		m_isrLastCycle = isrCycle;
-		while (cycles >= 0) {
-			// data bits
-			if (m_rxCurBit >= -1 && m_rxCurBit < (m_dataBits - 1)) {
-				if (cycles >= m_bitCycles) {
-					// preceding masked bits
-					int hiddenBits = cycles / m_bitCycles;
-					if (hiddenBits >= m_dataBits - m_rxCurBit) { hiddenBits = (m_dataBits - 1) - m_rxCurBit; }
-					bool lastBit = m_rxCurByte & BYTE_MSB_SET;
-					m_rxCurByte >>= hiddenBits;
-					// masked bits have same level as last unmasked bit
-					if (lastBit) { m_rxCurByte |= BYTE_ALL_BITS_SET << (sizeof(uint8_t) * 8 - hiddenBits); }
-					m_rxCurBit += hiddenBits;
-					cycles -= hiddenBits * m_bitCycles;
-				}
-				if (m_rxCurBit < (m_dataBits - 1)) {
-					++m_rxCurBit;
-					cycles -= m_bitCycles;
-					m_rxCurByte >>= 1;
-					if (level) { m_rxCurByte |= BYTE_MSB_SET; }
-				}
+		// error introduced by right/left shift is negligible
+		int32_t isrCycleRS1 = m_isrBuffer->pop();
+		uint32_t isrCycle = static_cast<uint32_t>(isrCycleRS1 >= 0 ? isrCycleRS1 : ~isrCycleRS1) << 1;
+
+		int32_t cycles = static_cast<int32_t>(isrCycle - lastIsrCycle);
+
+		if ((cycles < (3 * m_bitCycles / 10))) continue;
+
+		lastIsrCycle = isrCycle;
+		m_isrLastCycleRS1 = isrCycleRS1;
+
+		uint8_t bits = (cycles + (6 * m_bitCycles / 10)) / m_bitCycles; // 1/8 .. 8/10 * m_bitCycles
+		while (bits > 0) { 
+			// start bit detection
+			if (m_rxCurBit >= m_dataBits) {
+				// start bit level would be low
+				if (level) break;
+				m_rxCurBit = -1;
+				--bits;
 				continue;
 			}
+			// data bits
+			if (m_rxCurBit >= -1 && m_rxCurBit < (m_dataBits - 1)) {
+				uint8_t dataBits = min(bits, static_cast<uint8_t>(m_dataBits - m_rxCurBit - 1));
+				m_rxCurBit += dataBits;
+				bits -= dataBits;
+				m_rxCurByte >>= dataBits;
+				if (level) { m_rxCurByte |= (BYTE_ALL_BITS_SET << (8 - dataBits)); }
+				continue;
+			}
+			// stop bit
 			if (m_rxCurBit == (m_dataBits - 1)) {
 				// Store the received value in the buffer unless we have an overflow
+				// If no space in m_buffer, leave pending value in m_rxCurByte, will be
+				// retried next iteration.
 				if (m_buffer->push(m_rxCurByte >> (sizeof(uint8_t) * 8 - m_dataBits)))
 				{
 					++m_rxCurBit;
-					cycles -= m_bitCycles;
 					// reset to 0 is important for masked bit logic
 					m_rxCurByte = 0;
 				}
-				else {
-					// no space in m_buffer, leave pending value in m_rxCurByte, no actual overflow yet
-					return;
-				}
-				continue;
-			}
-			if (m_rxCurBit >= m_dataBits) {
-				// start bit level is low
-				if (!level) {
-					m_rxCurBit = -1;
-				}
+				break;
 			}
 			break;
 		}
@@ -379,7 +374,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead(SoftwareSerial * self) {
 	uint32_t curCycleRS1 = ESP.getCycleCount() >> 1;
 	bool level = digitalRead(self->m_rxPin);
 
-	// Level equals signedness bit, cycle value is right shifted by 1.
+	// Level equals sign bit, cycle value is right shifted by 1.
 	// Store in the queue unless we have an overflow.
 	if (!self->m_isrBuffer->push(level ? -curCycleRS1 : curCycleRS1)) self->m_isrOverflow.store(true);
 }
