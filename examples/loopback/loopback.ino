@@ -1,8 +1,9 @@
 #include <SoftwareSerial.h>
 
 // On ESP8266:
-// Local SoftwareSerial loopback, connect D5 (rx) to D6 (tx), or with repeater, connect crosswise.
-// For hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
+// Local SoftwareSerial loopback, connect D5 (rx) and D6 (tx).
+// For local hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
+// For hardware send/sink, connect D7 (rx) and D8 (tx).
 // Hint: The logger is run at 9600bps such that enableIntTx(true) can remain unchanged. Blocking
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
@@ -11,7 +12,7 @@
 // On ESP32:
 // For SoftwareSerial or hardware send/sink, connect D5 (rx) and D6 (tx).
 // Hardware Serial2 defaults to D4 (rx), D3 (tx).
-// For hardware loopback, connect D5 to D3 (tx), D6 to D4 (rx).
+// For local hardware loopback, connect D5 (rx) to D3 (tx), D6 (tx) to D4 (rx).
 
 #if defined(ESP32) && !defined(ARDUINO_D1_MINI32)
 #define D5 (14)
@@ -26,7 +27,7 @@
 //#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 38400;
+constexpr int IUTBITRATE = 57600;
 #else
 constexpr int IUTBITRATE = 57600;
 #endif
@@ -103,7 +104,7 @@ Serial.begin(9600);
 
 #if !defined(HWSENDNSINK)
 #if defined(ESP8266)
-	serialIUT.begin(IUTBITRATE, D7, D8, swSerialConfig, false, 4 * BLOCKSIZE);
+	serialIUT.begin(IUTBITRATE, D5, D6, swSerialConfig, false, 4 * BLOCKSIZE);
 #ifdef HALFDUPLEX
 	serialIUT.enableIntTx(false);
 #endif
