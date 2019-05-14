@@ -7,8 +7,7 @@
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
 // On ESP32:
-// Hardware Serial2 defaults to D4 (rx), D3 (tx).
-// For software or hardware loopback, connect source rx to local D3 (tx), source tx to local D4 (rx).
+// For software or hardware loopback, connect source rx to local D8 (tx), source tx to local D7 (rx).
 
 #if defined(ESP32) && !defined(ARDUINO_D1_MINI32)
 #define D5 (14)
@@ -18,10 +17,10 @@
 #endif
 
 //#define HWLOOPBACK 1
-//#define HALFDUPLEX 1
+#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 38400;
+constexpr int IUTBITRATE = 57600;
 #else
 constexpr int IUTBITRATE = 57600;
 #endif
