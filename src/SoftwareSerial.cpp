@@ -118,7 +118,16 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 #else
 	void SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 #endif
-	m_dataBits = 5 + (config % 4);
+	m_dataBits = config[0]-'0';         // TODO - add range checks to dataBits, parity and stopBits
+    switch(config[2]) {
+        case 'N': m_parity = NONE;
+        case 'O': m_parity = ODD;
+        case 'E': m_parity = EVEN;
+        case 'S': m_parity = SPACE;
+        case 'M': m_parity = MARK;
+        case 'A': m_parity = ADDR;
+    }
+    m_stopBits = config[2]-'0';
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	m_intTxEnabled = true;
 	if (m_buffer != 0 && m_isrBuffer != 0) {

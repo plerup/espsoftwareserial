@@ -32,12 +32,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // If only one tx or rx wanted then use this as parameter for the unused pin
 constexpr int SW_SERIAL_UNUSED_PIN = -1;
 
-enum SoftwareSerialConfig {
-	SWSERIAL_5N1 = 0,
-	SWSERIAL_6N1,
-	SWSERIAL_7N1,
-	SWSERIAL_8N1,
-};
+typedef const char SoftwareSerialConfig[4];
+enum ParityMode { NONE, ODD, EVEN, SPACE, MARK, ADDR };
 
 // This class is compatible with the corresponding AVR one,
 // the constructor however has an optional rx buffer size.
@@ -50,7 +46,7 @@ public:
 #ifndef ESP32
 	// Returns false if more than SOFTWARESERIAL_MAX_INSTS instances are started
 	bool begin(int32_t baud) {
-		return begin(baud, SWSERIAL_8N1);
+		return begin(baud, "8N1");
 	}
 	bool begin(int32_t baud, SoftwareSerialConfig config);
 #else
@@ -120,6 +116,8 @@ private:
 	bool m_invert;
 	bool m_overflow = false;
 	int8_t m_dataBits;
+    int8_t m_stopBits;
+    ParityMode m_parity;
 	int32_t m_bitCycles;
 	uint32_t m_periodDeadline;
 	bool m_intTxEnabled;
