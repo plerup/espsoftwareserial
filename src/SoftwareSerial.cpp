@@ -285,8 +285,15 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 	for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
 		bool withStopBit = true;
 		// push LSB start-data-stop bit pattern into uint32_t
-		// Stop bit : LOW if inverted logic, otherwise HIGH
-		uint32_t word = (!m_invert) << m_dataBits;
+		// 1 or 2 stop bits : LOW if inverted logic, otherwise HIGH
+		uint32_t word = ((!m_invert) << m_stopBits) -1;
+		// Parity bit
+		if (m_parity) { 
+			word <<= 1; 
+			word |= (m_invert ? ~(calcParity(buffer)) : calcParity(buffer));
+		}
+    	// Shift left to make space and fill in the databits
+    	word <<= m_dataBits;
 		word |= (m_invert ? ~*buffer : *buffer) & dataMask;
 		// Start bit : HIGH if inverted logic, otherwise LOW
 		word <<= 1;
@@ -442,4 +449,19 @@ void SoftwareSerial::perform_work() {
 		if (avail < 0) { avail += m_bufSize; }
 		if (avail) { receiveHandler(avail); }
 	}
+}
+
+bool SoftwareSerial::calcParity(const uint8_t *b) {
+	// Fast parity computation by lookup table
+	// https://graphics.stanford.edu/~seander/bithacks.html#ParityLookupTable
+	// Alternatively do it with mimimal memory but slightly slower:
+	// https://graphics.stanford.edu/~seander/bithacks.html#ParityNaive
+	static const bool parityTable256[256] = 
+	{
+    #define P2(n) n, n^1, n^1, n
+    #define P4(n) P2(n), P2(n^1), P2(n^1), P2(n)
+    #define P6(n) P4(n), P4(n^1), P4(n^1), P4(n)
+    P6(0), P6(1), P6(1), P6(0)
+	};
+  return parityTable256[*b];
 }
