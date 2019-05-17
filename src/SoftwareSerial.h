@@ -21,10 +21,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 */
 
-#ifndef SoftwareSerial_h
-#define SoftwareSerial_h
+#ifndef __SoftwareSerial_h
+#define __SoftwareSerial_h
 
-#include "CircularQueue/CircularQueue.h"
+#include "circular_queue/circular_queue.h"
 #include <Stream.h>
 #include <functional>
 
@@ -126,10 +126,10 @@ private:
 	int32_t m_bitCycles;
 	uint32_t m_periodDeadline;
 	bool m_intTxEnabled;
-	std::unique_ptr<CircularQueue<uint8_t> > m_buffer;
+	std::unique_ptr<circular_queue<uint8_t> > m_buffer;
 	// the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
 	// 1 = positive including 0, 0 = negative.
-	std::unique_ptr<CircularQueue<uint32_t> > m_isrBuffer;
+	std::unique_ptr<circular_queue<uint32_t> > m_isrBuffer;
 	std::atomic<bool> m_isrOverflow;
 	uint32_t m_isrLastCycle;
 	int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
@@ -138,4 +138,4 @@ private:
 	std::function<void(int available)> receiveHandler;
 };
 
-#endif
+#endif // __SoftwareSerial_h
