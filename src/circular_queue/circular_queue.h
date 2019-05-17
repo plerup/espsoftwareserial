@@ -1,5 +1,5 @@
 /*
-CircularQueue.h - Implementation of a lock-free circular queue for EspSoftwareSerial.
+circular_queue.h - Implementation of a lock-free circular queue for EspSoftwareSerial.
 Copyright (c) 2019 Dirk O. Kaar. All rights reserved.
 
 This library is free software; you can redistribute it and/or
@@ -99,7 +99,7 @@ public:
 		return true;
 	}
 
-	size_t push_n(T * buffer, size_t size)
+	size_t push_n(const T* buffer, size_t size)
 	{
 		auto inPos = m_inPosT.load();
 		auto outPos = m_outPos.load();
@@ -110,9 +110,10 @@ public:
 		int next = (inPos + blockSize) % m_bufSize;
 		auto dest = m_buffer.get() + inPos;
 		std::copy_n(buffer, blockSize, dest);
-		size = std::min(size - blockSize, outPos > 1 ? outPos - 1 : 0);
+		size = std::min(size - blockSize, outPos > 1 ? outPos - next - 1 : 0);
 		next += size;
-		std::copy_n(buffer + blockSize, size, m_buffer.get());
+		dest = m_buffer.get();
+		std::copy_n(buffer + blockSize, size, dest);
 		m_inPosT.store(next);
 		return blockSize + size;
 	}
@@ -126,7 +127,7 @@ public:
 		return val;
 	}
 
-	size_t pop_n(T * buffer, size_t size) {
+	size_t pop_n(T* buffer, size_t size) {
 		size_t avail = size = std::min(size, available());
 		if (!avail) return 0;
 		auto outPos = m_outPos.load();
@@ -165,7 +166,7 @@ public:
 #ifdef ESP8266
 	{
 		uint32_t savedPS = xt_rsil(15);
-		auto res = CircularQueue<T>::push(val);
+		auto res = circular_queue<T>::push(val);
 		xt_wsr_ps(savedPS);
 		return res;
 	}
@@ -176,11 +177,11 @@ public:
 	}
 #endif
 
-	size_t push_n(T* buffer, size_t size)
+	size_t push_n(const T* buffer, size_t size)
 #ifdef ESP8266
 	{
 		uint32_t savedPS = xt_rsil(15);
-		auto res = CircularQueue<T>::push_n(buffer, size);
+		auto res = circular_queue<T>::push_n(buffer, size);
 		xt_wsr_ps(savedPS);
 		return res;
 	}
