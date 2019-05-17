@@ -56,9 +56,9 @@ void SoftwareSerial::begin(int32_t baud, int8_t rxPin, int8_t txPin,
 	m_invert = invert;
 	if (isValidGPIOpin(rxPin)) {
 		m_rxPin = rxPin;
-		std::unique_ptr<CircularQueue<uint8_t> > buffer(new CircularQueue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
+		std::unique_ptr<circular_queue<uint8_t> > buffer(new circular_queue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
 		m_buffer = move(buffer);
-		std::unique_ptr<CircularQueue<uint32_t> > isrBuffer(new CircularQueue<uint32_t>((isrBufCapacity > 0) ? isrBufCapacity : (sizeof(uint8_t) * 8 + 2) * bufCapacity));
+		std::unique_ptr<circular_queue<uint32_t> > isrBuffer(new circular_queue<uint32_t>((isrBufCapacity > 0) ? isrBufCapacity : (sizeof(uint8_t) * 8 + 2) * bufCapacity));
 		m_isrBuffer = move(isrBuffer);
 		if (m_buffer != 0 && m_isrBuffer != 0) {
 			m_rxValid = true;
