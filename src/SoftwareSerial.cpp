@@ -69,6 +69,7 @@ SoftwareSerial::SoftwareSerial(
 		m_rxPin = receivePin;
 		m_bufSize = bufSize;
 		m_buffer = (uint8_t*)malloc(m_bufSize);
+		m_pbuffer = (uint8_t*)malloc(m_bufSize);
 		m_isrBufSize = isrBufSize ? isrBufSize : 10 * bufSize;
 		m_isrBuffer = static_cast<std::atomic<uint32_t>*>(malloc(m_isrBufSize * sizeof(uint32_t)));
 	}
@@ -127,6 +128,9 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
         case 'M': m_parity = MARK;
         case 'A': m_parity = ADDR;
     }
+	if (m_parity) { 
+		m_parityBits = 1;
+	}
     m_stopBits = config[2]-'0';
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	m_intTxEnabled = true;
@@ -411,7 +415,14 @@ void SoftwareSerial::rxBits() {
 				}
 				continue;
 			}
-			if (m_rxCurBit >= m_dataBits) {
+			// Parity bit if included
+			if (m_parity != NONE) {
+				++m_rxCurBit;
+				cycles -= m_bitCycles;
+				// TODO - Read parity bit and store in parity buffer
+				m_pbuffer[m_inPos] = 1; // Setting parity bit for now. Testing
+			}
+			if (m_rxCurBit >= m_dataBits+m_parityBits) {
 				// start bit level is low
 				if (!level) {
 					m_rxCurBit = -1;
@@ -465,3 +476,19 @@ bool SoftwareSerial::calcParity(const uint8_t *b) {
 	};
   return parityTable256[*b];
 }
+
+int SoftwareSerial::peekParityBit() {
+	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { return -1; }
+	return m_pbuffer[m_outPos];
+};
+
+int SoftwareSerial::readParityBit() {
+	return 0;	// TODO - is this function really needed or useful?
+};
+
+int SoftwareSerial::parityError() {
+	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { 
+		return 0; 
+	}
+	return ((m_pbuffer[m_outPos]) && (calcParity(&m_buffer[m_outPos])) ? 0 : 1);
+};

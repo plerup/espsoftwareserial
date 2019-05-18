@@ -66,6 +66,9 @@ public:
 	int available() override;
 	int peek() override;
 	int read() override;
+	int peekParityBit();
+	int readParityBit(); // TODO - is this really needed or useful?
+	int parityError();
 	void flush() override;
 	size_t write(uint8_t byte) override;
 	size_t write(const uint8_t *buffer, size_t size) override;
@@ -116,6 +119,7 @@ private:
 	bool m_invert;
 	bool m_overflow = false;
 	int8_t m_dataBits;
+	int8_t m_parityBits;
     int8_t m_stopBits;
     ParityMode m_parity;
 	int32_t m_bitCycles;
@@ -124,6 +128,7 @@ private:
 	int m_inPos, m_outPos;
 	int m_bufSize = 0;
 	uint8_t *m_buffer = 0;
+	uint8_t *m_pbuffer = 0;		// buffer to store parity for received chars
 	// the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
 	// 1 = positive including 0, 0 = negative.
 	std::atomic<int> m_isrInPos, m_isrOutPos;
@@ -131,7 +136,7 @@ private:
 	std::atomic<uint32_t>* m_isrBuffer;
 	std::atomic<bool> m_isrOverflow;
 	std::atomic<uint32_t> m_isrLastCycle;
-	int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
+	int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: parity bit if applicable. 8 or 9: stop bit.
 	uint8_t m_rxCurByte = 0;
 
 	std::function<void(int available)> receiveHandler = 0;
