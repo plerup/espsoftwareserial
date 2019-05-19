@@ -71,11 +71,14 @@ public:
 	// The readBytes functions are non-waiting, there is no timeout.
 	size_t readBytes(uint8_t* buffer, size_t size) override;
 	size_t readBytes(char* buffer, size_t size) override {
-		return readBytes((uint8_t*)buffer, size);
+		return readBytes(reinterpret_cast<uint8_t*>(buffer), size);
 	}
 	void flush() override;
 	size_t write(uint8_t byte) override;
 	size_t write(const uint8_t* buffer, size_t size) override;
+	size_t write(const char* buffer, size_t size) {
+		return write(reinterpret_cast<const uint8_t*>(buffer), size);
+	}
 	operator bool() const { return m_rxValid || m_txValid; }
 
 	// Disable or enable interrupts on the rx pin
