@@ -15,7 +15,6 @@ Lesser General Public License for more details.
 You should have received a copy of the GNU Lesser General Public
 License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
 */
 
 #ifndef __circular_queue_h
@@ -24,7 +23,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <atomic>
 #include <memory>
 #include <algorithm>
-#if !defined(ESP8266)
+#ifdef ESP8266
+#include "interrupts.h"
+#else
 #include <mutex>
 #endif
 
@@ -56,6 +57,7 @@ public:
 	{
 		m_bufSize = cap + 1;
 		m_buffer.reset(new T[m_bufSize]);
+		std::atomic_thread_fence(std::memory_order_release);
 		m_inPosT.store(0);
 		m_outPos.store(0);
 	}
@@ -79,12 +81,13 @@ public:
 		return avail;
 	}
 
-	T peek() const
+	const T& peek() const
 	{
 		const auto outPos = m_outPos.load();
 		const auto inPos = m_inPosT.load();
 		std::atomic_thread_fence(std::memory_order_acquire);
-		return (inPos == outPos) ? defaultValue : m_buffer[outPos];
+		if (inPos == outPos) return defaultValue;
+		else return m_buffer[outPos];
 	}
 
 	bool ICACHE_RAM_ATTR push(T val)
@@ -105,7 +108,7 @@ public:
 		return true;
 	}
 
-	size_t push_n(const T* buffer, size_t size)
+	size_t push_n(T* buffer, size_t size)
 	{
 		const auto inPos = m_inPosT.load();
 		const auto outPos = m_outPos.load();
@@ -114,10 +117,10 @@ public:
 		blockSize = std::min(size, blockSize);
 		if (!blockSize) return 0;
 		int next = (inPos + blockSize) % m_bufSize;
-		auto dest = m_buffer.get() + inPos;
 
 		std::atomic_thread_fence(std::memory_order_acquire);
 
+		auto dest = m_buffer.get() + inPos;
 		std::copy_n(buffer, blockSize, dest);
 		size = std::min(size - blockSize, outPos > 1 ? outPos - next - 1 : 0);
 		next += size;
@@ -189,10 +192,8 @@ public:
 	bool ICACHE_RAM_ATTR push(T val)
 #ifdef ESP8266
 	{
-		const uint32_t savedPS = xt_rsil(15);
-		const auto res = circular_queue<T>::push(val);
-		xt_wsr_ps(savedPS);
-		return res;
+		InterruptLock lock;
+		return circular_queue<T>::push(val);
 	}
 #else
 	{
@@ -201,13 +202,42 @@ public:
 	}
 #endif
 
-	size_t push_n(const T* buffer, size_t size)
+	const T& pop_revenant()
 #ifdef ESP8266
 	{
-		const uint32_t savedPS = xt_rsil(15);
-		const auto res = circular_queue<T>::push_n(buffer, size);
-		xt_wsr_ps(savedPS);
-		return res;
+		InterruptLock lock;
+		const auto outPos = circular_queue<T>::m_outPos.load();
+		const auto inPos = circular_queue<T>::m_inPosT.load();
+		std::atomic_thread_fence(std::memory_order_acquire);
+		if (inPos == outPos) return circular_queue<T>::defaultValue;
+		const auto & val = circular_queue<T>::m_buffer[inPos] = circular_queue<T>::m_buffer[outPos];
+		const auto bufSize = circular_queue<T>::m_bufSize;
+		std::atomic_thread_fence(std::memory_order_release);
+		circular_queue<T>::m_outPos.store((outPos + 1) % bufSize);
+		circular_queue<T>::m_inPosT.store((inPos + 1) % bufSize);
+		return val;
+	}
+#else
+	{
+		std::lock_guard<std::mutex> lock(m_pushMtx);
+		const auto outPos = circular_queue<T>::m_outPos.load();
+		const auto inPos = circular_queue<T>::m_inPosT.load();
+		std::atomic_thread_fence(std::memory_order_acquire);
+		if (inPos == outPos) return circular_queue<T>::defaultValue;		
+		const auto& val = circular_queue<T>::m_buffer[inPos] = circular_queue<T>::m_buffer[outPos];
+		const auto bufSize = circular_queue<T>::m_bufSize;
+		std::atomic_thread_fence(std::memory_order_release);
+		circular_queue<T>::m_outPos.store((outPos + 1) % bufSize);
+		circular_queue<T>::m_inPosT.store((inPos + 1) % bufSize);
+		return val;
+	}
+#endif
+
+	size_t push_n(T* buffer, size_t size)
+#ifdef ESP8266
+	{
+		InterruptLock lock;
+		return circular_queue<T>::push_n(buffer, size);
 	}
 #else
 	{
