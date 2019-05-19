@@ -35,12 +35,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 template< typename T > class circular_queue
 {
 public:
-	circular_queue() : m_bufSize(0)
+	circular_queue() : m_bufSize(1)
 	{
 		m_inPosT.store(0);
 		m_outPos.store(0);
 	}
-	circular_queue(const size_t capacity) : m_bufSize(capacity + 1), m_buffer(new std::atomic<T>[m_bufSize])
+	circular_queue(const size_t capacity) : m_bufSize(capacity + 1), m_buffer(new T[m_bufSize])
 	{
 		m_inPosT.store(0);
 		m_outPos.store(0);
@@ -55,7 +55,7 @@ public:
 	void capacity(const size_t cap)
 	{
 		m_bufSize = cap + 1;
-		m_buffer.reset(new std::atomic<T>[m_bufSize]);
+		m_buffer.reset(new T[m_bufSize]);
 		m_inPosT.store(0);
 		m_outPos.store(0);
 	}
@@ -81,19 +81,25 @@ public:
 
 	T peek() const
 	{
-		auto outPos = m_outPos.load();
-		return (m_inPosT.load() == outPos) ? defaultValue : m_buffer[outPos].load();
+		const auto outPos = m_outPos.load();
+		const auto inPos = m_inPosT.load();
+		std::atomic_thread_fence(std::memory_order_acquire);
+		return (inPos == outPos) ? defaultValue : m_buffer[outPos];
 	}
 
 	bool ICACHE_RAM_ATTR push(T val)
 	{
-		auto inPos = m_inPosT.load();
-		int next = (inPos + 1) % m_bufSize;
+		const auto inPos = m_inPosT.load();
+		const unsigned next = (inPos + 1) % m_bufSize;
 		if (next == m_outPos.load()) {
 			return false;
 		}
 
-		m_buffer[inPos].store(val);
+		std::atomic_thread_fence(std::memory_order_acquire);
+
+		m_buffer[inPos] = val;
+
+		std::atomic_thread_fence(std::memory_order_release);
 
 		m_inPosT.store(next);
 		return true;
@@ -101,28 +107,40 @@ public:
 
 	size_t push_n(const T* buffer, size_t size)
 	{
-		auto inPos = m_inPosT.load();
-		auto outPos = m_outPos.load();
+		const auto inPos = m_inPosT.load();
+		const auto outPos = m_outPos.load();
 
 		size_t blockSize = (outPos > inPos) ? outPos - 1 - inPos : (outPos == 0) ? m_bufSize - 1 - inPos : m_bufSize - inPos;
 		blockSize = std::min(size, blockSize);
 		if (!blockSize) return 0;
 		int next = (inPos + blockSize) % m_bufSize;
 		auto dest = m_buffer.get() + inPos;
+
+		std::atomic_thread_fence(std::memory_order_acquire);
+
 		std::copy_n(buffer, blockSize, dest);
 		size = std::min(size - blockSize, outPos > 1 ? outPos - next - 1 : 0);
 		next += size;
 		dest = m_buffer.get();
 		std::copy_n(buffer + blockSize, size, dest);
+
+		std::atomic_thread_fence(std::memory_order_release);
+
 		m_inPosT.store(next);
 		return blockSize + size;
 	}
 
 	T pop()
 	{
-		auto outPos = m_outPos.load();
+		const auto outPos = m_outPos.load();
 		if (m_inPosT.load() == outPos) return defaultValue;
-		auto val = m_buffer[outPos].load();
+
+		std::atomic_thread_fence(std::memory_order_acquire);
+
+		const auto val = m_buffer[outPos];
+
+		std::atomic_thread_fence(std::memory_order_release);
+
 		m_outPos.store((outPos + 1) % m_bufSize);
 		return val;
 	}
@@ -130,11 +148,17 @@ public:
 	size_t pop_n(T* buffer, size_t size) {
 		size_t avail = size = std::min(size, available());
 		if (!avail) return 0;
-		auto outPos = m_outPos.load();
+		const auto outPos = m_outPos.load();
 		size_t n = std::min(avail, m_bufSize - outPos);
+
+		std::atomic_thread_fence(std::memory_order_acquire);
+
 		buffer = std::copy_n(m_buffer.get() + outPos, n, buffer);
 		avail -= n;
 		std::copy_n(m_buffer.get(), avail, buffer);
+
+		std::atomic_thread_fence(std::memory_order_release);
+
 		m_outPos.store((outPos + size) % m_bufSize);
 		return size;
 	}
@@ -142,7 +166,7 @@ public:
 protected:
 	const T defaultValue = {};
 	unsigned m_bufSize;
-	std::unique_ptr<std::atomic<T>[] > m_buffer;
+	std::unique_ptr<T[] > m_buffer;
 	std::atomic<unsigned> m_inPosT;
 	std::atomic<unsigned> m_outPos;
 };
@@ -165,8 +189,8 @@ public:
 	bool ICACHE_RAM_ATTR push(T val)
 #ifdef ESP8266
 	{
-		uint32_t savedPS = xt_rsil(15);
-		auto res = circular_queue<T>::push(val);
+		const uint32_t savedPS = xt_rsil(15);
+		const auto res = circular_queue<T>::push(val);
 		xt_wsr_ps(savedPS);
 		return res;
 	}
@@ -180,8 +204,8 @@ public:
 	size_t push_n(const T* buffer, size_t size)
 #ifdef ESP8266
 	{
-		uint32_t savedPS = xt_rsil(15);
-		auto res = circular_queue<T>::push_n(buffer, size);
+		const uint32_t savedPS = xt_rsil(15);
+		const auto res = circular_queue<T>::push_n(buffer, size);
 		xt_wsr_ps(savedPS);
 		return res;
 	}
