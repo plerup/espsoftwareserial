@@ -54,6 +54,11 @@ public:
 	circular_queue(const circular_queue&) = delete;
 	circular_queue& operator=(const circular_queue&) = delete;
 
+	size_t capacity()
+	{
+		return m_bufSize - 1;
+	}
+
 	bool capacity(const size_t cap)
 	{
 		if (cap + 1 == m_bufSize) return true;
@@ -187,6 +192,7 @@ public:
 	circular_queue_mp(size_t capacity) : circular_queue<T>(capacity)
 	{
 	}
+	using circular_queue<T>::capacity;
 	using circular_queue<T>::flush;
 	using circular_queue<T>::available;
 	using circular_queue<T>::available_for_push;
