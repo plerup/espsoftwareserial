@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #if !defined(ESP8266) && !defined(ESP32)
 #define ICACHE_RAM_ATTR
+#define IRAM_ATTR
 #endif
 
 template< typename T > class circular_queue
@@ -53,13 +54,18 @@ public:
 	circular_queue(const circular_queue&) = delete;
 	circular_queue& operator=(const circular_queue&) = delete;
 
-	void capacity(const size_t cap)
+	bool capacity(const size_t cap)
 	{
+		if (cap + 1 == m_bufSize) return true;
+		else if (available() > cap) return false;
+		std::unique_ptr<T[] > buffer(new T[cap + 1]);
+		const auto available = pop_n(buffer, cap);
+		m_buffer.reset(buffer);
 		m_bufSize = cap + 1;
-		m_buffer.reset(new T[m_bufSize]);
 		std::atomic_thread_fence(std::memory_order_release);
-		m_inPosT.store(0);
+		m_inPosT.store(available);
 		m_outPos.store(0);
+		return true;
 	}
 
 	void flush()
@@ -181,7 +187,6 @@ public:
 	circular_queue_mp(size_t capacity) : circular_queue<T>(capacity)
 	{
 	}
-	using circular_queue<T>::capacity;
 	using circular_queue<T>::flush;
 	using circular_queue<T>::available;
 	using circular_queue<T>::available_for_push;
@@ -189,23 +194,33 @@ public:
 	using circular_queue<T>::pop;
 	using circular_queue<T>::pop_n;
 
-	bool ICACHE_RAM_ATTR push(T val)
+	bool capacity(const size_t cap)
+	{
 #ifdef ESP8266
-	{
 		InterruptLock lock;
-		return circular_queue<T>::push(val);
-	}
 #else
-	{
 		std::lock_guard<std::mutex> lock(m_pushMtx);
+#endif
+		return circular_queue<T>::capacity(cap);
+	}
+
+	bool ICACHE_RAM_ATTR push(T val)
+	{
+#ifdef ESP8266
+		InterruptLock lock;
+#else
+		std::lock_guard<std::mutex> lock(m_pushMtx);
+#endif
 		return circular_queue<T>::push(val);
 	}
-#endif
 
 	const T& pop_revenant()
-#ifdef ESP8266
 	{
+#ifdef ESP8266
 		InterruptLock lock;
+#else
+		std::lock_guard<std::mutex> lock(m_pushMtx);
+#endif
 		const auto outPos = circular_queue<T>::m_outPos.load();
 		const auto inPos = circular_queue<T>::m_inPosT.load();
 		std::atomic_thread_fence(std::memory_order_acquire);
@@ -217,30 +232,14 @@ public:
 		circular_queue<T>::m_inPosT.store((inPos + 1) % bufSize);
 		return val;
 	}
-#else
-	{
-		std::lock_guard<std::mutex> lock(m_pushMtx);
-		const auto outPos = circular_queue<T>::m_outPos.load();
-		const auto inPos = circular_queue<T>::m_inPosT.load();
-		std::atomic_thread_fence(std::memory_order_acquire);
-		if (inPos == outPos) return circular_queue<T>::defaultValue;		
-		const auto& val = circular_queue<T>::m_buffer[inPos] = circular_queue<T>::m_buffer[outPos];
-		const auto bufSize = circular_queue<T>::m_bufSize;
-		std::atomic_thread_fence(std::memory_order_release);
-		circular_queue<T>::m_outPos.store((outPos + 1) % bufSize);
-		circular_queue<T>::m_inPosT.store((inPos + 1) % bufSize);
-		return val;
-	}
-#endif
 
 	size_t push_n(T* buffer, size_t size)
-#ifdef ESP8266
 	{
+#ifdef ESP8266
 		InterruptLock lock;
 		return circular_queue<T>::push_n(buffer, size);
 	}
 #else
-	{
 		std::lock_guard<std::mutex> lock(m_pushMtx);
 		return circular_queue<T>::push_n(buffer, size);
 	}
