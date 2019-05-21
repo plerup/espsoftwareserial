@@ -68,8 +68,8 @@ public:
 		m_buffer.reset(buffer);
 		m_bufSize = cap + 1;
 		std::atomic_thread_fence(std::memory_order_release);
-		m_inPosT.store(available);
-		m_outPos.store(0);
+		m_inPosT.store(available, std::memory_order_relaxed);
+		m_outPos.store(0, std::memory_order_relaxed);
 		return true;
 	}
 
@@ -94,8 +94,8 @@ public:
 
 	const T& peek() const
 	{
-		const auto outPos = m_outPos.load();
-		const auto inPos = m_inPosT.load();
+		const auto outPos = m_outPos.load(std::memory_order_relaxed);
+		const auto inPos = m_inPosT.load(std::memory_order_relaxed);
 		std::atomic_thread_fence(std::memory_order_acquire);
 		if (inPos == outPos) return defaultValue;
 		else return m_buffer[outPos];
@@ -103,9 +103,9 @@ public:
 
 	bool ICACHE_RAM_ATTR push(T&& val)
 	{
-		const auto inPos = m_inPosT.load();
+		const auto inPos = m_inPosT.load(std::memory_order_relaxed);
 		const unsigned next = (inPos + 1) % m_bufSize;
-		if (next == m_outPos.load()) {
+		if (next == m_outPos.load(std::memory_order_relaxed)) {
 			return false;
 		}
 
@@ -115,14 +115,14 @@ public:
 
 		std::atomic_thread_fence(std::memory_order_release);
 
-		m_inPosT.store(next);
+		m_inPosT.store(next, std::memory_order_relaxed);
 		return true;
 	}
 
 	size_t push_n(T* buffer, size_t size)
 	{
-		const auto inPos = m_inPosT.load();
-		const auto outPos = m_outPos.load();
+		const auto inPos = m_inPosT.load(std::memory_order_relaxed);
+		const auto outPos = m_outPos.load(std::memory_order_relaxed);
 
 		size_t blockSize = (outPos > inPos) ? outPos - 1 - inPos : (outPos == 0) ? m_bufSize - 1 - inPos : m_bufSize - inPos;
 		blockSize = std::min(size, blockSize);
@@ -140,14 +140,14 @@ public:
 
 		std::atomic_thread_fence(std::memory_order_release);
 
-		m_inPosT.store(next);
+		m_inPosT.store(next, std::memory_order_relaxed);
 		return blockSize + size;
 	}
 
 	T pop()
 	{
-		const auto outPos = m_outPos.load();
-		if (m_inPosT.load() == outPos) return defaultValue;
+		const auto outPos = m_outPos.load(std::memory_order_relaxed);
+		if (m_inPosT.load(std::memory_order_relaxed) == outPos) return defaultValue;
 
 		std::atomic_thread_fence(std::memory_order_acquire);
 
@@ -155,14 +155,14 @@ public:
 
 		std::atomic_thread_fence(std::memory_order_release);
 
-		m_outPos.store((outPos + 1) % m_bufSize);
+		m_outPos.store((outPos + 1) % m_bufSize, std::memory_order_relaxed);
 		return val;
 	}
 
 	size_t pop_n(T* buffer, size_t size) {
 		size_t avail = size = std::min(size, available());
 		if (!avail) return 0;
-		const auto outPos = m_outPos.load();
+		const auto outPos = m_outPos.load(std::memory_order_relaxed);
 		size_t n = std::min(avail, m_bufSize - outPos);
 
 		std::atomic_thread_fence(std::memory_order_acquire);
@@ -173,7 +173,7 @@ public:
 
 		std::atomic_thread_fence(std::memory_order_release);
 
-		m_outPos.store((outPos + size) % m_bufSize);
+		m_outPos.store((outPos + size) % m_bufSize, std::memory_order_relaxed);
 		return size;
 	}
 
@@ -217,7 +217,7 @@ public:
 #else
 		std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
-		return circular_queue<T>::push(move(val));
+		return circular_queue<T>::push(std::move(val));
 	}
 
 	const T& pop_revenant()
@@ -227,15 +227,15 @@ public:
 #else
 		std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
-		const auto outPos = circular_queue<T>::m_outPos.load();
-		const auto inPos = circular_queue<T>::m_inPosT.load();
+		const auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
+		const auto inPos = circular_queue<T>::m_inPosT.load(std::memory_order_relaxed);
 		std::atomic_thread_fence(std::memory_order_acquire);
 		if (inPos == outPos) return circular_queue<T>::defaultValue;
 		const auto& val = circular_queue<T>::m_buffer[inPos] = circular_queue<T>::m_buffer[outPos];
 		const auto bufSize = circular_queue<T>::m_bufSize;
 		std::atomic_thread_fence(std::memory_order_release);
-		circular_queue<T>::m_outPos.store((outPos + 1) % bufSize);
-		circular_queue<T>::m_inPosT.store((inPos + 1) % bufSize);
+		circular_queue<T>::m_outPos.store((outPos + 1) % bufSize, std::memory_order_relaxed);
+		circular_queue<T>::m_inPosT.store((inPos + 1) % bufSize, std::memory_order_relaxed);
 		return val;
 	}
 
