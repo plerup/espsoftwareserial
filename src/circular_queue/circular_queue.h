@@ -101,7 +101,7 @@ public:
 		else return m_buffer[outPos];
 	}
 
-	bool ICACHE_RAM_ATTR push(T val)
+	bool ICACHE_RAM_ATTR push(T&& val)
 	{
 		const auto inPos = m_inPosT.load();
 		const unsigned next = (inPos + 1) % m_bufSize;
@@ -210,14 +210,14 @@ public:
 		return circular_queue<T>::capacity(cap);
 	}
 
-	bool ICACHE_RAM_ATTR push(T val)
+	bool ICACHE_RAM_ATTR push(T&& val)
 	{
 #ifdef ESP8266
 		InterruptLock lock;
 #else
 		std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
-		return circular_queue<T>::push(val);
+		return circular_queue<T>::push(move(val));
 	}
 
 	const T& pop_revenant()
@@ -231,7 +231,7 @@ public:
 		const auto inPos = circular_queue<T>::m_inPosT.load();
 		std::atomic_thread_fence(std::memory_order_acquire);
 		if (inPos == outPos) return circular_queue<T>::defaultValue;
-		const auto & val = circular_queue<T>::m_buffer[inPos] = circular_queue<T>::m_buffer[outPos];
+		const auto& val = circular_queue<T>::m_buffer[inPos] = circular_queue<T>::m_buffer[outPos];
 		const auto bufSize = circular_queue<T>::m_bufSize;
 		std::atomic_thread_fence(std::memory_order_release);
 		circular_queue<T>::m_outPos.store((outPos + 1) % bufSize);
