@@ -39,22 +39,32 @@ template< typename T > class circular_queue
 public:
 	circular_queue() : m_bufSize(1)
 	{
-		m_inPosT.store(0);
+		m_inPos.store(0);
 		m_outPos.store(0);
 	}
 	circular_queue(const size_t capacity) : m_bufSize(capacity + 1), m_buffer(new T[m_bufSize])
 	{
-		m_inPosT.store(0);
+		m_inPos.store(0);
 		m_outPos.store(0);
 	}
+	circular_queue(circular_queue&& cq) :
+		m_bufSize(cq.m_bufSize), m_buffer(cq.m_buffer), m_inPos(cq.m_inPos.load()), m_outPos(cq.m_outPos.load())
+	{}
 	~circular_queue()
 	{
 		m_buffer.reset();
 	}
 	circular_queue(const circular_queue&) = delete;
+	circular_queue& operator=(circular_queue&& cq)
+	{
+		m_bufSize = cq.m_bufSize;
+		m_buffer = cq.m_buffer;
+		m_inPos.store(cq.m_inPos.load());
+		m_outPos.store(cq.m_outPos.load());
+	}
 	circular_queue& operator=(const circular_queue&) = delete;
 
-	size_t capacity()
+	size_t capacity() const
 	{
 		return m_bufSize - 1;
 	}
@@ -68,34 +78,34 @@ public:
 		m_buffer.reset(buffer);
 		m_bufSize = cap + 1;
 		std::atomic_thread_fence(std::memory_order_release);
-		m_inPosT.store(available, std::memory_order_relaxed);
+		m_inPos.store(available, std::memory_order_relaxed);
 		m_outPos.store(0, std::memory_order_relaxed);
 		return true;
 	}
 
 	void flush()
 	{
-		m_outPos.store(m_inPosT.load());
+		m_outPos.store(m_inPos.load());
 	}
 
 	size_t available() const
 	{
-		int avail = static_cast<int>(m_inPosT.load() - m_outPos.load());
+		int avail = static_cast<int>(m_inPos.load() - m_outPos.load());
 		if (avail < 0) avail += m_bufSize;
 		return avail;
 	}
 
 	size_t available_for_push() const
 	{
-		int avail = static_cast<int>(m_outPos.load() - m_inPosT.load()) - 1;
+		int avail = static_cast<int>(m_outPos.load() - m_inPos.load()) - 1;
 		if (avail < 0) avail += m_bufSize;
 		return avail;
 	}
 
-	const T& peek() const
+	T peek() const
 	{
 		const auto outPos = m_outPos.load(std::memory_order_relaxed);
-		const auto inPos = m_inPosT.load(std::memory_order_relaxed);
+		const auto inPos = m_inPos.load(std::memory_order_relaxed);
 		std::atomic_thread_fence(std::memory_order_acquire);
 		if (inPos == outPos) return defaultValue;
 		else return m_buffer[outPos];
@@ -103,7 +113,7 @@ public:
 
 	bool ICACHE_RAM_ATTR push(T&& val)
 	{
-		const auto inPos = m_inPosT.load(std::memory_order_relaxed);
+		const auto inPos = m_inPos.load(std::memory_order_relaxed);
 		const unsigned next = (inPos + 1) % m_bufSize;
 		if (next == m_outPos.load(std::memory_order_relaxed)) {
 			return false;
@@ -115,13 +125,18 @@ public:
 
 		std::atomic_thread_fence(std::memory_order_release);
 
-		m_inPosT.store(next, std::memory_order_relaxed);
+		m_inPos.store(next, std::memory_order_relaxed);
 		return true;
 	}
 
-	size_t push_n(T* buffer, size_t size)
+	bool ICACHE_RAM_ATTR push(const T& val)
 	{
-		const auto inPos = m_inPosT.load(std::memory_order_relaxed);
+		return push(T(val));
+	}
+
+	size_t push_n(const T* buffer, size_t size)
+	{
+		const auto inPos = m_inPos.load(std::memory_order_relaxed);
 		const auto outPos = m_outPos.load(std::memory_order_relaxed);
 
 		size_t blockSize = (outPos > inPos) ? outPos - 1 - inPos : (outPos == 0) ? m_bufSize - 1 - inPos : m_bufSize - inPos;
@@ -140,14 +155,14 @@ public:
 
 		std::atomic_thread_fence(std::memory_order_release);
 
-		m_inPosT.store(next, std::memory_order_relaxed);
+		m_inPos.store(next, std::memory_order_relaxed);
 		return blockSize + size;
 	}
 
 	T pop()
 	{
 		const auto outPos = m_outPos.load(std::memory_order_relaxed);
-		if (m_inPosT.load(std::memory_order_relaxed) == outPos) return defaultValue;
+		if (m_inPos.load(std::memory_order_relaxed) == outPos) return defaultValue;
 
 		std::atomic_thread_fence(std::memory_order_acquire);
 
@@ -181,7 +196,7 @@ protected:
 	const T defaultValue = {};
 	unsigned m_bufSize;
 	std::unique_ptr<T[] > m_buffer;
-	std::atomic<unsigned> m_inPosT;
+	std::atomic<unsigned> m_inPos;
 	std::atomic<unsigned> m_outPos;
 };
 
@@ -189,9 +204,11 @@ template< typename T > class circular_queue_mp : protected circular_queue<T>
 {
 public:
 	circular_queue_mp() = default;
-	circular_queue_mp(size_t capacity) : circular_queue<T>(capacity)
-	{
-	}
+	circular_queue_mp(const size_t capacity) : circular_queue<T>(capacity)
+	{}
+	circular_queue_mp(circular_queue<T>&& cq) : circular_queue<T>(std::move(cq))
+	{}
+	using circular_queue<T>::operator=;
 	using circular_queue<T>::capacity;
 	using circular_queue<T>::flush;
 	using circular_queue<T>::available;
@@ -220,7 +237,27 @@ public:
 		return circular_queue<T>::push(std::move(val));
 	}
 
-	const T& pop_revenant()
+	bool ICACHE_RAM_ATTR push(const T& val)
+	{
+#ifdef ESP8266
+		InterruptLock lock;
+#else
+		std::lock_guard<std::mutex> lock(m_pushMtx);
+#endif
+		return circular_queue<T>::push(val);
+	}
+
+	size_t push_n(const T* buffer, size_t size)
+	{
+#ifdef ESP8266
+		InterruptLock lock;
+#else
+		std::lock_guard<std::mutex> lock(m_pushMtx);
+#endif
+		return circular_queue<T>::push_n(buffer, size);
+	}
+
+	T pop_revenant()
 	{
 #ifdef ESP8266
 		InterruptLock lock;
@@ -228,28 +265,18 @@ public:
 		std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
 		const auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
-		const auto inPos = circular_queue<T>::m_inPosT.load(std::memory_order_relaxed);
+		const auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
 		std::atomic_thread_fence(std::memory_order_acquire);
 		if (inPos == outPos) return circular_queue<T>::defaultValue;
-		const auto& val = circular_queue<T>::m_buffer[inPos] = circular_queue<T>::m_buffer[outPos];
+		const auto val = circular_queue<T>::m_buffer[inPos] = circular_queue<T>::m_buffer[outPos];
 		const auto bufSize = circular_queue<T>::m_bufSize;
 		std::atomic_thread_fence(std::memory_order_release);
 		circular_queue<T>::m_outPos.store((outPos + 1) % bufSize, std::memory_order_relaxed);
-		circular_queue<T>::m_inPosT.store((inPos + 1) % bufSize, std::memory_order_relaxed);
+		circular_queue<T>::m_inPos.store((inPos + 1) % bufSize, std::memory_order_relaxed);
 		return val;
 	}
 
-	size_t push_n(T* buffer, size_t size)
-	{
-#ifdef ESP8266
-		InterruptLock lock;
-		return circular_queue<T>::push_n(buffer, size);
-	}
-#else
-		std::lock_guard<std::mutex> lock(m_pushMtx);
-		return circular_queue<T>::push_n(buffer, size);
-	}
-
+#ifndef ESP8266
 protected:
 	std::mutex m_pushMtx;
 #endif
