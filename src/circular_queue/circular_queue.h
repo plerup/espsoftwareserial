@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <atomic>
 #include <memory>
 #include <algorithm>
+#include <functional>
 #ifdef ESP8266
 #include "interrupts.h"
 #else
@@ -121,7 +122,7 @@ public:
 
 		std::atomic_thread_fence(std::memory_order_acquire);
 
-		m_buffer[inPos] = val;
+		m_buffer[inPos] = std::move(val);
 
 		std::atomic_thread_fence(std::memory_order_release);
 
@@ -147,11 +148,11 @@ public:
 		std::atomic_thread_fence(std::memory_order_acquire);
 
 		auto dest = m_buffer.get() + inPos;
-		std::copy_n(buffer, blockSize, dest);
+		std::copy_n(std::make_move_iterator(buffer), blockSize, dest);
 		size = std::min(size - blockSize, outPos > 1 ? outPos - next - 1 : 0);
 		next += size;
 		dest = m_buffer.get();
-		std::copy_n(buffer + blockSize, size, dest);
+		std::copy_n(std::make_move_iterator(buffer + blockSize), size, dest);
 
 		std::atomic_thread_fence(std::memory_order_release);
 
@@ -166,7 +167,7 @@ public:
 
 		std::atomic_thread_fence(std::memory_order_acquire);
 
-		const auto val = m_buffer[outPos];
+		auto val = std::move(m_buffer[outPos]);
 
 		std::atomic_thread_fence(std::memory_order_release);
 
@@ -182,14 +183,28 @@ public:
 
 		std::atomic_thread_fence(std::memory_order_acquire);
 
-		buffer = std::copy_n(m_buffer.get() + outPos, n, buffer);
+		buffer = std::copy_n(std::make_move_iterator(m_buffer.get() + outPos), n, buffer);
 		avail -= n;
-		std::copy_n(m_buffer.get(), avail, buffer);
+		std::copy_n(std::make_move_iterator(m_buffer.get()), avail, buffer);
 
 		std::atomic_thread_fence(std::memory_order_release);
 
 		m_outPos.store((outPos + size) % m_bufSize, std::memory_order_relaxed);
 		return size;
+	}
+
+	void for_each(std::function<void(T&&)> fun)
+	{
+		auto outPos = m_outPos.load(std::memory_order_relaxed);
+		const auto inPos = m_inPos.load(std::memory_order_relaxed);
+		std::atomic_thread_fence(std::memory_order_acquire);
+		while (outPos != inPos)
+		{
+			fun(std::move(m_buffer[outPos]));
+			std::atomic_thread_fence(std::memory_order_release);
+			outPos = (outPos + 1) % m_bufSize;
+			m_outPos.store(outPos, std::memory_order_relaxed);
+		}
 	}
 
 protected:
@@ -216,6 +231,7 @@ public:
 	using circular_queue<T>::peek;
 	using circular_queue<T>::pop;
 	using circular_queue<T>::pop_n;
+	using circular_queue<T>::for_each;
 
 	bool capacity(const size_t cap)
 	{
@@ -268,12 +284,44 @@ public:
 		const auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
 		std::atomic_thread_fence(std::memory_order_acquire);
 		if (inPos == outPos) return circular_queue<T>::defaultValue;
-		const auto val = circular_queue<T>::m_buffer[inPos] = circular_queue<T>::m_buffer[outPos];
+		const auto val = circular_queue<T>::m_buffer[inPos] = std::move(circular_queue<T>::m_buffer[outPos]);
 		const auto bufSize = circular_queue<T>::m_bufSize;
 		std::atomic_thread_fence(std::memory_order_release);
 		circular_queue<T>::m_outPos.store((outPos + 1) % bufSize, std::memory_order_relaxed);
 		circular_queue<T>::m_inPos.store((inPos + 1) % bufSize, std::memory_order_relaxed);
 		return val;
+	}
+
+	bool for_each_revenant(std::function<bool(const T&)> fun)
+	{
+		auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
+		auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
+		auto inPos0 = inPos;
+		std::atomic_thread_fence(std::memory_order_acquire);
+		if (outPos == inPos0) return false;
+		do {
+			auto& val = circular_queue<T>::m_buffer[outPos];
+			if (fun(val))
+			{
+#ifdef ESP8266
+				InterruptLock lock;
+#else
+				std::lock_guard<std::mutex> lock(m_pushMtx);
+#endif
+				inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
+				std::atomic_thread_fence(std::memory_order_acquire);
+				circular_queue<T>::m_buffer[inPos] = std::move(val);
+				std::atomic_thread_fence(std::memory_order_release);
+				circular_queue<T>::m_inPos.store((inPos + 1) % circular_queue<T>::m_bufSize, std::memory_order_relaxed);
+			}
+			else
+			{
+				std::atomic_thread_fence(std::memory_order_release);
+			}
+			outPos = (outPos + 1) % circular_queue<T>::m_bufSize;
+			circular_queue<T>::m_outPos.store(outPos, std::memory_order_relaxed);
+		} while (outPos != inPos0);
+		return true;
 	}
 
 #ifndef ESP8266
