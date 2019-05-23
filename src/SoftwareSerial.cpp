@@ -302,12 +302,11 @@ void SoftwareSerial::rxBits() {
 	}
 #endif
 
-	uint32_t lastIsrCycle = m_isrLastCycle;
 	// stop bit can go undetected if leading data bits are at same level
 	// and there was also no next start bit yet, so one byte may be pending.
 	// low-cost check first
 	if (isrAvail == 0 && m_rxCurBit >= -1 && m_rxCurBit < m_dataBits) {
-		uint32_t expectedCycle = lastIsrCycle + (m_dataBits - m_rxCurBit) * m_bitCycles;
+		uint32_t expectedCycle = m_isrLastCycle + (m_dataBits - m_rxCurBit) * m_bitCycles;
 		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
 			// Store stop bit level and cycle in the buffer unless we have an overflow
 			// cycle's LSB is repurposed for the level bit
@@ -316,17 +315,14 @@ void SoftwareSerial::rxBits() {
 		}
 	}
 
-	while (isrAvail--) {
+	m_isrBuffer->for_each([this](const uint32_t& isrCycle) {
 		bool level = (m_isrLastCycle & 1) ^ m_invert;
 
-		// error introduced by edge value in LSB is negligible
-		uint32_t isrCycle = m_isrBuffer->pop();
+		// error introduced by edge value in LSB of isrCylce is negligible
+		int32_t cycles = static_cast<int32_t>(isrCycle - m_isrLastCycle);
 
-		int32_t cycles = static_cast<int32_t>(isrCycle - lastIsrCycle);
+		if ((cycles < (3 * m_bitCycles / 10))) return;
 
-		if ((cycles < (3 * m_bitCycles / 10))) continue;
-
-		lastIsrCycle = isrCycle;
 		m_isrLastCycle = isrCycle;
 
 		uint8_t bits = (cycles + (6 * m_bitCycles / 10)) / m_bitCycles; // 1/8 .. 8/10 * m_bitCycles
@@ -363,7 +359,7 @@ void SoftwareSerial::rxBits() {
 			}
 			break;
 		}
-	}
+	});
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead(SoftwareSerial * self) {
