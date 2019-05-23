@@ -273,7 +273,7 @@ public:
 		return circular_queue<T>::push_n(buffer, size);
 	}
 
-	T pop_revenant()
+	T pop_requeue()
 	{
 #ifdef ESP8266
 		InterruptLock lock;
@@ -292,7 +292,7 @@ public:
 		return val;
 	}
 
-	bool for_each_revenant(std::function<bool(const T&)> fun)
+	bool for_each_requeue(std::function<bool(const T&)> fun)
 	{
 		auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
 		auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
