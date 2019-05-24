@@ -149,7 +149,7 @@ public:
 
 		auto dest = m_buffer.get() + inPos;
 		std::copy_n(std::make_move_iterator(buffer), blockSize, dest);
-		size = std::min(size - blockSize, outPos > 1 ? outPos - next - 1 : 0);
+		size = std::min(size - blockSize, outPos > 1 ? static_cast<size_t>(outPos - next - 1) : 0);
 		next += size;
 		dest = m_buffer.get();
 		std::copy_n(std::make_move_iterator(buffer + blockSize), size, dest);
@@ -179,7 +179,7 @@ public:
 		size_t avail = size = std::min(size, available());
 		if (!avail) return 0;
 		const auto outPos = m_outPos.load(std::memory_order_relaxed);
-		size_t n = std::min(avail, m_bufSize - outPos);
+		size_t n = std::min(avail, static_cast<size_t>(m_bufSize - outPos));
 
 		std::atomic_thread_fence(std::memory_order_acquire);
 
