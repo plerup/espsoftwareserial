@@ -273,7 +273,7 @@ public:
 		return circular_queue<T>::push_n(buffer, size);
 	}
 
-	T pop_requeue()
+	T& pop_requeue()
 	{
 #ifdef ESP8266
 		InterruptLock lock;
@@ -284,7 +284,7 @@ public:
 		const auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
 		std::atomic_thread_fence(std::memory_order_acquire);
 		if (inPos == outPos) return circular_queue<T>::defaultValue;
-		const auto val = circular_queue<T>::m_buffer[inPos] = std::move(circular_queue<T>::m_buffer[outPos]);
+		T& val = circular_queue<T>::m_buffer[inPos] = std::move(circular_queue<T>::m_buffer[outPos]);
 		const auto bufSize = circular_queue<T>::m_bufSize;
 		std::atomic_thread_fence(std::memory_order_release);
 		circular_queue<T>::m_outPos.store((outPos + 1) % bufSize, std::memory_order_relaxed);
@@ -292,7 +292,7 @@ public:
 		return val;
 	}
 
-	bool for_each_requeue(std::function<bool(const T&)> fun)
+	bool for_each_requeue(std::function<bool(T&)> fun)
 	{
 		auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
 		auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
@@ -300,7 +300,7 @@ public:
 		std::atomic_thread_fence(std::memory_order_acquire);
 		if (outPos == inPos0) return false;
 		do {
-			auto& val = circular_queue<T>::m_buffer[outPos];
+			T& val = circular_queue<T>::m_buffer[outPos];
 			if (fun(val))
 			{
 #ifdef ESP8266
