@@ -280,6 +280,7 @@ public:
 #else
 		std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
+		std::atomic_thread_fence(std::memory_order_release);
 		const auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
 		const auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
 		std::atomic_thread_fence(std::memory_order_acquire);
@@ -294,9 +295,8 @@ public:
 
 	bool for_each_requeue(std::function<bool(T&)> fun)
 	{
+		auto inPos0 = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
 		auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
-		auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
-		auto inPos0 = inPos;
 		std::atomic_thread_fence(std::memory_order_acquire);
 		if (outPos == inPos0) return false;
 		do {
@@ -308,7 +308,8 @@ public:
 #else
 				std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
-				inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
+				std::atomic_thread_fence(std::memory_order_release);
+				auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
 				std::atomic_thread_fence(std::memory_order_acquire);
 				circular_queue<T>::m_buffer[inPos] = std::move(val);
 				std::atomic_thread_fence(std::memory_order_release);
