@@ -30,7 +30,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <mutex>
 #endif
 
-#if !defined(ESP8266) && !defined(ESP32)
+#ifdef ESP32
+#include <esp_attr.h>
+#elif !defined(ESP8266)
 #define ICACHE_RAM_ATTR
 #define IRAM_ATTR
 #endif
@@ -112,7 +114,7 @@ public:
 		else return m_buffer[outPos];
 	}
 
-	bool ICACHE_RAM_ATTR push(T&& val)
+	bool IRAM_ATTR push(T&& val)
 	{
 		const auto inPos = m_inPos.load(std::memory_order_relaxed);
 		const unsigned next = (inPos + 1) % m_bufSize;
@@ -130,7 +132,7 @@ public:
 		return true;
 	}
 
-	bool ICACHE_RAM_ATTR push(const T& val)
+	bool IRAM_ATTR push(const T& val)
 	{
 		return push(T(val));
 	}
@@ -243,7 +245,7 @@ public:
 		return circular_queue<T>::capacity(cap);
 	}
 
-	bool ICACHE_RAM_ATTR push(T&& val)
+	bool IRAM_ATTR push(T&& val)
 	{
 #ifdef ESP8266
 		InterruptLock lock;
@@ -253,7 +255,7 @@ public:
 		return circular_queue<T>::push(std::move(val));
 	}
 
-	bool ICACHE_RAM_ATTR push(const T& val)
+	bool IRAM_ATTR push(const T& val)
 	{
 #ifdef ESP8266
 		InterruptLock lock;
