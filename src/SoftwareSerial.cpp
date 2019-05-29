@@ -29,8 +29,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define SOFTWARESERIAL_MAX_INSTS 8
 #endif
 
-#define SWSER_DEBUG
-
 // As the ESP8266 Arduino attachInterrupt has no parameter, lists of objects
 // and callbacks corresponding to each possible list index have to be defined
 static SoftwareSerial* ObjList[SOFTWARESERIAL_MAX_INSTS];
@@ -136,10 +134,6 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
     m_stopBits = config[2]-'0';
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	m_intTxEnabled = true;
-#ifdef SWSER_DEBUG
-	Serial.printf("m_dataBits: %d,  m_parity: %d,  m_parityBits: %d, m_stopBits: %d\n", m_dataBits, m_parity, m_parityBits, m_stopBits);
-	Serial.printf("Cycles/bit: %d\n", m_bitCycles);
-#endif
 	if (m_buffer != 0 && m_isrBuffer != 0) {
 		m_rxValid = true;
 		m_inPos = m_outPos = 0;
@@ -204,7 +198,7 @@ void SoftwareSerial::enableTx(bool on) {
 void SoftwareSerial::enableRx(bool on) {
 	if (m_rxValid) {
 		if (on) {
-			m_rxCurBit = m_dataBits;
+			m_rxCurBit = m_dataBits + m_parityBits;
 #ifndef ESP32
 			attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_swsInstsIdx], CHANGE);
 #else
@@ -410,7 +404,8 @@ void SoftwareSerial::rxBits() {
 			if ((m_parity != NONE) && (m_rxCurBit == m_dataBits - 1)) {
 				++m_rxCurBit;
 				cycles -= m_bitCycles;
-				m_rxCurParityBit = level;
+				// Parity bit may have same level as last data bit and be hidden
+				m_rxCurParityBit = (cycles > 0) ? !level : level;
 				continue;
 			}
 			// stop bit - push current byte and parity to buffer
@@ -430,7 +425,7 @@ void SoftwareSerial::rxBits() {
 				}
 				continue;
 			}
-			if (m_rxCurBit >= m_dataBits + m_parityBits) {
+			if (m_rxCurBit >= (m_dataBits + m_parityBits)) {
 				// start bit level is low
 				if (!level) {
 					m_rxCurBit = -1;
@@ -482,7 +477,14 @@ bool SoftwareSerial::calcParity(const uint8_t *b) {
     #define P6(n) P4(n), P4(n^1), P4(n^1), P4(n)
     P6(0), P6(1), P6(1), P6(0)
 	};
-  return parityTable256[*b];
+	switch (m_parity) {
+        case NONE: return 0;
+        case ODD: return !parityTable256[*b];
+        case EVEN: return parityTable256[*b];
+		case SPACE: return 0;
+        case MARK: return 1;
+		default: return 0;
+    }
 }
 
 int SoftwareSerial::peekParityBit() {
