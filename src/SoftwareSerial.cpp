@@ -29,6 +29,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define SOFTWARESERIAL_MAX_INSTS 8
 #endif
 
+#define SWSER_DEBUG
+
 // As the ESP8266 Arduino attachInterrupt has no parameter, lists of objects
 // and callbacks corresponding to each possible list index have to be defined
 static SoftwareSerial* ObjList[SOFTWARESERIAL_MAX_INSTS];
@@ -120,20 +122,24 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 	void SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 #endif
 	m_dataBits = config[0]-'0';         // TODO - add range checks to dataBits, parity and stopBits
-    switch(config[2]) {
-        case 'N': m_parity = NONE;
-        case 'O': m_parity = ODD;
-        case 'E': m_parity = EVEN;
-        case 'S': m_parity = SPACE;
-        case 'M': m_parity = MARK;
-        case 'A': m_parity = ADDR;
+    switch(config[1]) {
+        case 'N': case 'n': m_parity = NONE; break;
+        case 'O': case 'o': m_parity = ODD; break;
+        case 'E': case 'e': m_parity = EVEN; break;
+        case 'S': case 's': m_parity = SPACE; break;
+        case 'M': case 'm': m_parity = MARK; break;
+		default: m_parity = NONE;
     }
-	if (m_parity) { 
+	if (m_parity != NONE) { 
 		m_parityBits = 1;
 	}
     m_stopBits = config[2]-'0';
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	m_intTxEnabled = true;
+#ifdef SWSER_DEBUG
+	Serial.printf("m_dataBits: %d,  m_parity: %d,  m_parityBits: %d, m_stopBits: %d\n", m_dataBits, m_parity, m_parityBits, m_stopBits);
+	Serial.printf("Cycles/bit: %d\n", m_bitCycles);
+#endif
 	if (m_buffer != 0 && m_isrBuffer != 0) {
 		m_rxValid = true;
 		m_inPos = m_outPos = 0;
@@ -302,7 +308,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		// Start bit : HIGH if inverted logic, otherwise LOW
 		word <<= 1;
 		word |= m_invert;
-		for (int i = 0; i <= m_dataBits + 1; ++i) {
+		for (int i = 0; i <= m_dataBits + m_parityBits + 1; ++i) {
 			bool pb = b;
 			b = (word >> i) & 1;
 			if (!pb && b) {
@@ -353,8 +359,8 @@ void SoftwareSerial::rxBits() {
 	// stop bit can go undetected if leading data bits are at same level
 	// and there was also no next start bit yet, so one byte may be pending.
 	// low-cost check first
-	if (avail == 0 && m_rxCurBit < m_dataBits && m_isrInPos.load() == m_isrOutPos.load() && m_rxCurBit >= 0) {
-		uint32_t expectedCycle = m_isrLastCycle.load() + (m_dataBits + 1 - m_rxCurBit) * m_bitCycles;
+	if (avail == 0 && m_rxCurBit < (m_dataBits + m_parityBits) && m_isrInPos.load() == m_isrOutPos.load() && m_rxCurBit >= 0) {
+		uint32_t expectedCycle = m_isrLastCycle.load() + (m_dataBits + m_parityBits + 1 - m_rxCurBit) * m_bitCycles;
 		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
 			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
 			// cycle's LSB is repurposed for the level bit
@@ -400,13 +406,22 @@ void SoftwareSerial::rxBits() {
 				}
 				continue;
 			}
-			if (m_rxCurBit == (m_dataBits - 1)) {
+			// parity bit
+			if ((m_parity != NONE) && (m_rxCurBit == m_dataBits - 1)) {
+				++m_rxCurBit;
+				cycles -= m_bitCycles;
+				m_rxCurParityBit = level;
+				continue;
+			}
+			// stop bit - push current byte and parity to buffer
+			if (m_rxCurBit == (m_dataBits + m_parityBits - 1)) {
 				++m_rxCurBit;
 				cycles -= m_bitCycles;
 				// Store the received value in the buffer unless we have an overflow
 				int next = (m_inPos + 1) % m_bufSize;
 				if (next != m_outPos) {
 					m_buffer[m_inPos] = m_rxCurByte >> (8 - m_dataBits);
+					if (m_parityBits) { m_pbuffer[m_inPos] = m_rxCurParityBit; }
 					// reset to 0 is important for masked bit logic
 					m_rxCurByte = 0;
 					m_inPos = next;
@@ -415,14 +430,7 @@ void SoftwareSerial::rxBits() {
 				}
 				continue;
 			}
-			// Parity bit if included
-			if (m_parity != NONE) {
-				++m_rxCurBit;
-				cycles -= m_bitCycles;
-				// TODO - Read parity bit and store in parity buffer
-				m_pbuffer[m_inPos] = 1; // Setting parity bit for now. Testing
-			}
-			if (m_rxCurBit >= m_dataBits+m_parityBits) {
+			if (m_rxCurBit >= m_dataBits + m_parityBits) {
 				// start bit level is low
 				if (!level) {
 					m_rxCurBit = -1;
@@ -490,5 +498,6 @@ int SoftwareSerial::parityError() {
 	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { 
 		return 0; 
 	}
+	// TODO - set m_parityError in read() if parity, similar to what is done for overflow()
 	return ((m_pbuffer[m_outPos]) && (calcParity(&m_buffer[m_outPos])) ? 0 : 1);
 };

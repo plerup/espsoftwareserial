@@ -33,7 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 constexpr int SW_SERIAL_UNUSED_PIN = -1;
 
 typedef const char SoftwareSerialConfig[4];
-enum ParityMode { NONE, ODD, EVEN, SPACE, MARK, ADDR };
+enum ParityMode { NONE = 0, ODD, EVEN, SPACE, MARK };
 
 // This class is compatible with the corresponding AVR one,
 // the constructor however has an optional rx buffer size.
@@ -138,7 +138,7 @@ private:
 	std::atomic<uint32_t> m_isrLastCycle;
 	int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: parity bit if applicable. 8 or 9: stop bit.
 	uint8_t m_rxCurByte = 0;
-
+	uint8_t m_rxCurParityBit;
 	std::function<void(int available)> receiveHandler = 0;
 };
 
