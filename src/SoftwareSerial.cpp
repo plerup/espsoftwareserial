@@ -466,22 +466,19 @@ void SoftwareSerial::perform_work() {
 }
 
 bool SoftwareSerial::calcParity(const uint8_t *b) {
-	// Fast parity computation by lookup table
-	// https://graphics.stanford.edu/~seander/bithacks.html#ParityLookupTable
-	// Alternatively do it with mimimal memory but slightly slower:
-	// https://graphics.stanford.edu/~seander/bithacks.html#ParityNaive
-	static const bool parityTable256[256] = 
-	{
-    #define P2(n) n, n^1, n^1, n
-    #define P4(n) P2(n), P2(n^1), P2(n^1), P2(n)
-    #define P6(n) P4(n), P4(n^1), P4(n^1), P4(n)
-    P6(0), P6(1), P6(1), P6(0)
-	};
+	// Fast parity computation with small memory footprint
+	// https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
 	switch (m_parity) {
         case NONE: return 0;
-        case ODD: return !parityTable256[*b];
-        case EVEN: return parityTable256[*b];
-		case SPACE: return 0;
+		case ODD: [[fallthrough]]
+		case EVEN: {
+			uint8_t v = *b;
+			v ^= v >> 4;
+			v &= 0xf;
+			if (m_parity == EVEN) { return (0x6996 >> v) & 1; }
+			else { return (0x6996 >> v) & 1; }
+		}
+    	case SPACE: return 0;
         case MARK: return 1;
 		default: return 0;
     }
