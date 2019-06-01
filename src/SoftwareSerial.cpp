@@ -495,14 +495,9 @@ int SoftwareSerial::peekParityBit() {
 	return m_pbuffer[m_outPos];
 };
 
-int SoftwareSerial::readParityBit() {
-	return 0;	// TODO - is this function really needed or useful?
-};
-
-int SoftwareSerial::parityError() {
+int SoftwareSerial::peekParityError() {
 	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { 
-		return 0; 
+		return -1; 
 	}
-	// TODO - set m_parityError in read() if parity, similar to what is done for overflow()
-	return ((m_pbuffer[m_outPos]) && (calcParity(&m_buffer[m_outPos])) ? 0 : 1);
+	return ((m_pbuffer[m_outPos]) == (calcParity(&m_buffer[m_outPos])) ? 0 : 1);
 };
