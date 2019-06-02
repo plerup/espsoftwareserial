@@ -120,23 +120,44 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 	void SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 #endif
 	switch(config & SWSER_NB_BIT_MASK) {
-		case SWSER_NB_BIT_5: { m_dataBits = 5; break; }
-		case SWSER_NB_BIT_6: { m_dataBits = 6; break; }
-		case SWSER_NB_BIT_7: { m_dataBits = 7; break; }
-		case SWSER_NB_BIT_8: { m_dataBits = 8; break; }		
-	}
-	switch(config & SWSER_PARITY_MASK) {
-		case SWSER_PARITY_NONE: { m_parity = NONE; 	break; }
-		case SWSER_PARITY_ODD: { m_parity = ODD; break; }
-		case SWSER_PARITY_EVEN: { m_parity = EVEN; break; }
-		case SWSER_PARITY_SPACE: { m_parity = SPACE; break; }
-		case SWSER_PARITY_MARK: { m_parity = MARK; break; }
-		default: m_parity = NONE;
-	}
+    case SWSER_NB_BIT_5:
+        m_dataBits = 5;
+        break;
+    case SWSER_NB_BIT_6:
+        m_dataBits = 6;
+        break;
+    case SWSER_NB_BIT_7:
+        m_dataBits = 7;
+        break;
+    case SWSER_NB_BIT_8:
+        m_dataBits = 8;
+        break;
+    }
+    switch(config & SWSER_PARITY_MASK) {
+    case SWSER_PARITY_NONE:
+        m_parity = NONE;
+        break;
+    case SWSER_PARITY_ODD:
+        m_parity = ODD;
+        break;
+    case SWSER_PARITY_EVEN:
+        m_parity = EVEN;
+        break;
+    case SWSER_PARITY_SPACE:
+        m_parity = SPACE;
+        break;
+    case SWSER_PARITY_MARK:
+        m_parity = MARK;
+        break;
+    default:
+        m_parity = NONE;
+    }
 	m_parityBits = (m_parity == NONE) ? 0 : 1;
 	switch (config & SWSER_NB_STOP_BIT_MASK) {
-		case SWSER_NB_STOP_BIT_1: {m_stopBits = 1; break; }
-		default: m_stopBits = 1;  // TODO - 1.5 and 2 stop bits not implemented yet
+	case SWSER_NB_STOP_BIT_1:
+		m_stopBits = 1;
+		break;
+	default: m_stopBits = 1;  // TODO - 1.5 and 2 stop bits not implemented yet
 	}
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
 	m_intTxEnabled = true;
@@ -247,7 +268,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool asyn) 
 	if (asyn && !m_intTxEnabled) { interrupts(); }
 	int32_t micro_s = static_cast<int32_t>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
 	if (micro_s > 0) {
-		if (asyn) optimistic_yield(micro_s); else delayMicroseconds(micro_s);
+		if (asyn) optimistic_yield(micro_s); 
+		else delayMicroseconds(micro_s);
 	}
 	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) { if (asyn) optimistic_yield(1); }
 	if (asyn) {
@@ -475,18 +497,27 @@ bool SoftwareSerial::calcParity(const uint8_t *b) {
 	// Fast parity computation with small memory footprint
 	// https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
 	switch (m_parity) {
-        case NONE: return 0;
-		case ODD: [[fallthrough]]
-		case EVEN: {
-			uint8_t v = *b;
-			v ^= v >> 4;
-			v &= 0xf;
-			if (m_parity == EVEN) { return (0x6996 >> v) & 1; }
-			else { return (0x6996 >> v) & 1; }
-		}
-    	case SPACE: return 0;
-        case MARK: return 1;
-		default: return 0;
+    case NONE:
+        return 0;
+    case ODD:
+        [[fallthrough]]
+    case EVEN: {
+        uint8_t v = *b;
+        v ^= v >> 4;
+        v &= 0xf;
+        if (m_parity == EVEN) {
+            return (0x6996 >> v) & 1;
+        }
+        else {
+            return (0x6996 >> v) & 1;
+        }
+    }
+    case SPACE:
+        return 0;
+    case MARK:
+        return 1;
+    default:
+        return 0;
     }
 }
 
