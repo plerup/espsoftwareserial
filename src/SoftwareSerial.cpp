@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 */
 
-//#define SWSER_DEBUG
+#define SWSER_DEBUG
 
 #include <Arduino.h>
 
@@ -339,7 +339,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		word <<= 1;
 		word |= m_invert;
 #ifdef SWSER_DEBUG
-			Serial.printf("Sending %d:\n", word);
+			Serial.printf("\nSending %d:\n", word);
 #endif
 		for (int i = 0; i <= m_dataBits + m_parityBits + m_stopBits; ++i) {
 			bool pb = b;
@@ -394,7 +394,10 @@ void SoftwareSerial::rxBits() {
 	// low-cost check first
 	if (avail == 0 && m_rxCurBit < (m_dataBits + m_parityBits + m_stopBits - 1) 
 			&& m_isrInPos.load() == m_isrOutPos.load() && m_rxCurBit >= 0) {
-		uint32_t expectedCycle = m_isrLastCycle.load() + (m_dataBits + m_parityBits + m_stopBits - m_rxCurBit) * m_bitCycles;
+		uint32_t expectedCycle = m_isrLastCycle.load() + (m_dataBits + m_parityBits + m_stopBits - 1 - m_rxCurBit) * m_bitCycles;
+#ifdef SWSER_DEBUG
+				Serial.printf("Undetect stop - expectedCycle: %d", expectedCycle);
+#endif
 		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
 			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
 			// cycle's LSB is repurposed for the level bit
@@ -403,6 +406,10 @@ void SoftwareSerial::rxBits() {
 				m_isrBuffer[m_isrInPos.load()].store((expectedCycle | 1) ^ !m_invert);
 				m_isrInPos.store(next);
 				++avail;
+#ifdef SWSER_DEBUG
+				Serial.printf(" - new value loaded %d\n", (expectedCycle | 1) ^ !m_invert);
+#endif
+
 			} else {
 				m_isrOverflow.store(true);
 			}
@@ -457,7 +464,7 @@ void SoftwareSerial::rxBits() {
 				continue;
 			}
 			// stop bit - push current byte and parity to buffer
-			if (m_rxCurBit <= (m_dataBits + m_parityBits + m_stopBits - 1)) {
+			if ((m_rxCurBit >= m_dataBits + m_parityBits - 1) && (m_rxCurBit < m_dataBits + m_parityBits + m_stopBits - 1)) {
 				++m_rxCurBit;
 				cycles -= m_bitCycles;
 				// If this is not the last stop bit
@@ -488,7 +495,7 @@ void SoftwareSerial::rxBits() {
 				}
 			}
 		//	if (m_rxCurBit >= (m_dataBits + m_parityBits)) {
-			if (m_rxCurBit >= (m_dataBits + m_parityBits + m_stopBits)) {
+			if (m_rxCurBit >= (m_dataBits + m_parityBits + m_stopBits - 1)) {
 #ifdef SWSER_DEBUG
 				Serial.printf("Start bit %d (%d), cycles: %d, isrCycle: %d\n", m_rxCurBit, level, cycles, isrCycle);
 #endif
@@ -534,6 +541,7 @@ void SoftwareSerial::perform_work() {
 bool SoftwareSerial::calcParity(const uint8_t *b) {
 	// Fast parity computation with small memory footprint
 	// https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
+	// TODO - fix parity calculation to work for words shorter than 8 bits
 	switch (m_parity) {
     case NONE:
         return 0;
