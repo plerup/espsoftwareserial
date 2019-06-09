@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 */
 
-#define SWSER_DEBUG
+//#define SWSER_DEBUG
 
 #include <Arduino.h>
 
@@ -327,10 +327,13 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		// push LSB start-data-stop bit pattern into uint32_t
 		// 1 or 2 stop bits : LOW if inverted logic, otherwise HIGH
 		uint32_t word = ((!m_invert) << m_stopBits) -1;
+#ifdef SWSER_DEBUG
+			Serial.printf("\nchar: %d, dataMask: %d, parity: %d\n", (*buffer & (uint8_t)dataMask), dataMask, calcParity(*buffer & (uint8_t)dataMask));
+#endif
 		// Parity bit
 		if (m_parity) { 
 			word <<= 1; 
-			word |= (m_invert ? ~(calcParity(buffer)) : calcParity(buffer));
+			word |= (m_invert ^ calcParity(*buffer & (uint8_t)dataMask));
 		}
     	// Shift left to make space and fill in the databits
     	word <<= m_dataBits;
@@ -339,7 +342,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		word <<= 1;
 		word |= m_invert;
 #ifdef SWSER_DEBUG
-			Serial.printf("\nSending %d:\n", word);
+			Serial.printf("Sending %d:\n", word);
 #endif
 		for (int i = 0; i <= m_dataBits + m_parityBits + m_stopBits; ++i) {
 			bool pb = b;
@@ -457,9 +460,10 @@ void SoftwareSerial::rxBits() {
 			if ((m_parity != NONE) && (m_rxCurBit == m_dataBits - 1)) {
 				++m_rxCurBit;
 				cycles -= m_bitCycles;
-				m_rxCurParityBit = level;
+				// If the last data bit and the parity bit are both 0, the parity bit will be hidden
+				m_rxCurParityBit = (cycles >= 0) ? (bool)(m_rxCurByte & 0x80) : level;
 #ifdef SWSER_DEBUG
-				Serial.printf("Parity bit %d (%d), cycles: %d, isrCycle: %d\n", m_rxCurBit, level, cycles, isrCycle);
+				Serial.printf("Parity bit %d (%d), cycles: %d, isrCycle: %d\n", m_rxCurBit, m_rxCurParityBit, cycles, isrCycle);
 #endif
 				continue;
 			}
@@ -505,7 +509,7 @@ void SoftwareSerial::rxBits() {
 				}
 			}
 			break;
-		} while (cycles > m_bitCycles * 3 / 10);
+		} while (cycles > 0);
 	}
 }
 
@@ -538,17 +542,16 @@ void SoftwareSerial::perform_work() {
 	}
 }
 
-bool SoftwareSerial::calcParity(const uint8_t *b) {
+bool SoftwareSerial::calcParity(const uint8_t b) {
 	// Fast parity computation with small memory footprint
 	// https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
-	// TODO - fix parity calculation to work for words shorter than 8 bits
 	switch (m_parity) {
     case NONE:
         return 0;
     case ODD:
         [[fallthrough]]
     case EVEN: {
-        uint8_t v = *b;
+        uint8_t v = b;
         v ^= v >> 4;
         v &= 0xf;
         if (m_parity == EVEN) {
@@ -576,5 +579,5 @@ int SoftwareSerial::peekParityError() {
 	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { 
 		return -1; 
 	}
-	return ((m_pbuffer[m_outPos]) == (calcParity(&m_buffer[m_outPos])) ? 0 : 1);
+	return ((m_pbuffer[m_outPos]) == (calcParity(m_buffer[m_outPos])) ? 0 : 1);
 };

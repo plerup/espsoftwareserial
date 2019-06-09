@@ -164,7 +164,7 @@ private:
 	bool isValidGPIOpin(int pin);
 	/* check m_rxValid that calling is safe */
 	void rxBits();
-	bool calcParity(const uint8_t *b);
+	bool calcParity(const uint8_t b);
 	// Member variables
 	bool m_oneWire;
 	int m_rxPin = SW_SERIAL_UNUSED_PIN;
