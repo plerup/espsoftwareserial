@@ -154,7 +154,7 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
     default:
         m_parity = NONE;
     }
-	m_parityBits = (m_parity == NONE) ? 0 : 1;
+	m_parityBits = m_parity != NONE;
 	switch (config & SWSER_NB_STOP_BIT_MASK) {
 	case SWSER_NB_STOP_BIT_1:
 		m_stopBits = 1;
@@ -303,10 +303,18 @@ void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(uint32_t dutyCycle, uint32_t of
 }
 
 size_t SoftwareSerial::write(uint8_t b) {
-	return write(&b, 1);
+	return write(&b, 1, m_parity);
 }
 
-size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size) {
+size_t SoftwareSerial::write(uint8_t b, ParityMode parity) {
+	return write(&b, 1, parity);
+}
+
+size_t SoftwareSerial::write(const uint8_t *buffer, size_t size) {
+	return write(buffer, size, m_parity);
+}
+
+size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size, ParityMode parity) {
 	if (m_rxValid) { rxBits(); }
 	if (!m_txValid) { return 0; }
 
@@ -328,12 +336,13 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size)
 		// 1 or 2 stop bits : LOW if inverted logic, otherwise HIGH
 		uint32_t word = ((!m_invert) << m_stopBits) -1;
 #ifdef SWSER_DEBUG
-			Serial.printf("\nchar: %d, dataMask: %d, parity: %d\n", (*buffer & (uint8_t)dataMask), dataMask, calcParity(*buffer & (uint8_t)dataMask));
+			Serial.printf("\nchar: %d, dataMask: %d, parityMode: %d, parityBit: %d\n", 
+				(*buffer & (uint8_t)dataMask), dataMask, parity, calcParity(*buffer & (uint8_t)dataMask, parity));
 #endif
 		// Parity bit
 		if (m_parity) { 
 			word <<= 1; 
-			word |= (m_invert ^ calcParity(*buffer & (uint8_t)dataMask));
+			word |= m_invert ^ calcParity(*buffer & (uint8_t)dataMask, parity);
 		}
     	// Shift left to make space and fill in the databits
     	word <<= m_dataBits;
@@ -498,7 +507,6 @@ void SoftwareSerial::rxBits() {
 					continue;
 				}
 			}
-		//	if (m_rxCurBit >= (m_dataBits + m_parityBits)) {
 			if (m_rxCurBit >= (m_dataBits + m_parityBits + m_stopBits - 1)) {
 #ifdef SWSER_DEBUG
 				Serial.printf("Start bit %d (%d), cycles: %d, isrCycle: %d\n", m_rxCurBit, level, cycles, isrCycle);
@@ -542,10 +550,10 @@ void SoftwareSerial::perform_work() {
 	}
 }
 
-bool SoftwareSerial::calcParity(const uint8_t b) {
+bool SoftwareSerial::calcParity(const uint8_t b, ParityMode parity) {
 	// Fast parity computation with small memory footprint
 	// https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
-	switch (m_parity) {
+	switch (parity) {
     case NONE:
         return 0;
     case ODD:
@@ -554,7 +562,7 @@ bool SoftwareSerial::calcParity(const uint8_t b) {
         uint8_t v = b;
         v ^= v >> 4;
         v &= 0xf;
-        if (m_parity == EVEN) {
+        if (parity == EVEN) {
             return (0x6996 >> v) & 1;
         }
         else {
@@ -579,5 +587,5 @@ int SoftwareSerial::peekParityError() {
 	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { 
 		return -1; 
 	}
-	return ((m_pbuffer[m_outPos]) == (calcParity(m_buffer[m_outPos])) ? 0 : 1);
+	return !((m_pbuffer[m_outPos]) == calcParity(m_buffer[m_outPos], m_parity));
 };

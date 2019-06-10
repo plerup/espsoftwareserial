@@ -132,7 +132,9 @@ public:
 	int peekParityError();
 	void flush() override;
 	size_t write(uint8_t byte) override;
+	size_t write(uint8_t byte, ParityMode parity);
 	size_t write(const uint8_t *buffer, size_t size) override;
+	size_t write(const uint8_t *buffer, size_t size, ParityMode parity);
 	operator bool() const { return m_rxValid || m_txValid; }
 
 	// Disable or enable interrupts on the rx pin
@@ -164,7 +166,7 @@ private:
 	bool isValidGPIOpin(int pin);
 	/* check m_rxValid that calling is safe */
 	void rxBits();
-	bool calcParity(const uint8_t b);
+	bool calcParity(const uint8_t b, ParityMode parity);
 	// Member variables
 	bool m_oneWire;
 	int m_rxPin = SW_SERIAL_UNUSED_PIN;
@@ -197,7 +199,7 @@ private:
 	std::atomic<uint32_t>* m_isrBuffer;
 	std::atomic<bool> m_isrOverflow;
 	std::atomic<uint32_t> m_isrLastCycle;
-	int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: parity bit if applicable. 8 or 9: stop bit.
+	int m_rxCurBit; // -1: start bit. 0 - 7: data bits. 8: parity bit (optional). 8(-9) or 9(-10): stop bit(s).
 	uint8_t m_rxCurByte = 0;
 	uint8_t m_rxCurParityBit;
 	std::function<void(int available)> receiveHandler = 0;
