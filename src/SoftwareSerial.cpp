@@ -243,7 +243,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
 		// Start bit : HIGH if inverted logic, otherwise LOW
 		word <<= 1;
 		word |= m_invert;
-		for (int i = 0; i <= m_dataBits + 1; ++i) {
+		for (int i = 0; i < m_dataBits + 2; ++i) {
 			bool pb = b;
 			b = (word >> i) & 1;
 			if (!pb && b) {
@@ -318,12 +318,12 @@ void SoftwareSerial::rxBits() {
 	m_isrBuffer->for_each([this](const uint32_t& isrCycle) {
 		bool level = (m_isrLastCycle & 1) ^ m_invert;
 
-		// error introduced by edge value in LSB of isrCylce is negligible
-		int32_t cycles = static_cast<int32_t>(isrCycle - m_isrLastCycle);
-
-		if ((cycles < (3 * m_bitCycles / 10))) return;
+		// error introduced by edge value in LSB of isrCycle is negligible
+		uint32_t cycles = isrCycle - m_isrLastCycle;
+		if (cycles < static_cast<uint32_t>(3 * m_bitCycles / 10)) return;
 
 		m_isrLastCycle = isrCycle;
+		if (static_cast<int32_t>(cycles) < 0) return;
 
 		uint8_t bits = (cycles + (6 * m_bitCycles / 10)) / m_bitCycles; // 1/8 .. 8/10 * m_bitCycles
 		while (bits > 0) { 
