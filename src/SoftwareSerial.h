@@ -128,7 +128,6 @@ public:
 	int available() override;
 	int peek() override;
 	int read() override;
-	int peekParityBit();
 	int peekParityError();
 	void flush() override;
 	size_t write(uint8_t byte) override;

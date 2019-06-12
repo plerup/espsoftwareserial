@@ -554,7 +554,8 @@ bool SoftwareSerial::calcParity(const uint8_t b, ParityMode parity) {
 	// Fast parity computation with small memory footprint
 	// https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
 	switch (parity) {
-    case NONE:
+    // TODO - remove case for NONE, SPACE and fallback to default?
+	case NONE:
         return 0;
     case ODD:
         [[fallthrough]]
@@ -577,11 +578,6 @@ bool SoftwareSerial::calcParity(const uint8_t b, ParityMode parity) {
         return 0;
     }
 }
-
-int SoftwareSerial::peekParityBit() {
-	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { return -1; }
-	return m_pbuffer[m_outPos];
-};
 
 int SoftwareSerial::peekParityError() {
 	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { 
