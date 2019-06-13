@@ -112,6 +112,7 @@ private:
 	bool isValidGPIOpin(int8_t pin);
 	/* check m_rxValid that calling is safe */
 	void rxBits();
+	void rxBits(const uint32_t& isrCycle);
 
 	// Member variables
 	bool m_oneWire;
