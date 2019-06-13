@@ -182,7 +182,7 @@ void loop() {
 #endif
 
 	// starting deadline for the first bytes to come in
-	deadline = micros() + static_cast<uint32_t>(128 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+	deadline = micros() + static_cast<uint32_t>(32 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	inCnt = 0;
 	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		int avail;
@@ -205,7 +205,7 @@ void loop() {
 		}
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = micros() + static_cast<uint32_t>(128 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+		deadline = micros() + static_cast<uint32_t>(32 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	}
 
 #ifdef HALFDUPLEX
