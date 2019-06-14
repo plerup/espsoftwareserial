@@ -124,7 +124,7 @@ private:
 	bool m_txEnableValid = false;
 	bool m_invert;
 	bool m_overflow = false;
-	uint8_t m_dataBits;
+	int8_t m_dataBits;
 	int32_t m_bit_us;
 	int32_t m_bitCycles;
 	uint32_t m_periodDeadline;
@@ -135,7 +135,7 @@ private:
 	std::unique_ptr<circular_queue<uint32_t> > m_isrBuffer;
 	std::atomic<bool> m_isrOverflow;
 	uint32_t m_isrLastCycle;
-	int m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
+	int8_t m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
 	uint8_t m_rxCurByte = 0;
 
 	std::function<void(int available)> receiveHandler;
