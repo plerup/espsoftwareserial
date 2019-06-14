@@ -17,12 +17,12 @@
 #endif
 
 //#define HWLOOPBACK 1
-#define HALFDUPLEX 1
+//#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 57600;
+constexpr int IUTBITRATE = 38400;
 #else
-constexpr int IUTBITRATE = 57600;
+constexpr int IUTBITRATE = 38400;
 #endif
 
 constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
