@@ -319,7 +319,7 @@ void SoftwareSerial::rxBits(const uint32_t& isrCycle) {
 
 	// error introduced by edge value in LSB of isrCycle is negligible
 	uint32_t cycles = isrCycle - m_isrLastCycle;
-	if (cycles < static_cast<uint32_t>(3 * m_bitCycles / 10)) return;
+	if (cycles < static_cast<uint32_t>(2 * m_bitCycles / 10) || (m_isrLastCycle & 1) == (isrCycle & 1)) return;
 
 	m_isrLastCycle = isrCycle;
 	if (static_cast<int32_t>(cycles) < 0) return;
