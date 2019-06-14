@@ -102,12 +102,11 @@ public:
 private:
 	// If asyn, its legal to exceed the deadline, for instance,
 	// by enabling interrupts.
-	void preciseDelay(uint32_t deadline, bool asyn);
+	void preciseDelay(uint32_t deadline, bool asyn, uint32_t savedPS);
 	// If withStopBit is set, either cycle contains a stop bit.
 	// If dutyCycle == 0, the level is not forced to HIGH.
 	// If offCycle == 0, the level remains unchanged from dutyCycle.
-	// returns the latest saved interrupt state.
-	uint32_t writePeriod(
+	void writePeriod(
 		uint32_t dutyCycle, uint32_t offCycle, bool withStopBit, uint32_t savedPS);
 	bool isValidGPIOpin(int8_t pin);
 	/* check m_rxValid that calling is safe */
