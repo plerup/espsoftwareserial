@@ -304,10 +304,9 @@ void SoftwareSerial::rxBits() {
 	// low-cost check first
 	if (!isrAvail && m_rxCurBit >= -1 && m_rxCurBit < m_dataBits) {
 		uint32_t expectedCycle = m_isrLastCycle + (m_dataBits - m_rxCurBit) * m_bitCycles;
-		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
+		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > 0) {
 			// Store stop bit level and cycle in the buffer unless we have an overflow
 			// cycle's LSB is repurposed for the level bit
-			// if m_isrBuffer is full, leave undetected stop bit pending, no actual overflow yet
 			rxBits((expectedCycle | 1) ^ m_invert);
 		}
 	}
