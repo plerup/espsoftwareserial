@@ -20,8 +20,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 */
 
-//#define SWSER_DEBUG
-
 #include <Arduino.h>
 
 #include <SoftwareSerial.h>
@@ -162,12 +160,9 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 	case SWSER_NB_STOP_BIT_2:
 		m_stopBits = 2;
 		break;
-	default: m_stopBits = 1;  // TODO - 1.5 stop bits not implemented yet
+	default: m_stopBits = 1;  // TODO - Implement 1.5 stop bits as 2 on receive, 1 on send
 	}
 	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
-#ifdef SWSER_DEBUG
-			Serial.printf("Data: %d, Parity: %d, Stop: %d, bitCycles: %d\n", m_dataBits, m_parity, m_stopBits, m_bitCycles);
-#endif
 	m_intTxEnabled = true;
 	if (m_buffer != 0 && m_isrBuffer != 0) {
 		m_rxValid = true;
@@ -335,10 +330,6 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size,
 		// push LSB start-data-stop bit pattern into uint32_t
 		// 1 or 2 stop bits : LOW if inverted logic, otherwise HIGH
 		uint32_t word = ((!m_invert) << m_stopBits) -1;
-#ifdef SWSER_DEBUG
-			Serial.printf("\nchar: %d, dataMask: %d, parityMode: %d, parityBit: %d\n", 
-				(*buffer & (uint8_t)dataMask), dataMask, parity, calcParity(*buffer & (uint8_t)dataMask, parity));
-#endif
 		// Parity bit
 		if (m_parity) { 
 			word <<= 1; 
@@ -350,9 +341,6 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size,
 		// Start bit : HIGH if inverted logic, otherwise LOW
 		word <<= 1;
 		word |= m_invert;
-#ifdef SWSER_DEBUG
-			Serial.printf("Sending %d:\n", word);
-#endif
 		for (int i = 0; i <= m_dataBits + m_parityBits + m_stopBits; ++i) {
 			bool pb = b;
 			b = (word >> i) & 1;
@@ -407,9 +395,6 @@ void SoftwareSerial::rxBits() {
 	if (avail == 0 && m_rxCurBit < (m_dataBits + m_parityBits + m_stopBits - 1) 
 			&& m_isrInPos.load() == m_isrOutPos.load() && m_rxCurBit >= 0) {
 		uint32_t expectedCycle = m_isrLastCycle.load() + (m_dataBits + m_parityBits + m_stopBits - 1 - m_rxCurBit) * m_bitCycles;
-#ifdef SWSER_DEBUG
-				Serial.printf("Undetect stop - expectedCycle: %d", expectedCycle);
-#endif
 		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
 			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
 			// cycle's LSB is repurposed for the level bit
@@ -418,10 +403,6 @@ void SoftwareSerial::rxBits() {
 				m_isrBuffer[m_isrInPos.load()].store((expectedCycle | 1) ^ !m_invert);
 				m_isrInPos.store(next);
 				++avail;
-#ifdef SWSER_DEBUG
-				Serial.printf(" - new value loaded %d\n", (expectedCycle | 1) ^ !m_invert);
-#endif
-
 			} else {
 				m_isrOverflow.store(true);
 			}
@@ -450,18 +431,12 @@ void SoftwareSerial::rxBits() {
 					if (lastBit) { m_rxCurByte |= 0xff << (8 - hiddenBits); }
 					m_rxCurBit += hiddenBits;
 					cycles -= hiddenBits * m_bitCycles;
-#ifdef SWSER_DEBUG
-				Serial.printf("Masked   %d-%d (%d), cycles:  %d, isrCycle: %d\n", m_rxCurBit - hiddenBits + 1, m_rxCurBit, lastBit, cycles, isrCycle);
-#endif
 				}
 				if (m_rxCurBit < (m_dataBits - 1)) {
 					++m_rxCurBit;
 					cycles -= m_bitCycles;
 					m_rxCurByte >>= 1;
 					if (level) { m_rxCurByte |= 0x80; }
-#ifdef SWSER_DEBUG
-				Serial.printf("Data bit   %d (%d), cycles: %d, isrCycle: %d\n", m_rxCurBit, level, cycles, isrCycle);
-#endif
 				}
 				continue;
 			}
@@ -471,9 +446,6 @@ void SoftwareSerial::rxBits() {
 				cycles -= m_bitCycles;
 				// If the last data bit and the parity bit are both 0, the parity bit will be hidden
 				m_rxCurParityBit = (cycles >= 0) ? (bool)(m_rxCurByte & 0x80) : level;
-#ifdef SWSER_DEBUG
-				Serial.printf("Parity bit %d (%d), cycles: %d, isrCycle: %d\n", m_rxCurBit, m_rxCurParityBit, cycles, isrCycle);
-#endif
 				continue;
 			}
 			// stop bit - push current byte and parity to buffer
@@ -482,17 +454,11 @@ void SoftwareSerial::rxBits() {
 				cycles -= m_bitCycles;
 				// If this is not the last stop bit
 				if ((m_stopBits == 2) && (m_rxCurBit == m_dataBits + m_parityBits)) {
-#ifdef SWSER_DEBUG
-					Serial.printf("First stop %d (%d), cycles: %d, isrCycle: %d\n", m_rxCurBit, level, cycles, isrCycle);
-#endif
 					continue;
 				}
 				// If this is the last stop bit
 				//if (m_rxCurBit == m_dataBits + m_parityBits + m_stopBits - 1) {
 				else {
-#ifdef SWSER_DEBUG
-					Serial.printf("Last stop  %d (%d), cycles:  %d, isrCycle: %d\n", m_rxCurBit, level, cycles, isrCycle);
-#endif
 					// Store the received value in the buffer unless we have an overflow
 					int next = (m_inPos + 1) % m_bufSize;
 					if (next != m_outPos) {
@@ -508,9 +474,6 @@ void SoftwareSerial::rxBits() {
 				}
 			}
 			if (m_rxCurBit >= (m_dataBits + m_parityBits + m_stopBits - 1)) {
-#ifdef SWSER_DEBUG
-				Serial.printf("Start bit %d (%d), cycles: %d, isrCycle: %d\n", m_rxCurBit, level, cycles, isrCycle);
-#endif
 				// start bit level is low
 				if (!level) {
 					m_rxCurBit = -1;
@@ -554,7 +517,6 @@ bool SoftwareSerial::calcParity(const uint8_t b, ParityMode parity) {
 	// Fast parity computation with small memory footprint
 	// https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
 	switch (parity) {
-    // TODO - remove case for NONE, SPACE and fallback to default?
 	case NONE:
         return 0;
     case ODD:

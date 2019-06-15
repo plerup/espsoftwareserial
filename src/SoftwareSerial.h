@@ -32,7 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // If only one tx or rx wanted then use this as parameter for the unused pin
 constexpr int SW_SERIAL_UNUSED_PIN = -1;
 
-// Options for `config` argument
+// Options for SoftwareSerialConfig
 #define SWSER_NB_BIT_MASK      0B00011000
 #define SWSER_NB_BIT_5         0B00000000
 #define SWSER_NB_BIT_6         0B00001000
