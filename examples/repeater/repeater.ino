@@ -95,7 +95,9 @@ void loop() {
 		else {
 			expected = (expected + 1) % 256;
 		}
-		if (r != (expected & ((1 << (5 + swSerialConfig % 4)) - 1))) {
+		// Kludge to calculate number of data bits: 
+		uint8_t databits = 5 + ((swSerialConfig & SWSER_NB_BIT_MASK) >> 3);
+		if (r != (expected & ((1 << databits) - 1))) {
 			++seqErrors;
 		}
 		++rxCount;

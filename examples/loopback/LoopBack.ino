@@ -147,7 +147,9 @@ void loop() {
 			else {
 				expected = (expected + 1) % 256;
 			}
-			if (r != (expected & ((1 << (5 + swSerialConfig % 4)) - 1))) {
+			// Kludge to calculate number of data bits: 
+			uint8_t databits = 5 + ((swSerialConfig & SWSER_NB_BIT_MASK) >> 3);
+			if (r != (expected & ((1 << databits) - 1))) {
 				++rxErrors;
 			}
 			++rxCount;
@@ -165,6 +167,8 @@ void loop() {
 		const long txCps = txCount * (1000000.0 / interval);
 		const long rxCps = rxCount * (1000000.0 / interval);
 		const long errorCps = rxErrors * (1000000.0 / interval);
+		// TODO - factor 10 in rate calculations below is not exact for short (e.g. 5N1) or long (8E2) modes (?) 
+		// Should rather be (1 + #databits + #parity_bits + #stopbits) 
 		logger.println(effTxTxt + 10 * txCps + "bps, "
 			+ effRxTxt + 10 * rxCps + "bps, "
 			+ errorCps + "cps errors (" + 100.0 * rxErrors / rxCount + "%)");
