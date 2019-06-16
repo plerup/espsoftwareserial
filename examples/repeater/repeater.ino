@@ -20,9 +20,9 @@
 //#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 38400;
+constexpr int IUTBITRATE = 19200;
 #else
-constexpr int IUTBITRATE = 38400;
+constexpr int IUTBITRATE = 19200;
 #endif
 
 constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
@@ -35,7 +35,7 @@ String bitRateTxt("Effective data rate: ");
 int rxCount;
 int seqErrors;
 int expected;
-constexpr int ReportInterval = IUTBITRATE / 16;
+constexpr int ReportInterval = IUTBITRATE / 8;
 
 #ifdef HWLOOPBACK
 #if defined(ESP8266)
@@ -80,14 +80,12 @@ void setup() {
 }
 
 void loop() {
-	expected = -1;
-
 #ifdef HALFDUPLEX
 	unsigned char block[BLOCKSIZE];
 #endif
 	int inCnt = 0;
 	// starting deadline for the first bytes to come in
-	uint32_t deadline = micros() + static_cast<uint32_t>(32 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+	uint32_t deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 16);
 	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		if (0 >= repeater.available()) {
 			delay(1);
@@ -110,7 +108,7 @@ void loop() {
 #endif
 		if (++inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = micros() + static_cast<uint32_t>(32 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+		deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 16);
 	}
 
 #ifdef HALFDUPLEX

@@ -7,8 +7,8 @@
 // Hint: The logger is run at 9600bps such that enableIntTx(true) can remain unchanged. Blocking
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
-// By default (no HWLOOPBACK, no HALFDUPLEX),
-// runs at 80MHz with 38400bps, and at 160MHz CPU frequency with 57600bps with nearly no errors.
+// Operating the repeater in software serial full duplex, runs at 19200bps and few errors (~3.5%).
+// Operating the repeater in half duplex mode, runs at 38400bps with nearly no errors.
 // On ESP32:
 // For SoftwareSerial or hardware send/sink, connect D5 (rx) and D6 (tx).
 // Hardware Serial2 defaults to D4 (rx), D3 (tx).
@@ -27,9 +27,9 @@
 //#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 38400;
+constexpr int IUTBITRATE = 19200;
 #else
-constexpr int IUTBITRATE = 38400;
+constexpr int IUTBITRATE = 19200;
 #endif
 
 #if defined(ESP8266) || defined(ESP32)
@@ -47,7 +47,7 @@ int txCount;
 int rxCount;
 int expected;
 int rxErrors;
-constexpr int ReportInterval = IUTBITRATE / 16;
+constexpr int ReportInterval = IUTBITRATE / 8;
 
 #if defined(ESP8266)
 #if defined(HWLOOPBACK)
@@ -129,8 +129,6 @@ Serial.begin(9600);
 unsigned char c = 0;
 
 void loop() {
-	expected = -1;
-
 	unsigned char block[BLOCKSIZE];
 	unsigned char inBuf[BLOCKSIZE];
 	for (int i = 0; i < BLOCKSIZE; ++i) {
@@ -165,7 +163,7 @@ void loop() {
 
 #ifdef HWLOOPBACK
 	// starting deadline for the first bytes to become readable
-	deadline = micros() + static_cast<uint32_t>(8 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+	deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 8);
 	inCnt = 0;
 	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		int avail = hwLoopback.available();
@@ -176,13 +174,13 @@ void loop() {
 		inCnt += hwLoopback.readBytes(&inBuf[inCnt], min(avail, min(BLOCKSIZE - inCnt, hwLoopback.availableForWrite())));
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = micros() + static_cast<uint32_t>(1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+		deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 8);
 	}
 	hwLoopback.write(inBuf, inCnt);
 #endif
 
 	// starting deadline for the first bytes to come in
-	deadline = micros() + static_cast<uint32_t>(32 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+	deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 8);
 	inCnt = 0;
 	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		int avail;
@@ -199,13 +197,14 @@ void loop() {
 			}
 			if (r != (expected & ((1 << (5 + swSerialConfig % 4)) - 1))) {
 				++rxErrors;
+				expected = -1;
 			}
 			++rxCount;
 			++inCnt;
 		}
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = micros() + static_cast<uint32_t>(32 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
+		deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 8);
 	}
 
 #ifdef HALFDUPLEX
@@ -224,10 +223,12 @@ void loop() {
 		logger.println(effTxTxt + 10 * txCps + "bps, "
 			+ effRxTxt + 10 * rxCps + "bps, "
 			+ errorCps + "cps errors (" + 100.0 * rxErrors / rxCount + "%)");
-		start = end;
 		txCount = 0;
 		rxCount = 0;
 		rxErrors = 0;
 		expected = -1;
+		// resync
+		delay(static_cast<uint32_t>(1000 * 10 * BLOCKSIZE / IUTBITRATE * 32));
+		start = micros();
 	}
 }
