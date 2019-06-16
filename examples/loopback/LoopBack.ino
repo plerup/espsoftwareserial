@@ -34,7 +34,11 @@ constexpr int IUTBITRATE = 28800;
 constexpr int IUTBITRATE = 2400;
 #endif
 
+#if defined(ESP8266) || defined(ESP32)
 constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
+#else
+constexpr unsigned swSerialConfig = 3;
+#endif
 
 constexpr int BLOCKSIZE = 16; // use fractions of 256
 
@@ -56,8 +60,10 @@ Stream& logger(Serial);
 
 #ifdef HWSENDNSINK
 Stream& serialIUT(Serial);
-#else
+#elif defined(ESP8266) || defined(ESP32)
 SoftwareSerial serialIUT(14, 12, false, 2 * BLOCKSIZE);
+#else
+SoftwareSerial serialIUT(14, 12);
 #endif
 
 void setup() {
@@ -68,15 +74,23 @@ void setup() {
 
 #if defined(HWLOOPBACK) || defined(HWSENDNSINK)
 	Serial.begin(IUTBITRATE);
+#if defined(ESP8266) || defined(ESP32)
 	Serial.setRxBufferSize(4 * BLOCKSIZE);
+#endif
+#if defined(ESP8266)
 	Serial.swap();
+#endif
 	ssLogger.begin(9600);
 #else
 	Serial.begin(9600);
 #endif
 
 #if !defined(HWSENDNSINK)
+#if defined(ESP8266) || defined(ESP32)
 	serialIUT.begin(IUTBITRATE, swSerialConfig);
+#else
+	serialIUT.begin(IUTBITRATE);
+#endif
 #endif
 
 	start = micros();
@@ -106,7 +120,9 @@ void loop() {
 	}
 	serialIUT.write(block, BLOCKSIZE);
 #ifdef HWSENDNSINK
+#if defined(ESP8266)
 	if (Serial.hasOverrun()) { logger.println("Serial::overrun"); }
+#endif
 #else
 	if (serialIUT.overflow()) { logger.println("SoftwareSerial::overflow"); }
 #endif
@@ -116,9 +132,9 @@ void loop() {
 
 #ifdef HWLOOPBACK
 	// starting deadline for the first bytes to become readable
-	deadline = ESP.getCycleCount() + static_cast<uint32_t>(1000000 / IUTBITRATE * ESP.getCpuFreqMHz() * 10 * BLOCKSIZE);
+	deadline = micros() + static_cast<uint32_t>(1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	inCnt = 0;
-	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) {
+	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		if (!Serial.available()) {
 			delay(100);
 			continue;
@@ -126,15 +142,15 @@ void loop() {
 		inCnt += Serial.readBytes(&inBuf[inCnt], min(BLOCKSIZE - inCnt, Serial.availableForWrite()));
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = ESP.getCycleCount() + static_cast<uint32_t>(200 * 1000 * ESP.getCpuFreqMHz());
+		deadline = micros() + 200000U;
 	}
 	Serial.write(inBuf, inCnt);
 #endif
 
 	// starting deadline for the first bytes to come in
-	deadline = ESP.getCycleCount() + static_cast<uint32_t>(2 * 1000000 / IUTBITRATE * ESP.getCpuFreqMHz() * 10 * BLOCKSIZE);
+	deadline = micros() + static_cast<uint32_t>(2 * 1000000 / IUTBITRATE * 10 * BLOCKSIZE);
 	inCnt = 0;
-	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) {
+	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		int avail;
 		if (0 == (avail = serialIUT.available())) {
 			delay(100);
@@ -157,7 +173,7 @@ void loop() {
 		}
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = ESP.getCycleCount() + static_cast<uint32_t>(200 * 1000 * ESP.getCpuFreqMHz());
+		deadline = micros() + 200000U;
 	}
 
 	if (txCount >= ReportInterval) {
