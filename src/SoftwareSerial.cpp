@@ -119,45 +119,45 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 #else
 	void SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 #endif
-	switch(config & SWSER_NB_BIT_MASK) {
-    case SWSER_NB_BIT_5:
+	switch(config & SWSERIAL_NB_BIT_MASK) {
+    case SWSERIAL_NB_BIT_5:
         m_dataBits = 5;
         break;
-    case SWSER_NB_BIT_6:
+    case SWSERIAL_NB_BIT_6:
         m_dataBits = 6;
         break;
-    case SWSER_NB_BIT_7:
+    case SWSERIAL_NB_BIT_7:
         m_dataBits = 7;
         break;
-    case SWSER_NB_BIT_8:
+    case SWSERIAL_NB_BIT_8:
         m_dataBits = 8;
         break;
     }
-    switch(config & SWSER_PARITY_MASK) {
-    case SWSER_PARITY_NONE:
-        m_parity = NONE;
+    switch(config & SWSERIAL_PARITY_CONF_MASK) {
+    case SWSERIAL_PARITY_CONF_NONE:
+        m_parity = SWSERIAL_PARITY_NONE;
         break;
-    case SWSER_PARITY_ODD:
-        m_parity = ODD;
+    case SWSERIAL_PARITY_CONF_ODD:
+        m_parity = SWSERIAL_PARITY_ODD;
         break;
-    case SWSER_PARITY_EVEN:
-        m_parity = EVEN;
+    case SWSERIAL_PARITY_CONF_EVEN:
+        m_parity = SWSERIAL_PARITY_EVEN;
         break;
-    case SWSER_PARITY_SPACE:
-        m_parity = SPACE;
+    case SWSERIAL_PARITY_CONF_SPACE:
+        m_parity = SWSERIAL_PARITY_SPACE;
         break;
-    case SWSER_PARITY_MARK:
-        m_parity = MARK;
+    case SWSERIAL_PARITY_CONF_MARK:
+        m_parity = SWSERIAL_PARITY_MARK;
         break;
     default:
-        m_parity = NONE;
+        m_parity = SWSERIAL_PARITY_NONE;
     }
-	m_parityBits = m_parity != NONE;
-	switch (config & SWSER_NB_STOP_BIT_MASK) {
-	case SWSER_NB_STOP_BIT_1:
+	m_parityBits = m_parity != SWSERIAL_PARITY_NONE;
+	switch (config & SWSERIAL_NB_STOP_BIT_MASK) {
+	case SWSERIAL_NB_STOP_BIT_1:
 		m_stopBits = 1;
 		break;
-	case SWSER_NB_STOP_BIT_2:
+	case SWSERIAL_NB_STOP_BIT_2:
 		m_stopBits = 2;
 		break;
 	default: m_stopBits = 1;  // TODO - Implement 1.5 stop bits as 2 on receive, 1 on send
@@ -271,8 +271,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool asyn) 
 	if (asyn && !m_intTxEnabled) { interrupts(); }
 	int32_t micro_s = static_cast<int32_t>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
 	if (micro_s > 0) {
-		if (asyn) optimistic_yield(micro_s); 
-		else delayMicroseconds(micro_s);
+		if (asyn) optimistic_yield(micro_s); else delayMicroseconds(micro_s);
 	}
 	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) { if (asyn) optimistic_yield(1); }
 	if (asyn) {
@@ -329,7 +328,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size,
 		bool withStopBit = true;
 		// push LSB start-data-stop bit pattern into uint32_t
 		// 1 or 2 stop bits : LOW if inverted logic, otherwise HIGH
-		uint32_t word = ((!m_invert) << m_stopBits) -1;
+		uint32_t word = ((!m_invert) << m_stopBits) - 1;
 		// Parity bit
 		if (m_parity) { 
 			word <<= 1; 
@@ -441,7 +440,7 @@ void SoftwareSerial::rxBits() {
 				continue;
 			}
 			// parity bit
-			if ((m_parity != NONE) && (m_rxCurBit == m_dataBits - 1)) {
+			if ((m_parity != SWSERIAL_PARITY_NONE) && (m_rxCurBit == m_dataBits - 1)) {
 				++m_rxCurBit;
 				cycles -= m_bitCycles;
 				// If the last data bit and the parity bit are both 0, the parity bit will be hidden
@@ -517,27 +516,27 @@ bool SoftwareSerial::calcParity(const uint8_t b, ParityMode parity) {
 	// Fast parity computation with small memory footprint
 	// https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
 	switch (parity) {
-	case NONE:
-        return 0;
-    case ODD:
+	case SWSERIAL_PARITY_NONE:
+        return false;
+    case SWSERIAL_PARITY_ODD:
         [[fallthrough]]
-    case EVEN: {
+    case SWSERIAL_PARITY_EVEN: {
         uint8_t v = b;
         v ^= v >> 4;
         v &= 0xf;
-        if (parity == EVEN) {
+        if (parity == SWSERIAL_PARITY_EVEN) {
             return (0x6996 >> v) & 1;
         }
         else {
             return !((0x6996 >> v) & 1);
         }
     }
-    case SPACE:
-        return 0;
-    case MARK:
-        return 1;
+    case SWSERIAL_PARITY_SPACE:
+        return false;
+    case SWSERIAL_PARITY_MARK:
+        return true;
     default:
-        return 0;
+        return false;
     }
 }
 

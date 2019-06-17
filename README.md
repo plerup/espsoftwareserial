@@ -37,7 +37,7 @@ to assemble received octets, thus promoting completed octets to the octet
 buffer, freeing fields in the edge detection buffer.
 
 Look at the swsertest.ino example. There, on reset, ASCII characters ' ' to 'z'
-are sent. This happens not as a block write, but in single write call per
+are sent. This happens not as a block write, but in a single write call per
 character. As the example uses a local loopback wire, every outgoing bit is
 immediately received back. Therefore, any single write call causes up to
 10 fields - depending on the exact bit pattern - to be occupied in the signal
@@ -115,7 +115,7 @@ individually set in each call to ``write()``.
 
 This allows a simple implementation of protocols where the parity bit is used to
 distinguish between data and addresses/commands ("9-bit" protocols). First set
-up SoftwareSerial with parity mode SPACE, e.g. ``SWSERIAL_S81``. This will add a
+up SoftwareSerial with parity mode SPACE, e.g. ``SWSERIAL_8S1``. This will add a
 parity bit to every byte sent, setting it to logical zero (SPACE parity).
 
 To detect incoming bytes with the parity bit set (MARK parity), use the
