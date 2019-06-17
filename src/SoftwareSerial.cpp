@@ -456,7 +456,6 @@ void SoftwareSerial::rxBits() {
 					continue;
 				}
 				// If this is the last stop bit
-				//if (m_rxCurBit == m_dataBits + m_parityBits + m_stopBits - 1) {
 				else {
 					// Store the received value in the buffer unless we have an overflow
 					int next = (m_inPos + 1) % m_bufSize;
@@ -479,7 +478,7 @@ void SoftwareSerial::rxBits() {
 				}
 			}
 			break;
-		} while (cycles > 0);
+		} while (cycles >= 0);
 	}
 }
 
