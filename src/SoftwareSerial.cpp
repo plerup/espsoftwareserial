@@ -321,7 +321,8 @@ void SoftwareSerial::rxBits(const uint32_t& isrCycle) {
 	int32_t cycles = isrCycle - m_isrLastCycle;
 	m_isrLastCycle = isrCycle;
 
-	int8_t bits = (cycles + (5 * m_bitCycles / 10)) / m_bitCycles; // 1/8 .. 8/10 * m_bitCycles
+	uint8_t bits = cycles / m_bitCycles;
+	if (cycles % m_bitCycles > (m_bitCycles >> 1)) ++bits;
 	while (bits > 0) {
 		// start bit detection
 		if (m_rxCurBit >= m_dataBits) {
@@ -333,7 +334,7 @@ void SoftwareSerial::rxBits(const uint32_t& isrCycle) {
 		}
 		// data bits
 		if (m_rxCurBit >= -1 && m_rxCurBit < (m_dataBits - 1)) {
-			int8_t dataBits = min(bits, static_cast<int8_t>(m_dataBits - m_rxCurBit - 1));
+			int8_t dataBits = min(bits, static_cast<uint8_t>(m_dataBits - m_rxCurBit - 1));
 			m_rxCurBit += dataBits;
 			bits -= dataBits;
 			m_rxCurByte >>= dataBits;
