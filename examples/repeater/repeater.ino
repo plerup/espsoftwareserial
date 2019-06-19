@@ -103,9 +103,9 @@ void loop() {
 		}
 		++rxCount;
 #ifdef HALFDUPLEX
-		block[inCnt] = expected;
+		block[inCnt] = r;
 #else
-		repeater.write(expected);
+		repeater.write(r);
 #endif
 		if (++inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
