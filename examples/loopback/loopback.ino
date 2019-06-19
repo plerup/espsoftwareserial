@@ -7,8 +7,10 @@
 // Hint: The logger is run at 9600bps such that enableIntTx(true) can remain unchanged. Blocking
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
-// Operating the repeater in software serial full duplex, runs at 19200bps and few errors (~3.5%).
-// Operating the repeater in half duplex mode, runs at 38400bps with nearly no errors.
+// Operating in software serial full duplex mode, runs at 19200bps and few errors (~2.5%).
+// Operating in software serial half duplex mode (both loopback and repeater),
+// runs at 57600bps with nearly no errors.
+// Operating loopback in full duplex, and repeater in half duplex, runs at 38400bps with nearly no errors.
 // On ESP32:
 // For SoftwareSerial or hardware send/sink, connect D5 (rx) and D6 (tx).
 // Hardware Serial2 defaults to D4 (rx), D3 (tx).
@@ -180,7 +182,7 @@ void loop() {
 #endif
 
 	// starting deadline for the first bytes to come in
-	deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 8);
+	deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 16);
 	inCnt = 0;
 	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		int avail;
@@ -204,7 +206,7 @@ void loop() {
 		}
 		if (inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 8);
+		deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 16);
 	}
 
 #ifdef HALFDUPLEX
@@ -228,7 +230,7 @@ void loop() {
 		rxErrors = 0;
 		expected = -1;
 		// resync
-		delay(static_cast<uint32_t>(1000 * 10 * BLOCKSIZE / IUTBITRATE * 32));
+		delay(static_cast<uint32_t>(1000 * 10 * BLOCKSIZE / IUTBITRATE * 48));
 		start = micros();
 	}
 }
