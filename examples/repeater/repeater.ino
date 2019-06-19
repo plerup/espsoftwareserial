@@ -85,7 +85,7 @@ void loop() {
 #endif
 	int inCnt = 0;
 	// starting deadline for the first bytes to come in
-	uint32_t deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 16);
+	uint32_t deadline = micros() + 200000;
 	while (static_cast<int32_t>(deadline - micros()) > 0) {
 		if (0 >= repeater.available()) {
 			delay(1);
@@ -99,6 +99,7 @@ void loop() {
 		}
 		if (r != (expected & ((1 << (5 + swSerialConfig % 4)) - 1))) {
 			++seqErrors;
+			expected = -1;
 		}
 		++rxCount;
 #ifdef HALFDUPLEX
@@ -108,7 +109,7 @@ void loop() {
 #endif
 		if (++inCnt >= BLOCKSIZE) { break; }
 		// wait for more outstanding bytes to trickle in
-		deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 16);
+		deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 32);
 	}
 
 #ifdef HALFDUPLEX
