@@ -119,45 +119,45 @@ bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 #else
 	void SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
 #endif
-	switch(config & SWSERIAL_NB_BIT_MASK) {
-    case SWSERIAL_NB_BIT_5:
+	switch(config & SWSERIAL_DB_MASK) {
+    case SWSERIAL_DB_5:
         m_dataBits = 5;
         break;
-    case SWSERIAL_NB_BIT_6:
+    case SWSERIAL_DB_6:
         m_dataBits = 6;
         break;
-    case SWSERIAL_NB_BIT_7:
+    case SWSERIAL_DB_7:
         m_dataBits = 7;
         break;
-    case SWSERIAL_NB_BIT_8:
+    case SWSERIAL_DB_8:
         m_dataBits = 8;
         break;
     }
-    switch(config & SWSERIAL_PARITY_CONF_MASK) {
-    case SWSERIAL_PARITY_CONF_NONE:
+    switch(config & SWSERIAL_PB_MASK) {
+    case SWSERIAL_PB_NONE:
         m_parity = SWSERIAL_PARITY_NONE;
         break;
-    case SWSERIAL_PARITY_CONF_ODD:
+    case SWSERIAL_PB_ODD:
         m_parity = SWSERIAL_PARITY_ODD;
         break;
-    case SWSERIAL_PARITY_CONF_EVEN:
+    case SWSERIAL_PB_EVEN:
         m_parity = SWSERIAL_PARITY_EVEN;
         break;
-    case SWSERIAL_PARITY_CONF_SPACE:
+    case SWSERIAL_PB_SPACE:
         m_parity = SWSERIAL_PARITY_SPACE;
         break;
-    case SWSERIAL_PARITY_CONF_MARK:
+    case SWSERIAL_PB_MARK:
         m_parity = SWSERIAL_PARITY_MARK;
         break;
     default:
         m_parity = SWSERIAL_PARITY_NONE;
     }
 	m_parityBits = m_parity != SWSERIAL_PARITY_NONE;
-	switch (config & SWSERIAL_NB_STOP_BIT_MASK) {
-	case SWSERIAL_NB_STOP_BIT_1:
+	switch (config & SWSERIAL_SB_MASK) {
+	case SWSERIAL_SB_1:
 		m_stopBits = 1;
 		break;
-	case SWSERIAL_NB_STOP_BIT_2:
+	case SWSERIAL_SB_2:
 		m_stopBits = 2;
 		break;
 	default: m_stopBits = 1;  // TODO - Implement 1.5 stop bits as 2 on receive, 1 on send
@@ -539,7 +539,7 @@ bool SoftwareSerial::calcParity(const uint8_t b, ParityMode parity) {
     }
 }
 
-int SoftwareSerial::peekParityError() {
+bool SoftwareSerial::peekParityError() {
 	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { 
 		return -1; 
 	}

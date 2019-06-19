@@ -164,7 +164,7 @@ void loop() {
 				expected = (expected + 1) % 256;
 			}
 			// Kludge to calculate number of data bits: 
-			uint8_t databits = 5 + ((swSerialConfig & SWSERIAL_NB_BIT_MASK) >> 3);
+			uint8_t databits = 5 + ((swSerialConfig & SWSERIAL_DB_MASK) >> 3);
 			if (r != (expected & ((1 << databits) - 1))) {
 				++rxErrors;
 			}
