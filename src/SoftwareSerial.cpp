@@ -62,7 +62,7 @@ void SoftwareSerial::begin(int32_t baud, int8_t rxPin, int8_t txPin,
 		m_isrBuffer = move(isrBuffer);
 		if (m_buffer != 0 && m_isrBuffer != 0) {
 			m_rxValid = true;
-			pinMode(m_rxPin, INPUT);
+			pinMode(m_rxPin, INPUT_PULLUP);
 		}
 	}
 	if (isValidGPIOpin(txPin)
@@ -126,7 +126,7 @@ void SoftwareSerial::enableTx(bool on) {
 			digitalWrite(m_txPin, !m_invert);
 		}
 		else {
-			pinMode(m_rxPin, INPUT);
+			pinMode(m_rxPin, INPUT_PULLUP);
 			enableRx(true);
 		}
 	}
