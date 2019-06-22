@@ -1,31 +1,28 @@
-//#ifdef ESP8266
-//#include <ESP8266WiFi.h>
-//#endif
-//#ifdef ESP32
-//#include "WiFi.h"
-//#endif
-
 #include <SoftwareSerial.h>
 
-// SoftwareSerial loopback for remote source (loopback.ino),
-// or hardware loopback, connect source D5 to local D8 (TX, 15), source D6 to local D7 (RX, 13).
+// On ESP8266:
+// SoftwareSerial loopback for remote source (loopback.ino), or hardware loopback.
+// Connect source D5 (rx) to local D8 (tx), source D6 (tx) to local D7 (rx).
 // Hint: The logger is run at 9600bps such that enableIntTx(true) can remain unchanged. Blocking
 // interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
-#define HWLOOPBACK 1
-#define HALFDUPLEX 1
+// On ESP32:
+// For software or hardware loopback, connect source rx to local D8 (tx), source tx to local D7 (rx).
 
-#ifndef RX
-#define RX 13
+#if defined(ESP32) && !defined(ARDUINO_D1_MINI32)
+#define D5 (14)
+#define D6 (12)
+#define D7 (13)
+#define D8 (15)
 #endif
-#ifndef TX
-#define TX 15
-#endif
+
+//#define HWLOOPBACK 1
+//#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 28800;
+constexpr int IUTBITRATE = 19200;
 #else
-constexpr int IUTBITRATE = 2400;
+constexpr int IUTBITRATE = 19200;
 #endif
 
 constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
@@ -38,29 +35,39 @@ String bitRateTxt("Effective data rate: ");
 int rxCount;
 int seqErrors;
 int expected;
-constexpr int ReportInterval = IUTBITRATE / 20;
+constexpr int ReportInterval = IUTBITRATE / 8;
 
 #ifdef HWLOOPBACK
-Stream& repeater(Serial);
-SoftwareSerial ssLogger(RX, TX);
-Stream& logger(ssLogger);
+#if defined(ESP8266)
+HardwareSerial& repeater(Serial);
+SoftwareSerial logger;
+#elif defined(ESP32)
+HardwareSerial& repeater(Serial2);
+HardwareSerial& logger(Serial);
+#endif
 #else
-SoftwareSerial repeater(14, 12, false, 2 * BLOCKSIZE);
-Stream& logger(Serial);
+SoftwareSerial repeater;
+HardwareSerial& logger(Serial);
 #endif
 
 void setup() {
-	//WiFi.mode(WIFI_OFF);
-	//WiFi.forceSleepBegin();
-	//delay(1);
-
 #ifdef HWLOOPBACK
-	Serial.begin(IUTBITRATE);
-	Serial.setRxBufferSize(2 * BLOCKSIZE);
-	Serial.swap();
-	ssLogger.begin(9600);
+#if defined(ESP8266)
+	repeater.begin(IUTBITRATE);
+	repeater.setRxBufferSize(2 * BLOCKSIZE);
+	repeater.swap();
+	logger.begin(9600, RX, TX);
+#elif defined(ESP32)
+	repeater.begin(IUTBITRATE, SERIAL_8N1, D7, D8);
+	repeater.setRxBufferSize(2 * BLOCKSIZE);
+	logger.begin(9600);
+#endif
 #else
-	repeater.begin(IUTBITRATE, swSerialConfig);
+#if defined(ESP8266)
+	repeater.begin(IUTBITRATE, D7, D8, swSerialConfig, false, 2 * BLOCKSIZE);
+#elif defined(ESP32)
+	repeater.begin(IUTBITRATE, D7, D8, swSerialConfig, false, 2 * BLOCKSIZE);
+#endif
 #ifdef HALFDUPLEX
 	repeater.enableIntTx(false);
 #endif
@@ -73,22 +80,17 @@ void setup() {
 }
 
 void loop() {
-	expected = -1;
-
 #ifdef HALFDUPLEX
 	unsigned char block[BLOCKSIZE];
+#endif
 	int inCnt = 0;
-	uint32_t deadline;
 	// starting deadline for the first bytes to come in
-	deadline = ESP.getCycleCount() + static_cast<uint32_t>(4 * 1000000 / IUTBITRATE * ESP.getCpuFreqMHz() * 10 * BLOCKSIZE);
-	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) {
-		if (!repeater.available()) {
-			delay(100);
+	uint32_t deadline = micros() + 200000;
+	while (static_cast<int32_t>(deadline - micros()) > 0) {
+		if (0 >= repeater.available()) {
+			delay(1);
 			continue;
 		}
-#else
-	while (repeater.available()) {
-#endif
 		int r = repeater.read();
 		if (r == -1) { logger.println("read() == -1"); }
 		if (expected == -1) { expected = r; }
@@ -97,31 +99,34 @@ void loop() {
 		}
 		if (r != (expected & ((1 << (5 + swSerialConfig % 4)) - 1))) {
 			++seqErrors;
+			expected = -1;
 		}
 		++rxCount;
-#if HALFDUPLEX
-		block[inCnt++] = expected;
-		if (inCnt >= BLOCKSIZE) { break; }
-		// wait for more outstanding bytes to trickle in
-		deadline = ESP.getCycleCount() + static_cast<uint32_t>(200 * 1000 * ESP.getCpuFreqMHz());
+#ifdef HALFDUPLEX
+		block[inCnt] = r;
 #else
-		repeater.write(expected);
+		repeater.write(r);
 #endif
+		if (++inCnt >= BLOCKSIZE) { break; }
+		// wait for more outstanding bytes to trickle in
+		deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 32);
 	}
 
 #ifdef HALFDUPLEX
+	repeater.write(block, inCnt);
+#endif
+
 	if (inCnt != 0 && inCnt != BLOCKSIZE) {
 		logger.print("Got "); logger.print(inCnt); logger.println(" bytes during buffer interval");
 	}
-	repeater.write(block, inCnt);
-#endif
 
 	if (rxCount >= ReportInterval) {
 		auto end = micros();
 		unsigned long interval = end - start;
 		long cps = rxCount * (1000000.0 / interval);
 		long seqErrorsps = seqErrors * (1000000.0 / interval);
-		logger.println(bitRateTxt + 10 * cps + "bps, " + seqErrorsps + "cps seq. errors");
+		logger.println(bitRateTxt + 10 * cps + "bps, "
+			+ seqErrorsps + "cps seq. errors (" + 100.0 * seqErrors / rxCount + "%)");
 		start = end;
 		rxCount = 0;
 		seqErrors = 0;

@@ -1,6 +1,6 @@
 # EspSoftwareSerial
 
-Implementation of the Arduino software serial library for the ESP8266
+Implementation of the Arduino software serial library for the ESP8266 / ESP32
 
 This fork implements interrupt service routine best practice.
 In the receive interrupt, instead of blocking for whole bytes
@@ -15,8 +15,8 @@ full duplex receives, with the SoftwareSerial::enableIntTx(false) function call.
 
 Same functionality is given as the corresponding AVR library but
 several instances can be active at the same time. Speed up to 115200 baud
-is supported. The constructor also has an optional input buffer size
-arguments.
+is supported. The constructor also has optional input buffer capacity
+arguments for byte buffer and ISR bit buffer.
 
 Please note that due to the fact that the ESP always have other activities
 ongoing, there will be some inexactness in interrupt timings. This may
@@ -29,7 +29,7 @@ Resource optimization
 The memory footprint can be optimized to just fit the amount of expected
 incoming asynchronous data.
 For this, the SoftwareSerial constructor provides two arguments. First, the
-octet buffer size for assembled received octets can be set. Read calls are
+octet buffer capacity for assembled received octets can be set. Read calls are
 satisfied from this buffer, freeing it in return.
 Second, the signal edge detection buffer of 32bit fields can be resized.
 One octet may require up to to 10 fields, but fewer may be needed,
@@ -48,31 +48,26 @@ the signal edge detection buffer to the octet buffer as soon as possible.
 Explaining by way of contrast, if during a a single write call, perhaps because
 of using block writing, more than a single octet is received, there will be a
 need for more than 10 fields in the signal edge detection buffer.
-The necessary size of the octet buffer only depends on the amount of incoming
+The necessary capacity of the octet buffer only depends on the amount of incoming
 data until the next read call.
 
 For the swsertest.ino example, this results in the following optimized
 constructor arguments to spend only the minimum RAM on buffers required:
 
-The octet buffer size (bufSize) is 93 (91 characters net plus two tolerance).
-The signal edge detection buffer (isrBufSize) is 10, as each octet has 10
-bits on the wire, which are immediately received during the write, and each
+The octet buffer capacity (bufCapacity) is 93 (91 characters net plus two tolerance).
+The signal edge detection buffer capacity (isrBufCapacity) is 10, as each octet has
+10 bits on the wire, which are immediately received during the write, and each
 write call causes the signal edge detection to promote the previously sent and
 received bits to the octet buffer.
 
 In a more generalized scenario, calculate the bits (use message size in octets
 times 10) that may be asynchronously received to determine the value for
-isrBufSize in the constructor. Also use the number of received octets
-that must be buffered for reading as the value of bufSize.
+isrBufCapacity in the constructor. Also use the number of received octets
+that must be buffered for reading as the value of bufCapacity.
 The more frequently your code calls write or read functions, the greater the
-chances are that you can reduce the isrBufSize footprint without losing data,
+chances are that you can reduce the isrBufCapacity footprint without losing data,
 and each time you call read to fetch from the octet buffer, you reduce the
 need for space there.
-
-The size of the tables needed for interrupt dispatch can be adapted to the
-actual maximum number of SoftwareSerial instances in a sketch.
-To reduce the memory footprint of these tables, define SOFTWARESERIAL_MAX_INSTS
-to the total number of SoftwareSerial objects your sketch uses.
 
 
 Updating EspSoftwareSerial in the esp8266com/esp8266 Arduino build environment
