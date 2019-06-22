@@ -16,7 +16,7 @@
 // Hardware Serial2 defaults to D4 (rx), D3 (tx).
 // For local hardware loopback, connect D5 (rx) to D3 (tx), D6 (tx) to D4 (rx).
 
-#if defined(ESP32) && !defined(ARDUINO_D1_MINI32)
+#if !defined(D5)
 #define D5 (14)
 #define D6 (12)
 #define D7 (13)
@@ -131,12 +131,11 @@ Serial.begin(9600);
 unsigned char c = 0;
 
 void loop() {
+#ifdef HALFDUPLEX
 	unsigned char block[BLOCKSIZE];
+#endif
 	unsigned char inBuf[BLOCKSIZE];
 	for (int i = 0; i < BLOCKSIZE; ++i) {
-		block[i] = c;
-		c = (c + 1) % 256;
-		++txCount;
 #ifndef HALFDUPLEX
 		serialIUT.write(c);
 #ifdef HWLOOPBACK
@@ -147,9 +146,13 @@ void loop() {
 			avail -= inCnt;
 		}
 #endif
-	}
 #else
+		block[i] = c;
+#endif
+		c = (c + 1) % 256;
+		++txCount;
 	}
+#ifdef HALFDUPLEX
 	serialIUT.write(block, BLOCKSIZE);
 #endif
 #ifdef HWSENDNSINK

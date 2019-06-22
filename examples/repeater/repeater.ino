@@ -9,7 +9,7 @@
 // On ESP32:
 // For software or hardware loopback, connect source rx to local D8 (tx), source tx to local D7 (rx).
 
-#if defined(ESP32) && !defined(ARDUINO_D1_MINI32)
+#if !defined(D5)
 #define D5 (14)
 #define D6 (12)
 #define D7 (13)
