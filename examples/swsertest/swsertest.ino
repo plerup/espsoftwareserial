@@ -4,6 +4,13 @@
 
 #include <SoftwareSerial.h>
 
+#if !defined(D5)
+#define D5 (14)
+#define D6 (12)
+#define D7 (13)
+#define D8 (15)
+#endif
+
 #ifdef ESP32
 #define BAUD_RATE 57600
 #else
