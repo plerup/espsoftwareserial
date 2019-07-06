@@ -1,5 +1,5 @@
 /*
-circular_queue.h - Implementation of a lock-free circular queue for EspSoftwareSerial.
+circular_queue_mp.h - Implementation of a lock-free circular queue for EspSoftwareSerial.
 Copyright (c) 2019 Dirk O. Kaar. All rights reserved.
 
 This library is free software; you can redistribute it and/or
