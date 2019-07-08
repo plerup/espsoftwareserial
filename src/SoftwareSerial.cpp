@@ -137,11 +137,7 @@ void SoftwareSerial::enableRx(bool on) {
 			m_rxCurBit = m_dataBits;
 			// Init to stop bit level and current cycle
 			m_isrLastCycle = (ESP.getCycleCount() | 1) ^ m_invert;
-#ifdef ESP8266
-			attachInterrupt(digitalPinToInterrupt(m_rxPin), std::bind(rxRead, this), CHANGE);
-#else
 			attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxRead), this, CHANGE);
-#endif
 		}
 		else {
 			detachInterrupt(digitalPinToInterrupt(m_rxPin));
