@@ -38,7 +38,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
             This implementation is lock-free between producer and consumer for the available(), peek(),
             pop(), and push() type functions.
 */
-template< typename T > class circular_queue
+template< typename T >
+class circular_queue
 {
 public:
     /*!
@@ -89,19 +90,7 @@ public:
         @return True if the new capacity could accommodate the present elements in
                 the queue, otherwise nothing is done and false is returned.
     */
-    bool capacity(const size_t cap)
-    {
-        if (cap + 1 == m_bufSize) return true;
-        else if (available() > cap) return false;
-        std::unique_ptr<T[] > buffer(new T[cap + 1]);
-        const auto available = pop_n(buffer, cap);
-        m_buffer.reset(buffer);
-        m_bufSize = cap + 1;
-        std::atomic_thread_fence(std::memory_order_release);
-        m_inPos.store(available, std::memory_order_relaxed);
-        m_outPos.store(0, std::memory_order_release);
-        return true;
-    }
+    bool capacity(const size_t cap);
 
     /*!
         @brief	Discard all data in the queue.
@@ -150,23 +139,7 @@ public:
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
-    bool IRAM_ATTR push(T&& val)
-    {
-        const auto inPos = m_inPos.load(std::memory_order_acquire);
-        const unsigned next = (inPos + 1) % m_bufSize;
-        if (next == m_outPos.load(std::memory_order_relaxed)) {
-            return false;
-        }
-
-        std::atomic_thread_fence(std::memory_order_acquire);
-
-        m_buffer[inPos] = std::move(val);
-
-        std::atomic_thread_fence(std::memory_order_release);
-
-        m_inPos.store(next, std::memory_order_release);
-        return true;
-    }
+    bool IRAM_ATTR push(T&& val);
 
     /*!
         @brief	Push a copy of the parameter into the queue.
@@ -184,91 +157,27 @@ public:
         @return The number of elements actually copied into the queue, counted
                 from the buffer head.
     */
-    size_t push_n(const T* buffer, size_t size)
-    {
-        const auto inPos = m_inPos.load(std::memory_order_acquire);
-        const auto outPos = m_outPos.load(std::memory_order_relaxed);
-
-        size_t blockSize = (outPos > inPos) ? outPos - 1 - inPos : (outPos == 0) ? m_bufSize - 1 - inPos : m_bufSize - inPos;
-        blockSize = std::min(size, blockSize);
-        if (!blockSize) return 0;
-        int next = (inPos + blockSize) % m_bufSize;
-
-        std::atomic_thread_fence(std::memory_order_acquire);
-
-        auto dest = m_buffer.get() + inPos;
-        std::copy_n(std::make_move_iterator(buffer), blockSize, dest);
-        size = std::min(size - blockSize, outPos > 1 ? static_cast<size_t>(outPos - next - 1) : 0);
-        next += size;
-        dest = m_buffer.get();
-        std::copy_n(std::make_move_iterator(buffer + blockSize), size, dest);
-
-        std::atomic_thread_fence(std::memory_order_release);
-
-        m_inPos.store(next, std::memory_order_release);
-        return blockSize + size;
-    }
+    size_t push_n(const T* buffer, size_t size);
 
     /*!
         @brief	Pop the next available element from the queue.
         @return An rvalue copy of the popped element, or a default
                 value of type T if the queue is empty.
     */
-    T pop()
-    {
-        const auto outPos = m_outPos.load(std::memory_order_acquire);
-        if (m_inPos.load(std::memory_order_relaxed) == outPos) return defaultValue;
-
-        std::atomic_thread_fence(std::memory_order_acquire);
-
-        auto val = std::move(m_buffer[outPos]);
-
-        std::atomic_thread_fence(std::memory_order_release);
-
-        m_outPos.store((outPos + 1) % m_bufSize, std::memory_order_release);
-        return val;
-    }
+    T pop();
 
     /*!
         @brief	Pop multiple elements in ordered sequence from the queue to a buffer.
         @return The number of elements actually popped from the queue to
                 buffer.
     */
-    size_t pop_n(T* buffer, size_t size) {
-        size_t avail = size = std::min(size, available());
-        if (!avail) return 0;
-        const auto outPos = m_outPos.load(std::memory_order_acquire);
-        size_t n = std::min(avail, static_cast<size_t>(m_bufSize - outPos));
-
-        std::atomic_thread_fence(std::memory_order_acquire);
-
-        buffer = std::copy_n(std::make_move_iterator(m_buffer.get() + outPos), n, buffer);
-        avail -= n;
-        std::copy_n(std::make_move_iterator(m_buffer.get()), avail, buffer);
-
-        std::atomic_thread_fence(std::memory_order_release);
-
-        m_outPos.store((outPos + size) % m_bufSize, std::memory_order_release);
-        return size;
-    }
+    size_t pop_n(T* buffer, size_t size);
 
     /*!
         @brief	Iterate over and remove each available element from queue,
                 calling back fun with an rvalue reference of every single element.
     */
-    void for_each(std::function<void(T&&)> fun)
-    {
-        auto outPos = m_outPos.load(std::memory_order_acquire);
-        const auto inPos = m_inPos.load(std::memory_order_relaxed);
-        std::atomic_thread_fence(std::memory_order_acquire);
-        while (outPos != inPos)
-        {
-            fun(std::move(m_buffer[outPos]));
-            std::atomic_thread_fence(std::memory_order_release);
-            outPos = (outPos + 1) % m_bufSize;
-            m_outPos.store(outPos, std::memory_order_release);
-        }
-    }
+    void for_each(std::function<void(T&&)> fun);
 
 protected:
     const T defaultValue = {};
@@ -277,5 +186,115 @@ protected:
     std::atomic<unsigned> m_inPos;
     std::atomic<unsigned> m_outPos;
 };
+
+template< typename T >
+bool circular_queue<T>::capacity(const size_t cap)
+{
+    if (cap + 1 == m_bufSize) return true;
+    else if (available() > cap) return false;
+    std::unique_ptr<T[] > buffer(new T[cap + 1]);
+    const auto available = pop_n(buffer, cap);
+    m_buffer.reset(buffer);
+    m_bufSize = cap + 1;
+    std::atomic_thread_fence(std::memory_order_release);
+    m_inPos.store(available, std::memory_order_relaxed);
+    m_outPos.store(0, std::memory_order_release);
+    return true;
+}
+
+template< typename T >
+bool IRAM_ATTR circular_queue<T>::push(T&& val)
+{
+    const auto inPos = m_inPos.load(std::memory_order_acquire);
+    const unsigned next = (inPos + 1) % m_bufSize;
+    if (next == m_outPos.load(std::memory_order_relaxed)) {
+        return false;
+    }
+
+    std::atomic_thread_fence(std::memory_order_acquire);
+
+    m_buffer[inPos] = std::move(val);
+
+    std::atomic_thread_fence(std::memory_order_release);
+
+    m_inPos.store(next, std::memory_order_release);
+    return true;
+}
+
+template< typename T >
+size_t circular_queue<T>::push_n(const T* buffer, size_t size)
+{
+    const auto inPos = m_inPos.load(std::memory_order_acquire);
+    const auto outPos = m_outPos.load(std::memory_order_relaxed);
+
+    size_t blockSize = (outPos > inPos) ? outPos - 1 - inPos : (outPos == 0) ? m_bufSize - 1 - inPos : m_bufSize - inPos;
+    blockSize = std::min(size, blockSize);
+    if (!blockSize) return 0;
+    int next = (inPos + blockSize) % m_bufSize;
+
+    std::atomic_thread_fence(std::memory_order_acquire);
+
+    auto dest = m_buffer.get() + inPos;
+    std::copy_n(std::make_move_iterator(buffer), blockSize, dest);
+    size = std::min(size - blockSize, outPos > 1 ? static_cast<size_t>(outPos - next - 1) : 0);
+    next += size;
+    dest = m_buffer.get();
+    std::copy_n(std::make_move_iterator(buffer + blockSize), size, dest);
+
+    std::atomic_thread_fence(std::memory_order_release);
+
+    m_inPos.store(next, std::memory_order_release);
+    return blockSize + size;
+}
+
+template< typename T >
+T circular_queue<T>::pop()
+{
+    const auto outPos = m_outPos.load(std::memory_order_acquire);
+    if (m_inPos.load(std::memory_order_relaxed) == outPos) return defaultValue;
+
+    std::atomic_thread_fence(std::memory_order_acquire);
+
+    auto val = std::move(m_buffer[outPos]);
+
+    std::atomic_thread_fence(std::memory_order_release);
+
+    m_outPos.store((outPos + 1) % m_bufSize, std::memory_order_release);
+    return val;
+}
+
+template< typename T >
+size_t circular_queue<T>::pop_n(T* buffer, size_t size) {
+    size_t avail = size = std::min(size, available());
+    if (!avail) return 0;
+    const auto outPos = m_outPos.load(std::memory_order_acquire);
+    size_t n = std::min(avail, static_cast<size_t>(m_bufSize - outPos));
+
+    std::atomic_thread_fence(std::memory_order_acquire);
+
+    buffer = std::copy_n(std::make_move_iterator(m_buffer.get() + outPos), n, buffer);
+    avail -= n;
+    std::copy_n(std::make_move_iterator(m_buffer.get()), avail, buffer);
+
+    std::atomic_thread_fence(std::memory_order_release);
+
+    m_outPos.store((outPos + size) % m_bufSize, std::memory_order_release);
+    return size;
+}
+
+template< typename T >
+void circular_queue<T>::for_each(std::function<void(T&&)> fun)
+{
+    auto outPos = m_outPos.load(std::memory_order_acquire);
+    const auto inPos = m_inPos.load(std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_acquire);
+    while (outPos != inPos)
+    {
+        fun(std::move(m_buffer[outPos]));
+        std::atomic_thread_fence(std::memory_order_release);
+        outPos = (outPos + 1) % m_bufSize;
+        m_outPos.store(outPos, std::memory_order_release);
+    }
+}
 
 #endif // __circular_queue_h
