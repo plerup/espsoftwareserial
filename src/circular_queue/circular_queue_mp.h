@@ -34,7 +34,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
             pop(), and push() type functions, but is guarded to safely allow only a single producer
             at any instant.
 */
-template< typename T > class circular_queue_mp : protected circular_queue<T>
+template< typename T >
+class circular_queue_mp : protected circular_queue<T>
 {
 public:
     circular_queue_mp() = default;
@@ -118,24 +119,7 @@ public:
         @return A reference to the just requeued element, or the default
                 value of type T if the queue is empty.
     */
-    T& pop_requeue()
-    {
-#ifdef ESP8266
-        esp8266::InterruptLock lock;
-#else
-        std::lock_guard<std::mutex> lock(m_pushMtx);
-#endif
-        const auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_acquire);
-        const auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
-        std::atomic_thread_fence(std::memory_order_acquire);
-        if (inPos == outPos) return circular_queue<T>::defaultValue;
-        T& val = circular_queue<T>::m_buffer[inPos] = std::move(circular_queue<T>::m_buffer[outPos]);
-        const auto bufSize = circular_queue<T>::m_bufSize;
-        std::atomic_thread_fence(std::memory_order_release);
-        circular_queue<T>::m_outPos.store((outPos + 1) % bufSize, std::memory_order_relaxed);
-        circular_queue<T>::m_inPos.store((inPos + 1) % bufSize, std::memory_order_release);
-        return val;
-    }
+    T& pop_requeue();
 
     /*!
         @brief	Iterate over, pop and optionally requeue each available element from the queue,
@@ -143,42 +127,65 @@ public:
                 Requeuing is dependent on the return boolean of the callback function. If it
                 returns true, the requeue occurs.
     */
-    bool for_each_requeue(std::function<bool(T&)> fun)
-    {
-        auto inPos0 = circular_queue<T>::m_inPos.load(std::memory_order_acquire);
-        auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
-        std::atomic_thread_fence(std::memory_order_acquire);
-        if (outPos == inPos0) return false;
-        do {
-            T& val = circular_queue<T>::m_buffer[outPos];
-            if (fun(val))
-            {
-#ifdef ESP8266
-                esp8266::InterruptLock lock;
-#else
-                std::lock_guard<std::mutex> lock(m_pushMtx);
-#endif
-                std::atomic_thread_fence(std::memory_order_release);
-                auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
-                std::atomic_thread_fence(std::memory_order_acquire);
-                circular_queue<T>::m_buffer[inPos] = std::move(val);
-                std::atomic_thread_fence(std::memory_order_release);
-                circular_queue<T>::m_inPos.store((inPos + 1) % circular_queue<T>::m_bufSize, std::memory_order_release);
-            }
-            else
-            {
-                std::atomic_thread_fence(std::memory_order_release);
-            }
-            outPos = (outPos + 1) % circular_queue<T>::m_bufSize;
-            circular_queue<T>::m_outPos.store(outPos, std::memory_order_release);
-        } while (outPos != inPos0);
-        return true;
-    }
+    bool for_each_requeue(std::function<bool(T&)> fun);
 
 #ifndef ESP8266
 protected:
     std::mutex m_pushMtx;
 #endif
 };
+
+template< typename T >
+T& circular_queue_mp<T>::pop_requeue()
+{
+#ifdef ESP8266
+    esp8266::InterruptLock lock;
+#else
+    std::lock_guard<std::mutex> lock(m_pushMtx);
+#endif
+    const auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_acquire);
+    const auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_acquire);
+    if (inPos == outPos) return circular_queue<T>::defaultValue;
+    T& val = circular_queue<T>::m_buffer[inPos] = std::move(circular_queue<T>::m_buffer[outPos]);
+    const auto bufSize = circular_queue<T>::m_bufSize;
+    std::atomic_thread_fence(std::memory_order_release);
+    circular_queue<T>::m_outPos.store((outPos + 1) % bufSize, std::memory_order_relaxed);
+    circular_queue<T>::m_inPos.store((inPos + 1) % bufSize, std::memory_order_release);
+    return val;
+}
+
+template< typename T >
+bool circular_queue_mp<T>::for_each_requeue(std::function<bool(T&)> fun)
+{
+    auto inPos0 = circular_queue<T>::m_inPos.load(std::memory_order_acquire);
+    auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_acquire);
+    if (outPos == inPos0) return false;
+    do {
+        T& val = circular_queue<T>::m_buffer[outPos];
+        if (fun(val))
+        {
+#ifdef ESP8266
+            esp8266::InterruptLock lock;
+#else
+            std::lock_guard<std::mutex> lock(m_pushMtx);
+#endif
+            std::atomic_thread_fence(std::memory_order_release);
+            auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
+            std::atomic_thread_fence(std::memory_order_acquire);
+            circular_queue<T>::m_buffer[inPos] = std::move(val);
+            std::atomic_thread_fence(std::memory_order_release);
+            circular_queue<T>::m_inPos.store((inPos + 1) % circular_queue<T>::m_bufSize, std::memory_order_release);
+        }
+        else
+        {
+            std::atomic_thread_fence(std::memory_order_release);
+        }
+        outPos = (outPos + 1) % circular_queue<T>::m_bufSize;
+        circular_queue<T>::m_outPos.store(outPos, std::memory_order_release);
+    } while (outPos != inPos0);
+    return true;
+}
 
 #endif // __circular_queue_mp_h
