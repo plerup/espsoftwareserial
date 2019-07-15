@@ -137,7 +137,7 @@ void SoftwareSerial::enableRx(bool on) {
 			m_rxCurBit = m_dataBits;
 			// Init to stop bit level and current cycle
 			m_isrLastCycle = (ESP.getCycleCount() | 1) ^ m_invert;
-			attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxRead), this, CHANGE);
+			attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitISR), this, CHANGE);
 		}
 		else {
 			detachInterrupt(digitalPinToInterrupt(m_rxPin));
@@ -357,7 +357,7 @@ void SoftwareSerial::rxBits(const uint32_t& isrCycle) {
 	}
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead(SoftwareSerial * self) {
+void ICACHE_RAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial * self) {
 	uint32_t curCycle = ESP.getCycleCount();
 	bool level = digitalRead(self->m_rxPin);
 
