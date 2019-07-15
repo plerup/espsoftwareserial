@@ -111,7 +111,7 @@ private:
 	void rxBits();
 	void rxBits(const uint32_t& isrCycle);
 
-	static void rxRead(SoftwareSerial* self);
+	static void rxBitISR(SoftwareSerial* self);
 
 	// Member variables
 	bool m_oneWire;
