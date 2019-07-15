@@ -86,8 +86,6 @@ public:
 	// One wire control
 	void enableTx(bool on);
 
-	static void rxRead(SoftwareSerial* self);
-
 	// AVR compatibility methods
 	bool listen() { enableRx(true); return true; }
 	void end();
@@ -100,7 +98,7 @@ public:
 	using Print::write;
 
 private:
-	// If asyn, its legal to exceed the deadline, for instance,
+	// If asyn, it's legal to exceed the deadline, for instance,
 	// by enabling interrupts.
 	void preciseDelay(uint32_t deadline, bool asyn, uint32_t savedPS);
 	// If withStopBit is set, either cycle contains a stop bit.
@@ -112,6 +110,8 @@ private:
 	/* check m_rxValid that calling is safe */
 	void rxBits();
 	void rxBits(const uint32_t& isrCycle);
+
+	static void rxRead(SoftwareSerial* self);
 
 	// Member variables
 	bool m_oneWire;
