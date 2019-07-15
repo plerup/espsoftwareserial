@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <Stream.h>
 #include <functional>
 
-// If only one tx or rx wanted then use this as parameter for the unused pin
+/// If only one tx or rx wanted then use this as parameter for the unused pin.
 constexpr int SW_SERIAL_UNUSED_PIN = -1;
 
 enum SoftwareSerialConfig {
@@ -38,11 +38,10 @@ enum SoftwareSerialConfig {
 	SWSERIAL_8N1,
 };
 
-// This class is compatible with the corresponding AVR one,
-// the constructor however has optional rx buffer capacity arguments
-// for byte buffer and ISR bit buffer.
-// Baudrates up to 115200 can be used.
-
+/// This class is compatible with the corresponding AVR one,
+/// the constructor however has optional rx buffer capacity arguments
+/// for byte buffer and ISR bit buffer.
+/// Baudrates up to 115200 can be used.
 class SoftwareSerial : public Stream {
 public:
 	SoftwareSerial();
@@ -54,9 +53,9 @@ public:
 		bool invert = false, int bufCapacity = 64, int isrBufCapacity = 0);
 	void begin(int32_t baud, SoftwareSerialConfig config) = delete;
 	int32_t baudRate();
-	// Transmit control pin
+	/// Transmit control pin.
 	void setTransmitEnablePin(int8_t txEnablePin);
-	// Enable or disable interrupts during tx
+	/// Enable or disable interrupts during tx.
 	void enableIntTx(bool on);
 
 	bool overflow();
@@ -68,8 +67,9 @@ public:
 	}
 	int peek() override;
 	int read() override;
-	// The readBytes functions are non-waiting, there is no timeout.
+	/// The readBytes functions are non-waiting, there is no timeout.
 	size_t readBytes(uint8_t* buffer, size_t size) override;
+	/// The readBytes functions are non-waiting, there is no timeout.
 	size_t readBytes(char* buffer, size_t size) override {
 		return readBytes(reinterpret_cast<uint8_t*>(buffer), size);
 	}
@@ -81,18 +81,22 @@ public:
 	}
 	operator bool() const { return m_rxValid || m_txValid; }
 
-	// Disable or enable interrupts on the rx pin
+	/// Disable or enable interrupts on the rx pin.
 	void enableRx(bool on);
-	// One wire control
+	/// One wire control.
 	void enableTx(bool on);
 
-	// AVR compatibility methods
+	// AVR compatibility methods.
 	bool listen() { enableRx(true); return true; }
 	void end();
 	bool isListening() { return m_rxEnabled; }
 	bool stopListening() { enableRx(false); return true; }
 
+	/// Set an event handler for received data.
 	void onReceive(std::function<void(int available)> handler);
+
+	/// Run the internal processing and event engine. Can be iteratively called
+	/// from loop, or otherwise scheduled.
 	void perform_work();
 
 	using Print::write;
