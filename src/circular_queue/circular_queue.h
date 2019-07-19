@@ -20,7 +20,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __circular_queue_h
 #define __circular_queue_h
 
+#ifdef ARDUINO
 #include <Arduino.h>
+#endif
 #include <atomic>
 #include <memory>
 #include <algorithm>
