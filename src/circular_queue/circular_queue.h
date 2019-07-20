@@ -28,9 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <algorithm>
 #include <functional>
 
-#ifdef ESP32
-#include <esp_attr.h>
-#elif !defined(ESP8266)
+#if !defined(ESP32) && !defined(ESP8266)
 #define ICACHE_RAM_ATTR
 #define IRAM_ATTR
 #endif
@@ -105,7 +103,7 @@ public:
     /*!
         @brief	Get a snapshot number of elements that can be retrieved by pop.
     */
-    size_t available() const
+    size_t IRAM_ATTR available() const
     {
         int avail = static_cast<int>(m_inPos.load() - m_outPos.load());
         if (avail < 0) avail += m_bufSize;
@@ -166,7 +164,7 @@ public:
         @return An rvalue copy of the popped element, or a default
                 value of type T if the queue is empty.
     */
-    T pop();
+    T IRAM_ATTR pop();
 
     /*!
         @brief	Pop multiple elements in ordered sequence from the queue to a buffer.
@@ -250,7 +248,7 @@ size_t circular_queue<T>::push_n(const T* buffer, size_t size)
 }
 
 template< typename T >
-T circular_queue<T>::pop()
+T IRAM_ATTR circular_queue<T>::pop()
 {
     const auto outPos = m_outPos.load(std::memory_order_acquire);
     if (m_inPos.load(std::memory_order_relaxed) == outPos) return defaultValue;
