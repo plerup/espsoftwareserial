@@ -52,6 +52,7 @@ public:
     using circular_queue<T>::pop;
     using circular_queue<T>::pop_n;
     using circular_queue<T>::for_each;
+    using circular_queue<T>::for_each_rev_requeue;
 
     /*!
         @brief	Resize the queue. The available elements in the queue are preserved.
@@ -129,14 +130,6 @@ public:
     */
     bool for_each_requeue(const std::function<bool(T&)>& fun);
 
-    /*!
-        @brief	In reverse order, iterate over, pop and optionally requeue each available element from the queue,
-                calling back fun with a reference of every single element.
-                Requeuing is dependent on the return boolean of the callback function. If it
-                returns true, the requeue occurs.
-    */
-    bool for_each_rev_requeue(const std::function<bool(T&)>& fun);
-
 #ifndef ESP8266
 protected:
     std::mutex m_pushMtx;
@@ -193,29 +186,6 @@ bool circular_queue_mp<T>::for_each_requeue(const std::function<bool(T&)>& fun)
         outPos = (outPos + 1) % circular_queue<T>::m_bufSize;
         circular_queue<T>::m_outPos.store(outPos, std::memory_order_release);
     } while (outPos != inPos0);
-    return true;
-}
-
-template< typename T >
-bool circular_queue_mp<T>::for_each_rev_requeue(const std::function<bool(T&)>& fun)
-{
-    auto inPos0 = circular_queue<T>::m_inPos.load(std::memory_order_acquire);
-    auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
-    std::atomic_thread_fence(std::memory_order_acquire);
-    if (outPos == inPos0) return false;
-    auto pos = inPos0;
-    auto outPos1 = inPos0;
-	const auto posDecr = circular_queue<T>::m_bufSize - 1;
-    do {
-        pos = (pos + posDecr) % circular_queue<T>::m_bufSize;
-        T&& val = std::move(circular_queue<T>::m_buffer[pos]);
-        if (fun(val))
-        {
-            outPos1 = (outPos1 + posDecr) % circular_queue<T>::m_bufSize;
-            if (outPos1 != pos) circular_queue<T>::m_buffer[outPos1] = std::move(val);
-        }
-    } while (pos != outPos);
-    circular_queue<T>::m_outPos.store(outPos1, std::memory_order_release);
     return true;
 }
 
