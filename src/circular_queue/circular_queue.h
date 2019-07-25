@@ -177,7 +177,7 @@ public:
         @brief	Iterate over and remove each available element from queue,
                 calling back fun with an rvalue reference of every single element.
     */
-    void for_each(std::function<void(T&&)> fun);
+    void for_each(const std::function<void(T&&)>& fun);
 
     /*!
         @brief	In reverse order, iterate over, pop and optionally requeue each available element from the queue,
@@ -291,7 +291,7 @@ size_t circular_queue<T>::pop_n(T* buffer, size_t size) {
 }
 
 template< typename T >
-void circular_queue<T>::for_each(std::function<void(T&&)> fun)
+void circular_queue<T>::for_each(const std::function<void(T&&)>& fun)
 {
     auto outPos = m_outPos.load(std::memory_order_acquire);
     const auto inPos = m_inPos.load(std::memory_order_relaxed);
