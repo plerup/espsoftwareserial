@@ -67,12 +67,21 @@ public:
 	}
 	int peek() override;
 	int read() override;
+	#ifdef ESP32
+	/// The readBytes functions are non-waiting, there is no timeout.
+	size_t readBytes(uint8_t* buffer, size_t size) ;
+	/// The readBytes functions are non-waiting, there is no timeout.
+	size_t readBytes(char* buffer, size_t size) {
+		return readBytes(reinterpret_cast<uint8_t*>(buffer), size);
+	}
+	#else
 	/// The readBytes functions are non-waiting, there is no timeout.
 	size_t readBytes(uint8_t* buffer, size_t size) override;
 	/// The readBytes functions are non-waiting, there is no timeout.
 	size_t readBytes(char* buffer, size_t size) override {
 		return readBytes(reinterpret_cast<uint8_t*>(buffer), size);
 	}
+	#endif 
 	void flush() override;
 	size_t write(uint8_t byte) override;
 	size_t write(const uint8_t* buffer, size_t size) override;
