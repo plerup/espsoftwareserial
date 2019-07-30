@@ -67,7 +67,15 @@ public:
         return 1;
     }
     int peek() override;
+    bool peekParity()
+    {
+        return m_parityBuffer->peek() & m_parityOutPos;
+    }
     int read() override;
+    bool parity()
+    {
+        return m_lastReadParity;
+    }
     /// The readBytes functions are non-waiting, there is no timeout.
     size_t readBytes(uint8_t* buffer, size_t size) override;
     /// The readBytes functions are non-waiting, there is no timeout.
@@ -136,6 +144,10 @@ private:
     uint32_t m_periodDuration;
     bool m_intTxEnabled;
     std::unique_ptr<circular_queue<uint8_t> > m_buffer;
+    std::unique_ptr<circular_queue<uint8_t> > m_parityBuffer;
+    uint8_t m_parityInPos;
+    uint8_t m_parityOutPos;
+    bool m_lastReadParity;
     // the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
     // 1 = positive including 0, 0 = negative.
     std::unique_ptr<circular_queue<uint32_t> > m_isrBuffer;

@@ -57,9 +57,12 @@ void SoftwareSerial::begin(uint32_t baud, int8_t rxPin, int8_t txPin,
         m_rxPin = rxPin;
         std::unique_ptr<circular_queue<uint8_t> > buffer(new circular_queue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
         m_buffer = move(buffer);
+        std::unique_ptr<circular_queue<uint8_t> > parityBuffer(new circular_queue<uint8_t>((bufCapacity > 0) ? (bufCapacity + 7) / 8 : 8));
+        m_parityBuffer = move(parityBuffer);
+        m_parityInPos = m_parityOutPos = 1;
         std::unique_ptr<circular_queue<uint32_t> > isrBuffer(new circular_queue<uint32_t>((isrBufCapacity > 0) ? isrBufCapacity : (sizeof(uint8_t) * 8 + 2) * bufCapacity));
         m_isrBuffer = move(isrBuffer);
-        if (m_buffer != 0 && m_isrBuffer != 0) {
+        if (m_buffer && m_parityBuffer && m_isrBuffer) {
             m_rxValid = true;
             pinMode(m_rxPin, INPUT_PULLUP);
         }
@@ -91,6 +94,9 @@ void SoftwareSerial::end()
     m_txValid = false;
     if (m_buffer) {
         m_buffer.reset();
+    }
+    if (m_parityBuffer) {
+        m_parityBuffer.reset();
     }
     if (m_isrBuffer) {
         m_isrBuffer.reset();
@@ -152,10 +158,18 @@ int SoftwareSerial::read() {
         rxBits();
         if (!m_buffer->available()) { return -1; }
     }
+    m_lastReadParity = m_parityBuffer->peek() & m_parityOutPos;
+    m_parityOutPos <<= 1;
+    if (!m_parityOutPos)
+    {
+        m_parityBuffer->pop();
+        m_parityOutPos = 1;
+    }
     return m_buffer->pop();
 }
 
 size_t SoftwareSerial::readBytes(uint8_t * buffer, size_t size) {
+    // TODO Parity: synchronize parity buffer with removed data bytes - discard parity.
     if (!m_rxValid) { return -1; }
     if (0 != (size = m_buffer->pop_n(buffer, size))) return size;
     rxBits();
@@ -276,6 +290,8 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
 void SoftwareSerial::flush() {
     if (!m_rxValid) { return; }
     m_buffer->flush();
+    m_parityBuffer->flush();
+    m_parityInPos = m_parityOutPos = 1;
 }
 
 bool SoftwareSerial::overflow() {
@@ -299,7 +315,7 @@ void SoftwareSerial::rxBits() {
     if (m_isrOverflow.load()) {
         m_overflow = true;
         m_isrOverflow.store(false);
-}
+    }
 #else
     if (m_isrOverflow.exchange(false)) {
         m_overflow = true;
@@ -354,7 +370,22 @@ void SoftwareSerial::rxBits(const uint32_t & isrCycle) {
             // if not high stop bit level, discard word
             if (level)
             {
-                m_buffer->push(m_rxCurByte >> (sizeof(uint8_t) * 8 - m_dataBits));
+                uint8_t octet = m_rxCurByte >> (sizeof(uint8_t) * 8 - m_dataBits);
+                m_buffer->push(octet);
+                octet ^= octet >> 4;
+                octet &= 0xf;
+                if ((0x6996 >> octet) & 1) {
+                    m_parityBuffer->pushpeek() |= m_parityInPos;
+                }
+                else {
+                    m_parityBuffer->pushpeek() &= ~m_parityInPos;
+                }
+                m_parityInPos <<= 1;
+                if (!m_parityInPos)
+                {
+                    m_parityBuffer->push();
+                    m_parityInPos = 1;
+                }
             }
             ++m_rxCurBit;
             // reset to 0 is important for masked bit logic
