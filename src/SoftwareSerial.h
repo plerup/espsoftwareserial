@@ -67,11 +67,8 @@ public:
         return 1;
     }
     int peek() override;
-    bool peekParity()
-    {
-        return m_parityBuffer->peek() & m_parityOutPos;
-    }
     int read() override;
+    // The parity bit associated with the last read() or peek() call
     bool parity()
     {
         return m_lastReadParity;
