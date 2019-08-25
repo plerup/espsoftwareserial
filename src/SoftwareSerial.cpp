@@ -49,7 +49,7 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 #endif
 }
 
-void SoftwareSerial::begin(int32_t baud, int8_t rxPin, int8_t txPin,
+void SoftwareSerial::begin(uint32_t baud, int8_t rxPin, int8_t txPin,
     SoftwareSerialConfig config, bool invert, int bufCapacity, int isrBufCapacity) {
     m_oneWire = (rxPin == txPin);
     m_invert = invert;
@@ -97,7 +97,7 @@ void SoftwareSerial::end()
     }
 }
 
-int32_t SoftwareSerial::baudRate() {
+uint32_t SoftwareSerial::baudRate() {
     return ESP.getCpuFreqMHz() * 1000000 / m_bitCycles;
 }
 
@@ -173,18 +173,23 @@ int SoftwareSerial::available() {
     return avail;
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool asyn, uint32_t savedPS) {
+void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool asyn, uint32_t savedPS) {
     if (asyn && !m_intTxEnabled) { xt_wsr_ps(savedPS); }
-    int32_t micro_s = static_cast<int32_t>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
+    auto expired = ESP.getCycleCount() - m_periodStart;
+    auto micro_s = expired < m_periodDuration ? (m_periodDuration - expired) / ESP.getCpuFreqMHz() : 0;
     if (asyn) {
-        if (micro_s > 0) delay(micro_s / 1000);
+        if (micro_s) delay(micro_s / 1000);
     }
     else
     {
         if (micro_s > m_bit_us) delayMicroseconds(micro_s - m_bit_us);
     }
-    while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) { if (asyn) optimistic_yield(10000); }
-    if (asyn) m_periodDeadline = ESP.getCycleCount();
+    while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { if (asyn) optimistic_yield(10000); }
+    if (asyn)
+    {
+        m_periodStart = ESP.getCycleCount();
+        m_periodDuration = 0;
+    }
     if (asyn && !m_intTxEnabled) { savedPS = xt_rsil(15); }
 }
 
@@ -192,18 +197,18 @@ void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
     uint32_t dutyCycle, uint32_t offCycle, bool withStopBit, uint32_t savedPS) {
     if (dutyCycle) {
         digitalWrite(m_txPin, HIGH);
-        m_periodDeadline += dutyCycle;
+        m_periodDuration += dutyCycle;
         bool asyn = withStopBit && !m_invert;
         // Reenable interrupts while delaying to avoid other tasks piling up
-        preciseDelay(m_periodDeadline, asyn, savedPS);
+        preciseDelay(asyn, savedPS);
         // Disable interrupts again
     }
     if (offCycle) {
         digitalWrite(m_txPin, LOW);
-        m_periodDeadline += offCycle;
+        m_periodDuration += offCycle;
         bool asyn = withStopBit && m_invert;
         // Reenable interrupts while delaying to avoid other tasks piling up
-        preciseDelay(m_periodDeadline, asyn, savedPS);
+        preciseDelay(asyn, savedPS);
         // Disable interrupts again
     }
 }
@@ -229,7 +234,8 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
         // Disable interrupts in order to get a clean transmit timing
         savedPS = xt_rsil(15);
     }
-    m_periodDeadline = ESP.getCycleCount();
+    m_periodStart = ESP.getCycleCount();
+    m_periodDuration = 0;
     const uint32_t dataMask = ((1UL << m_dataBits) - 1);
     for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
         bool withStopBit = true;
@@ -303,11 +309,11 @@ void SoftwareSerial::rxBits() {
     // and there was also no next start bit yet, so one byte may be pending.
     // low-cost check first
     if (!isrAvail && m_rxCurBit >= -1 && m_rxCurBit < m_dataBits) {
-        uint32_t expectedCycle = m_isrLastCycle + (m_dataBits - m_rxCurBit) * m_bitCycles;
-        if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > 0) {
+        uint32_t detectionCycles = (m_dataBits - m_rxCurBit) * m_bitCycles;
+        if (ESP.getCycleCount() - m_isrLastCycle > detectionCycles) {
             // Produce faux stop bit level, prevents start bit maldetection
             // cycle's LSB is repurposed for the level bit
-            rxBits((expectedCycle | 1) ^ m_invert);
+            rxBits(((m_isrLastCycle + detectionCycles) | 1) ^ m_invert);
         }
     }
 

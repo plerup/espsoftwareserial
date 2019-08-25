@@ -48,11 +48,10 @@ public:
     SoftwareSerial(const SoftwareSerial&) = delete;
     SoftwareSerial& operator= (const SoftwareSerial&) = delete;
     virtual ~SoftwareSerial();
-    void begin(int32_t baud, int8_t rxPin, int8_t txPin = -1,
+    void begin(uint32_t baud, int8_t rxPin, int8_t txPin = -1,
         SoftwareSerialConfig config = SWSERIAL_8N1,
         bool invert = false, int bufCapacity = 64, int isrBufCapacity = 0);
-    void begin(int32_t baud, SoftwareSerialConfig config) = delete;
-    int32_t baudRate();
+    uint32_t baudRate();
     /// Transmit control pin.
     void setTransmitEnablePin(int8_t txEnablePin);
     /// Enable or disable interrupts during tx.
@@ -104,7 +103,7 @@ public:
 private:
     // If asyn, it's legal to exceed the deadline, for instance,
     // by enabling interrupts.
-    void preciseDelay(uint32_t deadline, bool asyn, uint32_t savedPS);
+    void preciseDelay(bool asyn, uint32_t savedPS);
     // If withStopBit is set, either cycle contains a stop bit.
     // If dutyCycle == 0, the level is not forced to HIGH.
     // If offCycle == 0, the level remains unchanged from dutyCycle.
@@ -128,10 +127,11 @@ private:
     bool m_txEnableValid = false;
     bool m_invert;
     bool m_overflow = false;
-    int8_t m_dataBits;
-    int32_t m_bit_us;
-    int32_t m_bitCycles;
-    uint32_t m_periodDeadline;
+    uint8_t m_dataBits;
+    uint32_t m_bit_us;
+    uint32_t m_bitCycles;
+    uint32_t m_periodStart;
+    uint32_t m_periodDuration;
     bool m_intTxEnabled;
     std::unique_ptr<circular_queue<uint8_t> > m_buffer;
     // the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
