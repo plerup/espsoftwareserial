@@ -23,17 +23,21 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef ARDUINO
 #include <Arduino.h>
 #endif
+
+#if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
 #include <atomic>
 #include <memory>
 #include <algorithm>
 #include <functional>
+using std::min;
+#else
+#include "ghostl.h"
+#endif
 
 #if !defined(ESP32) && !defined(ESP8266)
 #define ICACHE_RAM_ATTR
 #define IRAM_ATTR
 #endif
-
-using std::min;
 
 /*!
     @brief	Instance class for a single-producer, single-consumer circular queue / ring buffer (FIFO).
@@ -123,18 +127,34 @@ public:
     }
 
     /*!
-        @brief	Peek at the next element pop returns without removing it from the queue.
-        @return An rvalue copy of the next element that can be popped, or a default
-                value of type T if the queue is empty.
+        @brief	Peek at the next element pop will return without removing it from the queue.
+        @return An rvalue copy of the next element that can be popped. If the queue is empty,
+                return an rvalue copy of the element that is pending the next push.
     */
     T peek() const
     {
-        const auto outPos = m_outPos.load(std::memory_order_acquire);
+        const auto outPos = m_outPos.load(std::memory_order_relaxed);
+        std::atomic_thread_fence(std::memory_order_acquire);
+        return m_buffer[outPos];
+    }
+
+    /*!
+        @brief	Peek at the next pending input value.
+        @return A reference to the next element that can be pushed.
+    */
+    T& IRAM_ATTR pushpeek()
+    {
         const auto inPos = m_inPos.load(std::memory_order_relaxed);
         std::atomic_thread_fence(std::memory_order_acquire);
-        if (inPos == outPos) return defaultValue;
-        else return m_buffer[outPos];
+        return m_buffer[inPos];
     }
+
+    /*!
+        @brief	Release the next pending input value, accessible by pushpeek(), into the queue.
+        @return true if the queue accepted the value, false if the queue
+                was full.
+    */
+    bool IRAM_ATTR push();
 
     /*!
         @brief	Move the rvalue parameter into the queue.
@@ -153,6 +173,7 @@ public:
         return push(T(val));
     }
 
+#if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
     /*!
         @brief	Push copies of multiple elements from a buffer into the queue,
                 in order, beginning at buffer's head.
@@ -160,6 +181,7 @@ public:
                 from the buffer head.
     */
     size_t push_n(const T* buffer, size_t size);
+#endif
 
     /*!
         @brief	Pop the next available element from the queue.
@@ -168,18 +190,25 @@ public:
     */
     T pop();
 
+#if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
     /*!
         @brief	Pop multiple elements in ordered sequence from the queue to a buffer.
+                If buffer is nullptr, simply discards up to size elements from the queue.
         @return The number of elements actually popped from the queue to
                 buffer.
     */
     size_t pop_n(T* buffer, size_t size);
+#endif
 
     /*!
         @brief	Iterate over and remove each available element from queue,
                 calling back fun with an rvalue reference of every single element.
     */
+#if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
     void for_each(const std::function<void(T&&)>& fun);
+#else
+    void for_each(std::function<void(T&&)> fun);
+#endif
 
     /*!
         @brief	In reverse order, iterate over, pop and optionally requeue each available element from the queue,
@@ -187,12 +216,20 @@ public:
                 Requeuing is dependent on the return boolean of the callback function. If it
                 returns true, the requeue occurs.
     */
+#if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
     bool for_each_rev_requeue(const std::function<bool(T&)>& fun);
+#else
+    bool for_each_rev_requeue(std::function<bool(T&)> fun);
+#endif
 
 protected:
     const T defaultValue = {};
     unsigned m_bufSize;
-    std::unique_ptr<T[] > m_buffer;
+#if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
+    std::unique_ptr<T[]> m_buffer;
+#else
+    std::unique_ptr<T> m_buffer;
+#endif
     std::atomic<unsigned> m_inPos;
     std::atomic<unsigned> m_outPos;
 };
@@ -209,6 +246,21 @@ bool circular_queue<T>::capacity(const size_t cap)
     std::atomic_thread_fence(std::memory_order_release);
     m_inPos.store(available, std::memory_order_relaxed);
     m_outPos.store(0, std::memory_order_release);
+    return true;
+}
+
+template< typename T >
+bool IRAM_ATTR circular_queue<T>::push()
+{
+    const auto inPos = m_inPos.load(std::memory_order_acquire);
+    const unsigned next = (inPos + 1) % m_bufSize;
+    if (next == m_outPos.load(std::memory_order_relaxed)) {
+        return false;
+    }
+
+    std::atomic_thread_fence(std::memory_order_acquire);
+
+    m_inPos.store(next, std::memory_order_release);
     return true;
 }
 
@@ -231,6 +283,7 @@ bool IRAM_ATTR circular_queue<T>::push(T&& val)
     return true;
 }
 
+#if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
 template< typename T >
 size_t circular_queue<T>::push_n(const T* buffer, size_t size)
 {
@@ -256,6 +309,7 @@ size_t circular_queue<T>::push_n(const T* buffer, size_t size)
     m_inPos.store(next, std::memory_order_release);
     return blockSize + size;
 }
+#endif
 
 template< typename T >
 T circular_queue<T>::pop()
@@ -273,6 +327,7 @@ T circular_queue<T>::pop()
     return val;
 }
 
+#if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
 template< typename T >
 size_t circular_queue<T>::pop_n(T* buffer, size_t size) {
     size_t avail = size = min(size, available());
@@ -282,18 +337,25 @@ size_t circular_queue<T>::pop_n(T* buffer, size_t size) {
 
     std::atomic_thread_fence(std::memory_order_acquire);
 
-    buffer = std::copy_n(std::make_move_iterator(m_buffer.get() + outPos), n, buffer);
-    avail -= n;
-    std::copy_n(std::make_move_iterator(m_buffer.get()), avail, buffer);
+    if (buffer) {
+        buffer = std::copy_n(std::make_move_iterator(m_buffer.get() + outPos), n, buffer);
+        avail -= n;
+        std::copy_n(std::make_move_iterator(m_buffer.get()), avail, buffer);
+    }
 
     std::atomic_thread_fence(std::memory_order_release);
 
     m_outPos.store((outPos + size) % m_bufSize, std::memory_order_release);
     return size;
 }
+#endif
 
 template< typename T >
+#if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
 void circular_queue<T>::for_each(const std::function<void(T&&)>& fun)
+#else
+void circular_queue<T>::for_each(std::function<void(T&&)> fun)
+#endif
 {
     auto outPos = m_outPos.load(std::memory_order_acquire);
     const auto inPos = m_inPos.load(std::memory_order_relaxed);
@@ -308,7 +370,11 @@ void circular_queue<T>::for_each(const std::function<void(T&&)>& fun)
 }
 
 template< typename T >
+#if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
 bool circular_queue<T>::for_each_rev_requeue(const std::function<bool(T&)>& fun)
+#else
+bool circular_queue<T>::for_each_rev_requeue(std::function<bool(T&)> fun)
+#endif
 {
     auto inPos0 = circular_queue<T>::m_inPos.load(std::memory_order_acquire);
     auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
