@@ -26,6 +26,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 namespace std
 {
+    template< typename T, int N > class array
+    {
+    private:
+        T v[N]{};
+    public:
+        int size() const { return N; }
+        T& operator[](int i) { return v[i]; }
+        const T& operator[](int i) const { return v[i]; }
+        operator T* () { return v; }
+    };
+
+
     template< typename T > class unique_ptr
     {
     public:
