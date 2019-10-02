@@ -48,17 +48,13 @@ namespace std
     template< typename T >	T&& move(T& t) noexcept { return static_cast<T&&>(t); }
 #endif
 
-    template< typename T, int N > class array
+    template< typename T, unsigned long N > struct array
     {
-    private:
-        T v[N]{};
-    public:
-        int size() const { return N; }
-        T& operator[](int i) { return v[i]; }
-        const T& operator[](int i) const { return v[i]; }
-        operator T* () { return v; }
+        T _M_elems[N];
+        unsigned long size() const { return N; }
+        T& operator[](unsigned long i) { return _M_elems[i]; }
+        const T& operator[](unsigned long i) const { return _M_elems[i]; }
     };
-
 
     template< typename T > class unique_ptr
     {
