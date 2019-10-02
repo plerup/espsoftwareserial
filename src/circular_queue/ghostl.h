@@ -22,40 +22,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __ghostl_h
 #define __ghostl_h
 
-#include <util/atomic.h>
+#if defined(ARDUINO_ARCH_SAMD)
+#include <atomic>
+#endif
 
 namespace std
 {
-    template< typename T, int N > class array
-    {
-    private:
-        T v[N]{};
-    public:
-        int size() const { return N; }
-        T& operator[](int i) { return v[i]; }
-        const T& operator[](int i) const { return v[i]; }
-        operator T* () { return v; }
-    };
-
-
-    template< typename T > class unique_ptr
-    {
-    public:
-        using pointer = T *;
-        unique_ptr() noexcept : ptr(nullptr) {}
-        unique_ptr(pointer p) : ptr(p) {}
-        pointer operator->() const noexcept { return ptr; }
-        T& operator[](size_t i) const { return ptr[i]; }
-        void reset(pointer p = pointer()) noexcept
-        {
-            delete ptr;
-            ptr = p;
-        }
-        T& operator*() const { return *ptr; }
-    private:
-        pointer ptr;
-    };
-
+#if !defined(ARDUINO_ARCH_SAMD)
     typedef enum memory_order {
         memory_order_relaxed,
         memory_order_acquire,
@@ -73,7 +46,39 @@ namespace std
     };
     inline void atomic_thread_fence(std::memory_order order) noexcept {}
     template< typename T >	T&& move(T& t) noexcept { return static_cast<T&&>(t); }
-    template< typename T > using function = T *;
+#endif
+
+    template< typename T, int N > class array
+    {
+    private:
+        T v[N]{};
+    public:
+        int size() const { return N; }
+        T& operator[](int i) { return v[i]; }
+        const T& operator[](int i) const { return v[i]; }
+        operator T* () { return v; }
+    };
+
+
+    template< typename T > class unique_ptr
+    {
+    public:
+        using pointer = T*;
+        unique_ptr() noexcept : ptr(nullptr) {}
+        unique_ptr(pointer p) : ptr(p) {}
+        pointer operator->() const noexcept { return ptr; }
+        T& operator[](size_t i) const { return ptr[i]; }
+        void reset(pointer p = pointer()) noexcept
+        {
+            delete ptr;
+            ptr = p;
+        }
+        T& operator*() const { return *ptr; }
+    private:
+        pointer ptr;
+    };
+
+    template< typename T > using function = T*;
 }
 
 #endif // __ghostl_h
