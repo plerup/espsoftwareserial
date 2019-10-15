@@ -16,10 +16,12 @@ full duplex receives, with the SoftwareSerial::enableIntTx(false) function call.
 
 The same functionality is given as the corresponding AVR library but
 several instances can be active at the same time. Speed up to 115200 baud
-is supported. The begin function also has optional input buffer capacity
-arguments for byte buffer and ISR bit buffer.
+is supported. Diverging from the AVR SoftwareSerial class, the constructor takes
+no arguments, instead the begin() function handles pin assignments and logic inversion.
+It also has optional input buffer capacity arguments for byte buffer and ISR bit buffer.
+This way, it is a better drop-in replacement for the hardware serial APIs on the ESP MCUs.
 
-Please note that due to the fact that the ESP always have other activities
+Please note that due to the fact that the ESPs always have other activities
 ongoing, there will be some inexactness in interrupt timings. This may
 lead to inevitable, but few, bit errors when having heavy data traffic
 at high baud rates.

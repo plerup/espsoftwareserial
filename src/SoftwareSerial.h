@@ -38,10 +38,12 @@ enum SoftwareSerialConfig {
     SWSERIAL_8N1,
 };
 
-/// This class is compatible with the corresponding AVR one,
-/// the constructor however has optional rx buffer capacity arguments
-/// for byte buffer and ISR bit buffer.
-/// Baudrates up to 115200 can be used.
+/// This class is compatible with the corresponding AVR one, however,
+/// the constructor takes no arguments, for compatibility with the
+/// HardwareSerial class.
+/// Instead, the begin() function handles pin assignments and logic inversion.
+/// It also has optional input buffer capacity arguments for byte buffer and ISR bit buffer.
+/// Bitrates up to at least 115200 can be used.
 class SoftwareSerial : public Stream {
 public:
     SoftwareSerial();
