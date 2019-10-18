@@ -274,6 +274,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
 }
 
 void SoftwareSerial::flush() {
+    if (!m_rxValid) { return; }
     m_buffer->flush();
 }
 
