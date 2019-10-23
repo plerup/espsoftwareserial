@@ -20,411 +20,528 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 */
 
-#include <SoftwareSerial.h>
 #include <Arduino.h>
 
-#ifdef ESP32
-#define xt_rsil(a) (a)
-#define xt_wsr_ps(a)
+#include <SoftwareSerial.h>
+
+#ifndef ESP32
+#ifndef SOFTWARESERIAL_MAX_INSTS
+#define SOFTWARESERIAL_MAX_INSTS 8
 #endif
 
-constexpr uint8_t BYTE_ALL_BITS_SET = ~static_cast<uint8_t>(0);
+// As the ESP8266 Arduino attachInterrupt has no parameter, lists of objects
+// and callbacks corresponding to each possible list index have to be defined
+static SoftwareSerial* ObjList[SOFTWARESERIAL_MAX_INSTS];
 
-SoftwareSerial::SoftwareSerial() {
-    m_isrOverflow = false;
+template<int I> void ICACHE_RAM_ATTR sws_isr() {
+	SoftwareSerial::rxRead(ObjList[I]);
+}
+
+template <int N, int I = N - 1> class ISRTable : public ISRTable<N, I - 1> {
+public:
+	static const int dummy;
+};
+
+template <int N> class ISRTable<N, -1> {
+public:
+	static const int dummy;
+	static void (*array[N])();
+};
+
+template <int N, int I>	const int ISRTable<N, I>::dummy =
+	reinterpret_cast<int>(ISRTable<N, -1>::array[I] = sws_isr<I>) + 0 * ISRTable<N, I - 1>::dummy;
+
+template <int N> void (*ISRTable<N, -1>::array[N])();
+
+template class ISRTable<SOFTWARESERIAL_MAX_INSTS>;
+
+static void (*(*ISRList))() = ISRTable<SOFTWARESERIAL_MAX_INSTS>::array;
+#endif
+
+SoftwareSerial::SoftwareSerial(
+	int receivePin, int transmitPin, bool inverse_logic, int bufSize, int isrBufSize) {
+	m_isrBuffer = 0;
+	m_isrOverflow = false;
+	m_isrLastCycle = 0;
+	m_oneWire = (receivePin == transmitPin);
+	m_invert = inverse_logic;
+	if (isValidGPIOpin(receivePin)) {
+		m_rxPin = receivePin;
+		m_bufSize = bufSize;
+		m_buffer = (uint8_t*)malloc(m_bufSize);
+		m_pbuffer = (uint8_t*)malloc(m_bufSize);
+		m_isrBufSize = isrBufSize ? isrBufSize : 10 * bufSize;
+		m_isrBuffer = static_cast<std::atomic<uint32_t>*>(malloc(m_isrBufSize * sizeof(uint32_t)));
+	}
+	if (isValidGPIOpin(transmitPin)
+#ifdef ESP8266
+		|| (!m_oneWire && (transmitPin == 16))) {
+#else
+		) {
+#endif
+		m_txValid = true;
+		m_txPin = transmitPin;
+	}
 }
 
 SoftwareSerial::~SoftwareSerial() {
-    end();
+	end();
+	if (m_buffer) {
+		free(m_buffer);
+	}
+	if (m_isrBuffer) {
+		free(m_isrBuffer);
+	}
 }
 
-bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
-#if defined(ESP8266)
-    return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 15);
-#elif defined(ESP32)
-    return pin == 0 || pin == 2 || (pin >= 4 && pin <= 5) || (pin >= 12 && pin <= 19) ||
-        (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 35);
-#else
-    return true;
-#endif
-}
-
-void SoftwareSerial::begin(uint32_t baud, int8_t rxPin, int8_t txPin,
-    SoftwareSerialConfig config, bool invert, int bufCapacity, int isrBufCapacity) {
-    m_oneWire = (rxPin == txPin);
-    m_invert = invert;
-    if (isValidGPIOpin(rxPin)) {
-        m_rxPin = rxPin;
-        std::unique_ptr<circular_queue<uint8_t> > buffer(new circular_queue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
-        m_buffer = move(buffer);
-        std::unique_ptr<circular_queue<uint8_t> > parityBuffer(new circular_queue<uint8_t>((bufCapacity > 0) ? (bufCapacity + 7) / 8 : 8));
-        m_parityBuffer = move(parityBuffer);
-        m_parityInPos = m_parityOutPos = 1;
-        std::unique_ptr<circular_queue<uint32_t> > isrBuffer(new circular_queue<uint32_t>((isrBufCapacity > 0) ? isrBufCapacity : (sizeof(uint8_t) * 8 + 2) * bufCapacity));
-        m_isrBuffer = move(isrBuffer);
-        if (m_buffer && m_parityBuffer && m_isrBuffer) {
-            m_rxValid = true;
-            pinMode(m_rxPin, INPUT_PULLUP);
-        }
-    }
-    if (isValidGPIOpin(txPin)
+bool SoftwareSerial::isValidGPIOpin(int pin) {
 #ifdef ESP8266
-        || ((txPin == 16) && !m_oneWire)) {
-#else
-        ) {
+	return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 15);
 #endif
-        m_txValid = true;
-        m_txPin = txPin;
-        if (!m_oneWire) {
-            pinMode(m_txPin, OUTPUT);
-            digitalWrite(m_txPin, !m_invert);
-        }
-    }
+#ifdef ESP32
+	return pin == 0 || pin == 2 || (pin >= 4 && pin <= 5) || (pin >= 12 && pin <= 19) ||
+		(pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 35);
+#endif
+}
 
-    m_dataBits = 5 + config;
-    m_bit_us = (1000000 + baud / 2) / baud;
-    m_bitCycles = (ESP.getCpuFreqMHz() * 1000000 + baud / 2) / baud;
-    m_intTxEnabled = true;
-    if (!m_rxEnabled) { enableRx(true); }
+#ifndef ESP32
+bool SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
+	if (m_swsInstsIdx < 0)
+		for (size_t i = 0; i < (sizeof ObjList / sizeof ObjList[0]); ++i)
+		{
+			if (!ObjList[i]) {
+				m_swsInstsIdx = i;
+				ObjList[m_swsInstsIdx] = this;
+				break;
+			}
+		}
+	if (m_swsInstsIdx < 0) return false;
+#else
+	void SoftwareSerial::begin(int32_t baud, SoftwareSerialConfig config) {
+#endif
+	switch(config & SWSERIAL_DB_MASK) {
+    case SWSERIAL_DB_5:
+        m_dataBits = 5;
+        break;
+    case SWSERIAL_DB_6:
+        m_dataBits = 6;
+        break;
+    case SWSERIAL_DB_7:
+        m_dataBits = 7;
+        break;
+    case SWSERIAL_DB_8:
+        m_dataBits = 8;
+        break;
+    }
+    switch(config & SWSERIAL_PB_MASK) {
+    case SWSERIAL_PB_NONE:
+        m_parity = SWSERIAL_PARITY_NONE;
+        break;
+    case SWSERIAL_PB_ODD:
+        m_parity = SWSERIAL_PARITY_ODD;
+        break;
+    case SWSERIAL_PB_EVEN:
+        m_parity = SWSERIAL_PARITY_EVEN;
+        break;
+    case SWSERIAL_PB_SPACE:
+        m_parity = SWSERIAL_PARITY_SPACE;
+        break;
+    case SWSERIAL_PB_MARK:
+        m_parity = SWSERIAL_PARITY_MARK;
+        break;
+    default:
+        m_parity = SWSERIAL_PARITY_NONE;
+    }
+	m_parityBits = m_parity != SWSERIAL_PARITY_NONE;
+	switch (config & SWSERIAL_SB_MASK) {
+	case SWSERIAL_SB_1:
+		m_stopBits = 1;
+		break;
+	case SWSERIAL_SB_2:
+		m_stopBits = 2;
+		break;
+	default: m_stopBits = 1;  // TODO - Implement 1.5 stop bits as 2 on receive, 1 on send
+	}
+	m_bitCycles = ESP.getCpuFreqMHz() * 1000000 / baud;
+	m_intTxEnabled = true;
+	if (m_buffer != 0 && m_isrBuffer != 0) {
+		m_rxValid = true;
+		m_inPos = m_outPos = 0;
+		m_isrInPos.store(0);
+		m_isrOutPos.store(0);
+		pinMode(m_rxPin, INPUT);
+	}
+	if (m_txValid && !m_oneWire) {
+		pinMode(m_txPin, OUTPUT);
+		digitalWrite(m_txPin, !m_invert);
+	}
+
+	if (!m_rxEnabled) { enableRx(true); }
+#ifndef ESP32
+	return true;
+#endif
 }
 
 void SoftwareSerial::end()
 {
-    enableRx(false);
-    m_txValid = false;
-    if (m_buffer) {
-        m_buffer.reset();
-    }
-    if (m_parityBuffer) {
-        m_parityBuffer.reset();
-    }
-    if (m_isrBuffer) {
-        m_isrBuffer.reset();
-    }
+	enableRx(false);
+#ifndef ESP32
+	if (m_swsInstsIdx >= 0)	{
+		ObjList[m_swsInstsIdx] = 0;
+		m_swsInstsIdx = -1;
+	}
+#endif
 }
 
-uint32_t SoftwareSerial::baudRate() {
-    return ESP.getCpuFreqMHz() * 1000000 / m_bitCycles;
+int32_t SoftwareSerial::baudRate() {
+	return ESP.getCpuFreqMHz() * 1000000 / m_bitCycles;
 }
 
-void SoftwareSerial::setTransmitEnablePin(int8_t txEnablePin) {
-    if (isValidGPIOpin(txEnablePin)) {
-        m_txEnableValid = true;
-        m_txEnablePin = txEnablePin;
-        pinMode(m_txEnablePin, OUTPUT);
-        digitalWrite(m_txEnablePin, LOW);
-    }
-    else {
-        m_txEnableValid = false;
-    }
+void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
+	if (isValidGPIOpin(transmitEnablePin)) {
+		m_txEnableValid = true;
+		m_txEnablePin = transmitEnablePin;
+		pinMode(m_txEnablePin, OUTPUT);
+		digitalWrite(m_txEnablePin, LOW);
+	} else {
+		m_txEnableValid = false;
+	}
 }
 
 void SoftwareSerial::enableIntTx(bool on) {
-    m_intTxEnabled = on;
+	m_intTxEnabled = on;
 }
 
 void SoftwareSerial::enableTx(bool on) {
-    if (m_txValid && m_oneWire) {
-        if (on) {
-            enableRx(false);
-            pinMode(m_txPin, OUTPUT);
-            digitalWrite(m_txPin, !m_invert);
-        }
-        else {
-            pinMode(m_rxPin, INPUT_PULLUP);
-            enableRx(true);
-        }
-    }
+	if (m_txValid && m_oneWire) {
+		if (on) {
+			enableRx(false);
+			pinMode(m_txPin, OUTPUT);
+			digitalWrite(m_txPin, !m_invert);
+		} else {
+			pinMode(m_rxPin, INPUT);
+			enableRx(true);
+		}
+	}
 }
 
 void SoftwareSerial::enableRx(bool on) {
-    if (m_rxValid) {
-        if (on) {
-            m_rxCurBit = m_dataBits;
-            // Init to stop bit level and current cycle
-            m_isrLastCycle = (ESP.getCycleCount() | 1) ^ m_invert;
-            attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitISR), this, CHANGE);
-        }
-        else {
-            detachInterrupt(digitalPinToInterrupt(m_rxPin));
-        }
-        m_rxEnabled = on;
-    }
+	if (m_rxValid) {
+		if (on) {
+			m_rxCurBit = m_dataBits + m_parityBits + m_stopBits;
+#ifndef ESP32
+			attachInterrupt(digitalPinToInterrupt(m_rxPin), ISRList[m_swsInstsIdx], CHANGE);
+#else
+			attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxRead), this, CHANGE);
+#endif
+		} else {
+			detachInterrupt(digitalPinToInterrupt(m_rxPin));
+		}
+		m_rxEnabled = on;
+	}
 }
 
 int SoftwareSerial::read() {
-    if (!m_rxValid) { return -1; }
-    if (!m_buffer->available()) {
-        rxBits();
-        if (!m_buffer->available()) { return -1; }
-    }
-    auto val = m_buffer->pop();
-    m_lastReadParity = m_parityBuffer->peek() & m_parityOutPos;
-    m_parityOutPos <<= 1;
-    if (!m_parityOutPos)
-    {
-        m_parityOutPos = 1;
-        m_parityBuffer->pop();
-    }
-    return val;
-}
-
-size_t SoftwareSerial::readBytes(uint8_t * buffer, size_t size) {
-    if (!m_rxValid) { return -1; }
-    if (0 == (size = m_buffer->pop_n(buffer, size))) {
-        rxBits();
-        size = m_buffer->pop_n(buffer, size);
-    }
-    if (0 != size) {
-        uint32_t parityBits = size;
-        while (m_parityOutPos >>= 1) ++parityBits;
-        m_parityOutPos = (1 << (parityBits % 8));
-        m_parityBuffer->pop_n(nullptr, parityBits / 8);
-        return size;
-    }
-    return -1;
+	if (!m_rxValid) { return -1; }
+	if (m_inPos == m_outPos) {
+		rxBits();
+		if (m_inPos == m_outPos) { return -1; }
+	}
+	uint8_t ch = m_buffer[m_outPos];
+	m_outPos = (m_outPos + 1) % m_bufSize;
+	return ch;
 }
 
 int SoftwareSerial::available() {
-    if (!m_rxValid) { return 0; }
-    rxBits();
-    int avail = m_buffer->available();
-    if (!avail) {
-        optimistic_yield(10000);
-    }
-    return avail;
+	if (!m_rxValid) { return 0; }
+	rxBits();
+	int avail = m_inPos - m_outPos;
+	if (avail < 0) { avail += m_bufSize; }
+	if (!avail) {
+		optimistic_yield(2 * (m_dataBits + 2) * m_bitCycles / ESP.getCpuFreqMHz());
+		rxBits();
+		avail = m_inPos - m_outPos;
+		if (avail < 0) { avail += m_bufSize; }
+	}
+	return avail;
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool asyn, uint32_t savedPS) {
-    if (asyn && !m_intTxEnabled) { xt_wsr_ps(savedPS); }
-    auto expired = ESP.getCycleCount() - m_periodStart;
-    auto micro_s = expired < m_periodDuration ? (m_periodDuration - expired) / ESP.getCpuFreqMHz() : 0;
-    if (asyn) {
-        if (micro_s) delay(micro_s / 1000);
-    }
-    else
-    {
-        if (micro_s > m_bit_us) delayMicroseconds(micro_s - m_bit_us);
-    }
-    while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { if (asyn) optimistic_yield(10000); }
-    if (asyn)
-    {
-        m_periodStart = ESP.getCycleCount();
-        m_periodDuration = 0;
-    }
-    if (asyn && !m_intTxEnabled) { savedPS = xt_rsil(15); }
+void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t deadline, bool asyn) {
+	// Reenable interrupts while delaying to avoid other tasks piling up
+	if (asyn && !m_intTxEnabled) { interrupts(); }
+	int32_t micro_s = static_cast<int32_t>(deadline - ESP.getCycleCount()) / ESP.getCpuFreqMHz();
+	if (micro_s > 0) {
+		if (asyn) optimistic_yield(micro_s); else delayMicroseconds(micro_s);
+	}
+	while (static_cast<int32_t>(deadline - ESP.getCycleCount()) > 0) { if (asyn) optimistic_yield(1); }
+	if (asyn) {
+		// Disable interrupts again
+		if (!m_intTxEnabled) {
+			noInterrupts();
+		}
+		m_periodDeadline = ESP.getCycleCount();
+	}
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
-    uint32_t dutyCycle, uint32_t offCycle, bool withStopBit, uint32_t savedPS) {
-    if (dutyCycle) {
-        digitalWrite(m_txPin, HIGH);
-        m_periodDuration += dutyCycle;
-        bool asyn = withStopBit && !m_invert;
-        // Reenable interrupts while delaying to avoid other tasks piling up
-        preciseDelay(asyn, savedPS);
-        // Disable interrupts again
-    }
-    if (offCycle) {
-        digitalWrite(m_txPin, LOW);
-        m_periodDuration += offCycle;
-        bool asyn = withStopBit && m_invert;
-        // Reenable interrupts while delaying to avoid other tasks piling up
-        preciseDelay(asyn, savedPS);
-        // Disable interrupts again
-    }
+void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(uint32_t dutyCycle, uint32_t offCycle, bool withStopBit) {
+	if (dutyCycle) {
+		digitalWrite(m_txPin, HIGH);
+		m_periodDeadline += dutyCycle;
+		preciseDelay(m_periodDeadline, withStopBit && !m_invert);
+	}
+	if (offCycle) {
+		digitalWrite(m_txPin, LOW);
+		m_periodDeadline += offCycle;
+		preciseDelay(m_periodDeadline, withStopBit && m_invert);
+	}
 }
 
 size_t SoftwareSerial::write(uint8_t b) {
-    return write(&b, 1);
+	return write(&b, 1, m_parity);
 }
 
-size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size) {
-    if (m_rxValid) { rxBits(); }
-    if (!m_txValid) { return -1; }
+size_t SoftwareSerial::write(uint8_t b, ParityMode parity) {
+	return write(&b, 1, parity);
+}
 
-    if (m_txEnableValid) {
-        digitalWrite(m_txEnablePin, HIGH);
-    }
-    // Stop bit : LOW if inverted logic, otherwise HIGH
-    bool b = !m_invert;
-    // Force line level on entry
-    uint32_t dutyCycle = b;
-    uint32_t offCycle = m_invert;
-    uint32_t savedPS = 0;
-    if (!m_intTxEnabled) {
-        // Disable interrupts in order to get a clean transmit timing
-        savedPS = xt_rsil(15);
-    }
-    m_periodStart = ESP.getCycleCount();
-    m_periodDuration = 0;
-    const uint32_t dataMask = ((1UL << m_dataBits) - 1);
-    for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
-        bool withStopBit = true;
-        // push LSB start-data-stop bit pattern into uint32_t
-        // Stop bit : LOW if inverted logic, otherwise HIGH
-        uint32_t word = (!m_invert) << m_dataBits;
-        word |= (m_invert ? ~*buffer : *buffer) & dataMask;
-        // Start bit : HIGH if inverted logic, otherwise LOW
-        word <<= 1;
-        word |= m_invert;
-        for (int i = 0; i < m_dataBits + 2; ++i) {
-            bool pb = b;
-            b = (word >> i) & 1;
-            if (!pb && b) {
-                writePeriod(dutyCycle, offCycle, withStopBit, savedPS);
-                withStopBit = false;
-                dutyCycle = offCycle = 0;
-            }
-            if (b) {
-                dutyCycle += m_bitCycles;
-            }
-            else {
-                offCycle += m_bitCycles;
-            }
-        }
-    }
-    writePeriod(dutyCycle, offCycle, true, savedPS);
-    if (!m_intTxEnabled) {
-        // restore the interrupt state
-        xt_wsr_ps(savedPS);
-    }
-    if (m_txEnableValid) {
-        digitalWrite(m_txEnablePin, LOW);
-    }
-    return size;
+size_t SoftwareSerial::write(const uint8_t *buffer, size_t size) {
+	return write(buffer, size, m_parity);
+}
+
+size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t *buffer, size_t size, ParityMode parity) {
+	if (m_rxValid) { rxBits(); }
+	if (!m_txValid) { return 0; }
+
+	if (m_txEnableValid) {
+		digitalWrite(m_txEnablePin, HIGH);
+	}
+	// Stop bit : LOW if inverted logic, otherwise HIGH
+	bool b = !m_invert;
+	// Force line level on entry
+	uint32_t dutyCycle = b;
+	uint32_t offCycle = m_invert;
+	// Disable interrupts in order to get a clean transmit timing
+	if (!m_intTxEnabled) { noInterrupts(); }
+	m_periodDeadline = ESP.getCycleCount();
+	const uint32_t dataMask = ((1UL << m_dataBits) - 1);
+	for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
+		bool withStopBit = true;
+		// push LSB start-data-stop bit pattern into uint32_t
+		// 1 or 2 stop bits : LOW if inverted logic, otherwise HIGH
+		uint32_t word = ((!m_invert) << m_stopBits) - 1;
+		// Parity bit
+		if (m_parity) { 
+			word <<= 1; 
+			word |= m_invert ^ calcParity(*buffer & (uint8_t)dataMask, parity);
+		}
+    	// Shift left to make space and fill in the databits
+    	word <<= m_dataBits;
+		word |= (m_invert ? ~*buffer : *buffer) & dataMask;
+		// Start bit : HIGH if inverted logic, otherwise LOW
+		word <<= 1;
+		word |= m_invert;
+		for (int i = 0; i <= m_dataBits + m_parityBits + m_stopBits; ++i) {
+			bool pb = b;
+			b = (word >> i) & 1;
+			if (!pb && b) {
+				writePeriod(dutyCycle, offCycle, withStopBit);
+				withStopBit = false;
+				dutyCycle = offCycle = 0;
+			}
+			if (b) {
+				dutyCycle += m_bitCycles;
+			} else {
+				offCycle += m_bitCycles;
+			}
+		}
+	}
+	writePeriod(dutyCycle, offCycle, true);
+	if (!m_intTxEnabled) { interrupts(); }
+	if (m_txEnableValid) {
+		digitalWrite(m_txEnablePin, LOW);
+	}
+	return size;
 }
 
 void SoftwareSerial::flush() {
-    if (!m_rxValid) { return; }
-    m_buffer->flush();
-    m_parityInPos = m_parityOutPos = 1;
-    m_parityBuffer->flush();
+	m_inPos = m_outPos = 0;
+	m_isrInPos.store(0);
+	m_isrOutPos.store(0);
 }
 
 bool SoftwareSerial::overflow() {
-    bool res = m_overflow;
-    m_overflow = false;
-    return res;
+	bool res = m_overflow;
+	m_overflow = false;
+	return res;
 }
 
 int SoftwareSerial::peek() {
-    if (!m_rxValid) { return -1; }
-    if (!m_buffer->available()) {
-        rxBits();
-        if (!m_buffer->available()) return -1;
-    }
-    auto val = m_buffer->peek();
-    m_lastReadParity = m_parityBuffer->peek() & m_parityOutPos;
-    return val;
+	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { return -1; }
+	return m_buffer[m_outPos];
 }
 
 void SoftwareSerial::rxBits() {
-    int isrAvail = m_isrBuffer->available();
-#ifdef ESP8266
-    if (m_isrOverflow.load()) {
-        m_overflow = true;
-        m_isrOverflow.store(false);
-    }
-#else
-    if (m_isrOverflow.exchange(false)) {
-        m_overflow = true;
-    }
-#endif
+	int avail = m_isrInPos.load() - m_isrOutPos.load();
+	if (avail < 0) { avail += m_isrBufSize; }
+	if (m_isrOverflow.load()) {
+		m_overflow = true;
+		m_isrOverflow.store(false);
+	}
 
-    // stop bit can go undetected if leading data bits are at same level
-    // and there was also no next start bit yet, so one byte may be pending.
-    // low-cost check first
-    if (!isrAvail && m_rxCurBit >= -1 && m_rxCurBit < m_dataBits) {
-        uint32_t detectionCycles = (m_dataBits - m_rxCurBit) * m_bitCycles;
-        if (ESP.getCycleCount() - m_isrLastCycle > detectionCycles) {
-            // Produce faux stop bit level, prevents start bit maldetection
-            // cycle's LSB is repurposed for the level bit
-            rxBits(((m_isrLastCycle + detectionCycles) | 1) ^ m_invert);
-        }
-    }
+	// stop bit can go undetected if leading data bits are at same level
+	// and there was also no next start bit yet, so one byte may be pending.
+	// low-cost check first
+	if (avail == 0 && m_rxCurBit < (m_dataBits + m_parityBits + m_stopBits - 1) 
+			&& m_isrInPos.load() == m_isrOutPos.load() && m_rxCurBit >= 0) {
+		uint32_t expectedCycle = m_isrLastCycle.load() + (m_dataBits + m_parityBits + m_stopBits - 1 - m_rxCurBit) * m_bitCycles;
+		if (static_cast<int32_t>(ESP.getCycleCount() - expectedCycle) > m_bitCycles) {
+			// Store inverted stop bit edge and cycle in the buffer unless we have an overflow
+			// cycle's LSB is repurposed for the level bit
+			int next = (m_isrInPos.load() + 1) % m_isrBufSize;
+			if (next != m_isrOutPos.load()) {
+				m_isrBuffer[m_isrInPos.load()].store((expectedCycle | 1) ^ !m_invert);
+				m_isrInPos.store(next);
+				++avail;
+			} else {
+				m_isrOverflow.store(true);
+			}
+		}
+	}
 
-    m_isrBuffer->for_each([this](const uint32_t& isrCycle) { rxBits(isrCycle); });
+	while (avail--) {
+		// error introduced by edge value in LSB is negligible
+		uint32_t isrCycle = m_isrBuffer[m_isrOutPos.load()].load();
+		// extract inverted edge value
+		bool level = (isrCycle & 1) == m_invert;
+		m_isrOutPos.store((m_isrOutPos.load() + 1) % m_isrBufSize);
+		int32_t cycles = static_cast<int32_t>(isrCycle - m_isrLastCycle.load() - (m_bitCycles / 2));
+		if (cycles < 0) { continue; }
+		m_isrLastCycle.store(isrCycle);
+		do {
+			// data bits
+			if (m_rxCurBit >= -1 && m_rxCurBit < (m_dataBits - 1)) {
+				if (cycles >= m_bitCycles) {
+					// preceding masked bits
+					int hiddenBits = cycles / m_bitCycles;
+					if (hiddenBits >= m_dataBits - m_rxCurBit) { hiddenBits = (m_dataBits - 1) - m_rxCurBit; }
+					bool lastBit = m_rxCurByte & 0x80;
+					m_rxCurByte >>= hiddenBits;
+					// masked bits have same level as last unmasked bit
+					if (lastBit) { m_rxCurByte |= 0xff << (8 - hiddenBits); }
+					m_rxCurBit += hiddenBits;
+					cycles -= hiddenBits * m_bitCycles;
+				}
+				if (m_rxCurBit < (m_dataBits - 1)) {
+					++m_rxCurBit;
+					cycles -= m_bitCycles;
+					m_rxCurByte >>= 1;
+					if (level) { m_rxCurByte |= 0x80; }
+				}
+				continue;
+			}
+			// parity bit
+			if ((m_parity != SWSERIAL_PARITY_NONE) && (m_rxCurBit == m_dataBits - 1)) {
+				++m_rxCurBit;
+				cycles -= m_bitCycles;
+				// If the last data bit and the parity bit are both 0, the parity bit will be hidden
+				m_rxCurParityBit = (cycles >= 0) ? (bool)(m_rxCurByte & 0x80) : level;
+				continue;
+			}
+			// stop bit - push current byte and parity to buffer
+			if ((m_rxCurBit >= m_dataBits + m_parityBits - 1) && (m_rxCurBit < m_dataBits + m_parityBits + m_stopBits - 1)) {
+				++m_rxCurBit;
+				cycles -= m_bitCycles;
+				// If this is not the last stop bit
+				if ((m_stopBits == 2) && (m_rxCurBit == m_dataBits + m_parityBits)) {
+					continue;
+				}
+				// If this is the last stop bit
+				else {
+					// Store the received value in the buffer unless we have an overflow
+					int next = (m_inPos + 1) % m_bufSize;
+					if (next != m_outPos) {
+						m_buffer[m_inPos] = m_rxCurByte >> (8 - m_dataBits);
+						if (m_parityBits) { m_pbuffer[m_inPos] = m_rxCurParityBit; }
+						// reset to 0 is important for masked bit logic
+						m_rxCurByte = 0;
+						m_inPos = next;
+					} else {
+						m_overflow = true;
+					}
+					continue;
+				}
+			}
+			if (m_rxCurBit >= (m_dataBits + m_parityBits + m_stopBits - 1)) {
+				// start bit level is low
+				if (!level) {
+					m_rxCurBit = -1;
+				}
+			}
+			break;
+		} while (cycles >= 0);
+	}
 }
 
-void SoftwareSerial::rxBits(const uint32_t & isrCycle) {
-    bool level = (m_isrLastCycle & 1) ^ m_invert;
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead(SoftwareSerial* self) {
+	uint32_t curCycle = ESP.getCycleCount();
+	bool level = digitalRead(self->m_rxPin);
 
-    // error introduced by edge value in LSB of isrCycle is negligible
-    int32_t cycles = isrCycle - m_isrLastCycle;
-    m_isrLastCycle = isrCycle;
-
-    uint8_t bits = cycles / m_bitCycles;
-    if (cycles % m_bitCycles > (m_bitCycles >> 1)) ++bits;
-    while (bits > 0) {
-        // start bit detection
-        if (m_rxCurBit >= m_dataBits) {
-            // leading edge of start bit
-            if (level) break;
-            m_rxCurBit = -1;
-            --bits;
-            continue;
-        }
-        // data bits
-        if (m_rxCurBit >= -1 && m_rxCurBit < (m_dataBits - 1)) {
-            int8_t dataBits = min(bits, static_cast<uint8_t>(m_dataBits - m_rxCurBit - 1));
-            m_rxCurBit += dataBits;
-            bits -= dataBits;
-            m_rxCurByte >>= dataBits;
-            if (level) { m_rxCurByte |= (BYTE_ALL_BITS_SET << (8 - dataBits)); }
-            continue;
-        }
-        // stop bit
-        if (m_rxCurBit == (m_dataBits - 1)) {
-            // Store the received value in the buffer unless we have an overflow
-            // if not high stop bit level, discard word
-            if (level)
-            {
-                m_rxCurByte >>= (sizeof(uint8_t) * 8 - m_dataBits);
-                uint8_t octet = m_rxCurByte;
-                octet ^= octet >> 4;
-                octet &= 0xf;
-                if ((0x6996 >> octet) & 1) {
-                    m_parityBuffer->pushpeek() |= m_parityInPos;
-                }
-                else {
-                    m_parityBuffer->pushpeek() &= ~m_parityInPos;
-                }
-                m_parityInPos <<= 1;
-                if (!m_parityInPos)
-                {
-                    m_parityBuffer->push();
-                    m_parityInPos = 1;
-                }
-                m_buffer->push(m_rxCurByte);
-            }
-            ++m_rxCurBit;
-            // reset to 0 is important for masked bit logic
-            m_rxCurByte = 0;
-            break;
-        }
-        break;
-    }
-}
-
-void ICACHE_RAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial * self) {
-    uint32_t curCycle = ESP.getCycleCount();
-    bool level = digitalRead(self->m_rxPin);
-
-    // Store level and cycle in the buffer unless we have an overflow
-    // cycle's LSB is repurposed for the level bit
-    if (!self->m_isrBuffer->push((curCycle | 1) ^ !level)) self->m_isrOverflow.store(true);
+	// Store inverted edge value & cycle in the buffer unless we have an overflow
+	// cycle's LSB is repurposed for the level bit
+	int next = (self->m_isrInPos.load() + 1) % self->m_isrBufSize;
+	if (next != self->m_isrOutPos.load()) {
+		self->m_isrBuffer[self->m_isrInPos.load()].store((curCycle | 1) ^ level);
+		self->m_isrInPos.store(next);
+	} else {
+		self->m_isrOverflow.store(true);
+	}
 }
 
 void SoftwareSerial::onReceive(std::function<void(int available)> handler) {
-    receiveHandler = handler;
+	receiveHandler = handler;
 }
 
 void SoftwareSerial::perform_work() {
-    if (!m_rxValid) { return; }
-    rxBits();
-    if (receiveHandler) {
-        int avail = m_buffer->available();
-        if (avail) { receiveHandler(avail); }
+	if (!m_rxValid) { return; }
+	rxBits();
+	if (receiveHandler) {
+		int avail = m_inPos - m_outPos;
+		if (avail < 0) { avail += m_bufSize; }
+		if (avail) { receiveHandler(avail); }
+	}
+}
+
+bool SoftwareSerial::calcParity(const uint8_t b, ParityMode parity) {
+	// Fast parity computation with small memory footprint
+	// https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
+	switch (parity) {
+	case SWSERIAL_PARITY_NONE:
+        return false;
+    case SWSERIAL_PARITY_ODD:
+        [[fallthrough]]
+    case SWSERIAL_PARITY_EVEN: {
+        uint8_t v = b;
+        v ^= v >> 4;
+        v &= 0xf;
+        if (parity == SWSERIAL_PARITY_EVEN) {
+            return (0x6996 >> v) & 1;
+        }
+        else {
+            return !((0x6996 >> v) & 1);
+        }
+    }
+    case SWSERIAL_PARITY_SPACE:
+        return false;
+    case SWSERIAL_PARITY_MARK:
+        return true;
+    default:
+        return false;
     }
 }
+
+bool SoftwareSerial::peekParityError() {
+	if (!m_rxValid || (rxBits(), m_inPos == m_outPos)) { 
+		return -1; 
+	}
+	return !((m_pbuffer[m_outPos]) == calcParity(m_buffer[m_outPos], m_parity));
+};

@@ -21,139 +21,194 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 */
 
-#ifndef __SoftwareSerial_h
-#define __SoftwareSerial_h
+#ifndef SoftwareSerial_h
+#define SoftwareSerial_h
 
-#include "circular_queue/circular_queue.h"
+#include <inttypes.h>
 #include <Stream.h>
 #include <functional>
+#include <atomic>
 
-/// If only one tx or rx wanted then use this as parameter for the unused pin.
+// If only one tx or rx wanted then use this as parameter for the unused pin
 constexpr int SW_SERIAL_UNUSED_PIN = -1;
 
-enum SoftwareSerialConfig {
-    SWSERIAL_5N1 = 0,
-    SWSERIAL_6N1,
-    SWSERIAL_7N1,
-    SWSERIAL_8N1,
+// Options for SoftwareSerialConfig
+// Number of data bits
+constexpr uint8_t SWSERIAL_DB_MASK  = 0B00011000;
+constexpr uint8_t SWSERIAL_DB_5     = 0B00000000;
+constexpr uint8_t SWSERIAL_DB_6     = 0B00001000;
+constexpr uint8_t SWSERIAL_DB_7     = 0B00010000;
+constexpr uint8_t SWSERIAL_DB_8     = 0B00011000;
+// Parity bit configuration
+constexpr uint8_t SWSERIAL_PB_MASK  = 0B00000111;
+constexpr uint8_t SWSERIAL_PB_NONE  = 0B00000000;
+constexpr uint8_t SWSERIAL_PB_EVEN  = 0B00000010;
+constexpr uint8_t SWSERIAL_PB_ODD   = 0B00000011;
+constexpr uint8_t SWSERIAL_PB_MARK  = 0B00000100;
+constexpr uint8_t SWSERIAL_PB_SPACE = 0B00000101;
+// Number of stop bits
+constexpr uint8_t SWSERIAL_SB_MASK  = 0B01100000;
+constexpr uint8_t SWSERIAL_SB_1     = 0B00100000;
+constexpr uint8_t SWSERIAL_SB_15    = 0B01000000;
+constexpr uint8_t SWSERIAL_SB_2     = 0B01100000;
+
+enum SoftwareSerialConfig : uint8_t {
+	SWSERIAL_5N1 = ( SWSERIAL_DB_5 | SWSERIAL_PB_NONE  | SWSERIAL_SB_1 ),
+	SWSERIAL_6N1 = ( SWSERIAL_DB_6 | SWSERIAL_PB_NONE  | SWSERIAL_SB_1 ),
+	SWSERIAL_7N1 = ( SWSERIAL_DB_7 | SWSERIAL_PB_NONE  | SWSERIAL_SB_1 ),
+	SWSERIAL_8N1 = ( SWSERIAL_DB_8 | SWSERIAL_PB_NONE  | SWSERIAL_SB_1 ),
+	SWSERIAL_5E1 = ( SWSERIAL_DB_5 | SWSERIAL_PB_EVEN  | SWSERIAL_SB_1 ),
+	SWSERIAL_6E1 = ( SWSERIAL_DB_6 | SWSERIAL_PB_EVEN  | SWSERIAL_SB_1 ),
+	SWSERIAL_7E1 = ( SWSERIAL_DB_7 | SWSERIAL_PB_EVEN  | SWSERIAL_SB_1 ),
+	SWSERIAL_8E1 = ( SWSERIAL_DB_8 | SWSERIAL_PB_EVEN  | SWSERIAL_SB_1 ),
+	SWSERIAL_5O1 = ( SWSERIAL_DB_5 | SWSERIAL_PB_ODD   | SWSERIAL_SB_1 ),
+	SWSERIAL_6O1 = ( SWSERIAL_DB_6 | SWSERIAL_PB_ODD   | SWSERIAL_SB_1 ),
+	SWSERIAL_7O1 = ( SWSERIAL_DB_7 | SWSERIAL_PB_ODD   | SWSERIAL_SB_1 ),
+	SWSERIAL_8O1 = ( SWSERIAL_DB_8 | SWSERIAL_PB_ODD   | SWSERIAL_SB_1 ),
+	SWSERIAL_5M1 = ( SWSERIAL_DB_5 | SWSERIAL_PB_MARK  | SWSERIAL_SB_1 ),
+	SWSERIAL_6M1 = ( SWSERIAL_DB_6 | SWSERIAL_PB_MARK  | SWSERIAL_SB_1 ),
+	SWSERIAL_7M1 = ( SWSERIAL_DB_7 | SWSERIAL_PB_MARK  | SWSERIAL_SB_1 ),
+	SWSERIAL_8M1 = ( SWSERIAL_DB_8 | SWSERIAL_PB_MARK  | SWSERIAL_SB_1 ),
+	SWSERIAL_5S1 = ( SWSERIAL_DB_5 | SWSERIAL_PB_SPACE | SWSERIAL_SB_1 ),
+	SWSERIAL_6S1 = ( SWSERIAL_DB_6 | SWSERIAL_PB_SPACE | SWSERIAL_SB_1 ),
+	SWSERIAL_7S1 = ( SWSERIAL_DB_7 | SWSERIAL_PB_SPACE | SWSERIAL_SB_1 ),
+	SWSERIAL_8S1 = ( SWSERIAL_DB_8 | SWSERIAL_PB_SPACE | SWSERIAL_SB_1 ),
+	SWSERIAL_5N2 = ( SWSERIAL_DB_5 | SWSERIAL_PB_NONE  | SWSERIAL_SB_2 ),
+	SWSERIAL_6N2 = ( SWSERIAL_DB_6 | SWSERIAL_PB_NONE  | SWSERIAL_SB_2 ),
+	SWSERIAL_7N2 = ( SWSERIAL_DB_7 | SWSERIAL_PB_NONE  | SWSERIAL_SB_2 ),
+	SWSERIAL_8N2 = ( SWSERIAL_DB_8 | SWSERIAL_PB_NONE  | SWSERIAL_SB_2 ),
+	SWSERIAL_5E2 = ( SWSERIAL_DB_5 | SWSERIAL_PB_EVEN  | SWSERIAL_SB_2 ),
+	SWSERIAL_6E2 = ( SWSERIAL_DB_6 | SWSERIAL_PB_EVEN  | SWSERIAL_SB_2 ),
+	SWSERIAL_7E2 = ( SWSERIAL_DB_7 | SWSERIAL_PB_EVEN  | SWSERIAL_SB_2 ),
+	SWSERIAL_8E2 = ( SWSERIAL_DB_8 | SWSERIAL_PB_EVEN  | SWSERIAL_SB_2 ),
+	SWSERIAL_5O2 = ( SWSERIAL_DB_5 | SWSERIAL_PB_ODD   | SWSERIAL_SB_2 ),
+	SWSERIAL_6O2 = ( SWSERIAL_DB_6 | SWSERIAL_PB_ODD   | SWSERIAL_SB_2 ),
+	SWSERIAL_7O2 = ( SWSERIAL_DB_7 | SWSERIAL_PB_ODD   | SWSERIAL_SB_2 ),
+	SWSERIAL_8O2 = ( SWSERIAL_DB_8 | SWSERIAL_PB_ODD   | SWSERIAL_SB_2 ),
+	SWSERIAL_5M2 = ( SWSERIAL_DB_5 | SWSERIAL_PB_MARK  | SWSERIAL_SB_2 ),
+	SWSERIAL_6M2 = ( SWSERIAL_DB_6 | SWSERIAL_PB_MARK  | SWSERIAL_SB_2 ),
+	SWSERIAL_7M2 = ( SWSERIAL_DB_7 | SWSERIAL_PB_MARK  | SWSERIAL_SB_2 ),
+	SWSERIAL_8M2 = ( SWSERIAL_DB_8 | SWSERIAL_PB_MARK  | SWSERIAL_SB_2 ),
+	SWSERIAL_5S2 = ( SWSERIAL_DB_5 | SWSERIAL_PB_SPACE | SWSERIAL_SB_2 ),
+	SWSERIAL_6S2 = ( SWSERIAL_DB_6 | SWSERIAL_PB_SPACE | SWSERIAL_SB_2 ),
+	SWSERIAL_7S2 = ( SWSERIAL_DB_7 | SWSERIAL_PB_SPACE | SWSERIAL_SB_2 ),
+	SWSERIAL_8S2 = ( SWSERIAL_DB_8 | SWSERIAL_PB_SPACE | SWSERIAL_SB_2 )
 };
 
-/// This class is compatible with the corresponding AVR one, however,
-/// the constructor takes no arguments, for compatibility with the
-/// HardwareSerial class.
-/// Instead, the begin() function handles pin assignments and logic inversion.
-/// It also has optional input buffer capacity arguments for byte buffer and ISR bit buffer.
-/// Bitrates up to at least 115200 can be used.
+enum ParityMode : uint8_t
+{
+	SWSERIAL_PARITY_NONE = 0,
+	SWSERIAL_PARITY_ODD,
+	SWSERIAL_PARITY_EVEN,
+	SWSERIAL_PARITY_SPACE,
+	SWSERIAL_PARITY_MARK
+};
+
+// This class is compatible with the corresponding AVR one,
+// the constructor however has an optional rx buffer size.
+// Baudrates up to 115200 can be used.
+
 class SoftwareSerial : public Stream {
 public:
-    SoftwareSerial();
-    SoftwareSerial(const SoftwareSerial&) = delete;
-    SoftwareSerial& operator= (const SoftwareSerial&) = delete;
-    virtual ~SoftwareSerial();
-    void begin(uint32_t baud, int8_t rxPin, int8_t txPin = -1,
-        SoftwareSerialConfig config = SWSERIAL_8N1,
-        bool invert = false, int bufCapacity = 64, int isrBufCapacity = 0);
-    uint32_t baudRate();
-    /// Transmit control pin.
-    void setTransmitEnablePin(int8_t txEnablePin);
-    /// Enable or disable interrupts during tx.
-    void enableIntTx(bool on);
+	SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, int bufSize = 64, int isrBufSize = 0);
+	virtual ~SoftwareSerial();
+#ifndef ESP32
+	// Returns false if more than SOFTWARESERIAL_MAX_INSTS instances are started
+	bool begin(int32_t baud) {
+		return begin(baud, SWSERIAL_8N1);
+	}
+	bool begin(int32_t baud, SoftwareSerialConfig config);
+#else
+	void begin(int32_t baud) {
+		begin(baud, SWSERIAL_8N1);
+	}
+	void begin(int32_t baud, SoftwareSerialConfig config);
+#endif
+	int32_t baudRate();
+	// Transmit control pin
+	void setTransmitEnablePin(int transmitEnablePin);
+	// Enable or disable interrupts during tx
+	void enableIntTx(bool on);
 
-    bool overflow();
+	bool overflow();
 
-    int available() override;
-    int availableForWrite() {
-        if (!m_txValid) return 0;
-        return 1;
-    }
-    int peek() override;
-    int read() override;
-    // The parity bit associated with the last read() or peek() call
-    bool parity()
-    {
-        return m_lastReadParity;
-    }
-    /// The readBytes functions are non-waiting, there is no timeout.
-    size_t readBytes(uint8_t* buffer, size_t size) override;
-    /// The readBytes functions are non-waiting, there is no timeout.
-    size_t readBytes(char* buffer, size_t size) override {
-        return readBytes(reinterpret_cast<uint8_t*>(buffer), size);
-    }
-    void flush() override;
-    size_t write(uint8_t byte) override;
-    size_t write(const uint8_t* buffer, size_t size) override;
-    size_t write(const char* buffer, size_t size) {
-        return write(reinterpret_cast<const uint8_t*>(buffer), size);
-    }
-    operator bool() const { return m_rxValid || m_txValid; }
+	int available() override;
+	int peek() override;
+	int read() override;
+	bool peekParityError();
+	void flush() override;
+	size_t write(uint8_t byte) override;
+	size_t write(uint8_t byte, ParityMode parity);
+	size_t write(const uint8_t *buffer, size_t size) override;
+	size_t write(const uint8_t *buffer, size_t size, ParityMode parity);
+	operator bool() const { return m_rxValid || m_txValid; }
 
-    /// Disable or enable interrupts on the rx pin.
-    void enableRx(bool on);
-    /// One wire control.
-    void enableTx(bool on);
+	// Disable or enable interrupts on the rx pin
+	void enableRx(bool on);
+	// One wire control
+	void enableTx(bool on);
 
-    // AVR compatibility methods.
-    bool listen() { enableRx(true); return true; }
-    void end();
-    bool isListening() { return m_rxEnabled; }
-    bool stopListening() { enableRx(false); return true; }
+	static void rxRead(SoftwareSerial* self);
 
-    /// Set an event handler for received data.
-    void onReceive(std::function<void(int available)> handler);
+	// AVR compatibility methods
+	bool listen() { enableRx(true); return true; }
+	void end();
+	bool isListening() { return m_rxEnabled; }
+	bool stopListening() { enableRx(false); return true; }
 
-    /// Run the internal processing and event engine. Can be iteratively called
-    /// from loop, or otherwise scheduled.
-    void perform_work();
+	void onReceive(std::function<void(int available)> handler);
+	void perform_work();
 
-    using Print::write;
+	using Print::write;
 
 private:
-    // If asyn, it's legal to exceed the deadline, for instance,
-    // by enabling interrupts.
-    void preciseDelay(bool asyn, uint32_t savedPS);
-    // If withStopBit is set, either cycle contains a stop bit.
-    // If dutyCycle == 0, the level is not forced to HIGH.
-    // If offCycle == 0, the level remains unchanged from dutyCycle.
-    void writePeriod(
-        uint32_t dutyCycle, uint32_t offCycle, bool withStopBit, uint32_t savedPS);
-    bool isValidGPIOpin(int8_t pin);
-    /* check m_rxValid that calling is safe */
-    void rxBits();
-    void rxBits(const uint32_t& isrCycle);
-
-    static void rxBitISR(SoftwareSerial* self);
-
-    // Member variables
-    bool m_oneWire;
-    int8_t m_rxPin = SW_SERIAL_UNUSED_PIN;
-    int8_t m_txPin = SW_SERIAL_UNUSED_PIN;
-    int8_t m_txEnablePin = SW_SERIAL_UNUSED_PIN;
-    bool m_rxValid = false;
-    bool m_rxEnabled = false;
-    bool m_txValid = false;
-    bool m_txEnableValid = false;
-    bool m_invert;
-    bool m_overflow = false;
-    uint8_t m_dataBits;
-    uint32_t m_bit_us;
-    uint32_t m_bitCycles;
-    uint32_t m_periodStart;
-    uint32_t m_periodDuration;
-    bool m_intTxEnabled;
-    std::unique_ptr<circular_queue<uint8_t> > m_buffer;
-    std::unique_ptr<circular_queue<uint8_t> > m_parityBuffer;
-    uint8_t m_parityInPos;
-    uint8_t m_parityOutPos;
-    bool m_lastReadParity;
-    // the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
-    // 1 = positive including 0, 0 = negative.
-    std::unique_ptr<circular_queue<uint32_t> > m_isrBuffer;
-    std::atomic<bool> m_isrOverflow;
-    uint32_t m_isrLastCycle;
-    int8_t m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
-    uint8_t m_rxCurByte = 0;
-
-    std::function<void(int available)> receiveHandler;
+	// If asyn, its legal to exceed the deadline, for instance,
+	// by enabling interrupts.
+	void preciseDelay(uint32_t deadline, bool asyn);
+	// If withStopBit is set, either cycle contains a stop bit.
+	// If dutyCycle == 0, the level is not forced to HIGH.
+	// If offCycle == 0, the level remains unchanged from dutyCycle.
+	void writePeriod(uint32_t dutyCycle, uint32_t offCycle, bool withStopBit);
+	bool isValidGPIOpin(int pin);
+	/* check m_rxValid that calling is safe */
+	void rxBits();
+	bool calcParity(const uint8_t b, ParityMode parity);
+	// Member variables
+	bool m_oneWire;
+	int m_rxPin = SW_SERIAL_UNUSED_PIN;
+	int m_txPin = SW_SERIAL_UNUSED_PIN;
+#ifndef ESP32
+	ssize_t m_swsInstsIdx = -1;
+#endif
+	int m_txEnablePin = SW_SERIAL_UNUSED_PIN;
+	bool m_rxValid = false;
+	bool m_rxEnabled = false;
+	bool m_txValid = false;
+	bool m_txEnableValid = false;
+	bool m_invert;
+	bool m_overflow = false;
+	int8_t m_dataBits;
+	int8_t m_parityBits;
+    int8_t m_stopBits;
+    ParityMode m_parity;
+	int32_t m_bitCycles;
+	uint32_t m_periodDeadline;
+	bool m_intTxEnabled;
+	int m_inPos, m_outPos;
+	int m_bufSize = 0;
+	uint8_t *m_buffer = 0;
+	uint8_t *m_pbuffer = 0;		// buffer to store parity for received chars
+	// the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
+	// 1 = positive including 0, 0 = negative.
+	std::atomic<int> m_isrInPos, m_isrOutPos;
+	int m_isrBufSize = 0;
+	std::atomic<uint32_t>* m_isrBuffer;
+	std::atomic<bool> m_isrOverflow;
+	std::atomic<uint32_t> m_isrLastCycle;
+	int m_rxCurBit; // -1: start bit. 0 - 7: data bits. 8: parity bit (optional). 8(-9) or 9(-10): stop bit(s).
+	uint8_t m_rxCurByte = 0;
+	uint8_t m_rxCurParityBit;
+	std::function<void(int available)> receiveHandler = 0;
 };
 
-#endif // __SoftwareSerial_h
+#endif
