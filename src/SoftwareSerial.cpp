@@ -187,7 +187,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool asyn, uint32_t savedPS) {
     while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { if (asyn) optimistic_yield(10000); }
     if (asyn)
     {
-        m_periodStart = ESP.getCycleCount();
+        resetPeriodStart();
         m_periodDuration = 0;
     }
     if (asyn && !m_intTxEnabled) { savedPS = xt_rsil(15); }
@@ -234,7 +234,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
         // Disable interrupts in order to get a clean transmit timing
         savedPS = xt_rsil(15);
     }
-    m_periodStart = ESP.getCycleCount();
+    resetPeriodStart();
     m_periodDuration = 0;
     const uint32_t dataMask = ((1UL << m_dataBits) - 1);
     for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
@@ -299,7 +299,7 @@ void SoftwareSerial::rxBits() {
     if (m_isrOverflow.load()) {
         m_overflow = true;
         m_isrOverflow.store(false);
-}
+    }
 #else
     if (m_isrOverflow.exchange(false)) {
         m_overflow = true;

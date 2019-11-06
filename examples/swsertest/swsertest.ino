@@ -4,7 +4,7 @@
 
 #include <SoftwareSerial.h>
 
-#if !defined(D5)
+#if defined(ESP8266) && !defined(D5)
 #define D5 (14)
 #define D6 (12)
 #define D7 (13)

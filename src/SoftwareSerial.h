@@ -103,6 +103,16 @@ public:
     using Print::write;
 
 private:
+    void resetPeriodStart()
+    {
+#if defined(ESP8266)
+        m_periodStart = ESP.getCycleCount() - 64;
+#elif defined(ESP32)
+        m_periodStart = ESP.getCycleCount();
+#else
+        m_periodStart = ESP.getCycleCount();
+#endif
+    }
     // If asyn, it's legal to exceed the deadline, for instance,
     // by enabling interrupts.
     void preciseDelay(bool asyn, uint32_t savedPS);
