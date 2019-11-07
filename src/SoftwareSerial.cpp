@@ -137,7 +137,10 @@ void SoftwareSerial::enableRx(bool on) {
             m_rxCurBit = m_dataBits;
             // Init to stop bit level and current cycle
             m_isrLastCycle = (ESP.getCycleCount() | 1) ^ m_invert;
-            attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitISR), this, CHANGE);
+            if (m_bitCycles > (ESP.getCpuFreqMHz() * 1000000 + 74880 / 2) / 74880)
+                attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitISR), this, CHANGE);
+            else
+                attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitSyncISR), this, m_invert ? RISING : FALLING);
         }
         else {
             detachInterrupt(digitalPinToInterrupt(m_rxPin));
@@ -371,6 +374,33 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial * self) {
     // Store level and cycle in the buffer unless we have an overflow
     // cycle's LSB is repurposed for the level bit
     if (!self->m_isrBuffer->push((curCycle | 1) ^ !level)) self->m_isrOverflow.store(true);
+}
+
+void ICACHE_RAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial * self) {
+    uint32_t wait = self->m_bitCycles + self->m_bitCycles / 3 - 600;
+    uint32_t start = ESP.getCycleCount();
+
+    bool level = self->m_invert;
+    // Store level and cycle in the buffer unless we have an overflow
+    // cycle's LSB is repurposed for the level bit
+    if (!self->m_isrBuffer->push(((start + wait) | 1) ^ !level)) self->m_isrOverflow.store(true);
+
+    for (uint32_t i = 0; i < self->m_dataBits + 2; ++i) {
+        while (ESP.getCycleCount() - start < wait) {};
+        wait += self->m_bitCycles;
+
+        // Store level and cycle in the buffer unless we have an overflow
+        // cycle's LSB is repurposed for the level bit
+        if (digitalRead(self->m_rxPin) != level)
+        {
+            if (!self->m_isrBuffer->push(((start + wait) | 1) ^ level)) self->m_isrOverflow.store(true);
+            level = !level;
+        }
+    }
+
+    // Must clear this bit in the interrupt register,
+    // it gets set even when interrupts are disabled
+    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << self->m_rxPin);
 }
 
 void SoftwareSerial::onReceive(std::function<void(int available)> handler) {

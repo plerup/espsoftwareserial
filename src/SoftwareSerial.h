@@ -128,6 +128,7 @@ private:
     void rxBits(const uint32_t& isrCycle);
 
     static void rxBitISR(SoftwareSerial* self);
+    static void rxBitSyncISR(SoftwareSerial* self);
 
     // Member variables
     bool m_oneWire;
