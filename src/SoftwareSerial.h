@@ -108,7 +108,7 @@ private:
 #if defined(ESP8266)
         m_periodStart = ESP.getCycleCount() - 64;
 #elif defined(ESP32)
-        m_periodStart = ESP.getCycleCount();
+        m_periodStart = ESP.getCycleCount() - 64;
 #else
         m_periodStart = ESP.getCycleCount();
 #endif
