@@ -21,17 +21,18 @@
 #define D6 (12)
 #define D7 (13)
 #define D8 (15)
+#define TX (1)
 #endif
 
 // Pick only one of HWLOOPBACK OR HWSENDNSINK
-//#define HWLOOPBACK 1
+#define HWLOOPBACK 1
 //#define HWSENDNSINK 1
-//#define HALFDUPLEX 1
+#define HALFDUPLEX 1
 
 #ifdef ESP32
 constexpr int IUTBITRATE = 115200;
 #else
-constexpr int IUTBITRATE = 115200;
+constexpr int IUTBITRATE = 128000;
 #endif
 
 #if defined(ESP8266) || defined(ESP32)

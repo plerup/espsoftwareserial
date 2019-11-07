@@ -137,7 +137,7 @@ void SoftwareSerial::enableRx(bool on) {
             m_rxCurBit = m_dataBits;
             // Init to stop bit level and current cycle
             m_isrLastCycle = (ESP.getCycleCount() | 1) ^ m_invert;
-            if (m_bitCycles > (ESP.getCpuFreqMHz() * 1000000 + 74880 / 2) / 74880)
+            if (m_bitCycles > (ESP.getCpuFreqMHz() * 1000000U + 74880U / 2) / 74880U)
                 attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitISR), this, CHANGE);
             else
                 attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitSyncISR), this, m_invert ? RISING : FALLING);
@@ -377,7 +377,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial * self) {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial * self) {
-    uint32_t wait = self->m_bitCycles + self->m_bitCycles / 3 - 600;
+    uint32_t wait = self->m_bitCycles - 130;
     uint32_t start = ESP.getCycleCount();
 
     bool level = self->m_invert;
@@ -385,7 +385,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial * self) {
     // cycle's LSB is repurposed for the level bit
     if (!self->m_isrBuffer->push(((start + wait) | 1) ^ !level)) self->m_isrOverflow.store(true);
 
-    for (uint32_t i = 0; i < self->m_dataBits + 2; ++i) {
+    for (uint32_t i = 0; i < self->m_dataBits + 2U; ++i) {
         while (ESP.getCycleCount() - start < wait) {};
         wait += self->m_bitCycles;
 
@@ -397,10 +397,6 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial * self) {
             level = !level;
         }
     }
-
-    // Must clear this bit in the interrupt register,
-    // it gets set even when interrupts are disabled
-    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << self->m_rxPin);
 }
 
 void SoftwareSerial::onReceive(std::function<void(int available)> handler) {
