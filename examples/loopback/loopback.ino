@@ -24,9 +24,9 @@
 #endif
 
 // Pick only one of HWLOOPBACK OR HWSENDNSINK
-#define HWLOOPBACK 1
+//#define HWLOOPBACK 1
 //#define HWSENDNSINK 1
-#define HALFDUPLEX 1
+//#define HALFDUPLEX 1
 
 #ifdef ESP32
 constexpr int IUTBITRATE = 115200;
