@@ -188,19 +188,19 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool asyn, uint32_t savedPS) {
     if (asyn)
     {
         resetPeriodStart();
-        m_periodDuration = 0;
     }
     if (asyn && !m_intTxEnabled) { savedPS = xt_rsil(15); }
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
     uint32_t dutyCycle, uint32_t offCycle, bool withStopBit, uint32_t savedPS) {
+    preciseDelay(false, savedPS);
     if (dutyCycle) {
         digitalWrite(m_txPin, HIGH);
         m_periodDuration += dutyCycle;
         bool asyn = withStopBit && !m_invert;
         // Reenable interrupts while delaying to avoid other tasks piling up
-        preciseDelay(asyn, savedPS);
+        if (asyn || offCycle) preciseDelay(asyn, savedPS);
         // Disable interrupts again
     }
     if (offCycle) {
@@ -208,7 +208,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
         m_periodDuration += offCycle;
         bool asyn = withStopBit && m_invert;
         // Reenable interrupts while delaying to avoid other tasks piling up
-        preciseDelay(asyn, savedPS);
+        if (asyn) preciseDelay(asyn, savedPS);
         // Disable interrupts again
     }
 }
@@ -235,7 +235,6 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
         savedPS = xt_rsil(15);
     }
     resetPeriodStart();
-    m_periodDuration = 0;
     const uint32_t dataMask = ((1UL << m_dataBits) - 1);
     for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
         bool withStopBit = true;

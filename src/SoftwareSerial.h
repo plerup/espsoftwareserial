@@ -105,10 +105,11 @@ public:
 private:
     void resetPeriodStart()
     {
+        m_periodDuration = 0;
 #if defined(ESP8266)
-        m_periodStart = ESP.getCycleCount() - 64;
+        m_periodStart = ESP.getCycleCount() - 50;
 #elif defined(ESP32)
-        m_periodStart = ESP.getCycleCount() - 64;
+        m_periodStart = ESP.getCycleCount() - 32;
 #else
         m_periodStart = ESP.getCycleCount();
 #endif
