@@ -24,15 +24,16 @@
 #define TX (1)
 #endif
 
-// Pick only one of HWLOOPBACK OR HWSENDNSINK
+// Pick only one of HWLOOPBACK, HWSOURCESWSINK, or HWSOURCESINK
 #define HWLOOPBACK 1
-//#define HWSENDNSINK 1
+//#define HWSOURCESWSINK 1
+//#define HWSOURCESINK 1
 #define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 115200;
+constexpr int IUTBITRATE = 64000;
 #else
-constexpr int IUTBITRATE = 128000;
+constexpr int IUTBITRATE = 153600;
 #endif
 
 #if defined(ESP8266) || defined(ESP32)
@@ -53,11 +54,11 @@ int rxErrors;
 constexpr int ReportInterval = IUTBITRATE / 8;
 
 #if defined(ESP8266)
-#if defined(HWLOOPBACK)
-HardwareSerial& hwLoopback(Serial);
+#if defined(HWLOOPBACK) || defined(HWSOURCESWSINK)
+HardwareSerial& hwSerial(Serial);
 SoftwareSerial serialIUT;
 SoftwareSerial logger;
-#elif defined(HWSENDNSINK)
+#elif defined(HWSOURCESINK)
 HardwareSerial& serialIUT(Serial);
 SoftwareSerial logger;
 #else
@@ -65,10 +66,10 @@ SoftwareSerial serialIUT;
 HardwareSerial& logger(Serial);
 #endif
 #elif defined(ESP32)
-#if defined(HWLOOPBACK)
-HardwareSerial& hwLoopback(Serial2);
+#if defined(HWLOOPBACK) || defined (HWSOURCESWSINK)
+HardwareSerial& hwSerial(Serial2);
 SoftwareSerial serialIUT;
-#elif defined(HWSENDNSINK)
+#elif defined(HWSOURCESINK)
 HardwareSerial& serialIUT(Serial2);
 #else
 SoftwareSerial serialIUT;
@@ -81,7 +82,7 @@ HardwareSerial& logger(Serial);
 
 void setup() {
 #if defined(ESP8266)
-#if defined(HWLOOPBACK) || defined(HWSENDNSINK)
+#if defined(HWLOOPBACK) || defined(HWSOURCESINK) || defined(HWSOURCESWSINK)
     Serial.begin(IUTBITRATE);
     Serial.swap();
     Serial.setRxBufferSize(2 * BLOCKSIZE);
@@ -90,11 +91,11 @@ void setup() {
     Serial.begin(9600);
 #endif
 #elif defined(ESP32)
-#if defined(HWLOOPBACK)
+#if defined(HWLOOPBACK) || defined(HWSOURCESWSINK)
     Serial2.begin(IUTBITRATE);
     Serial2.setRxBufferSize(2 * BLOCKSIZE);
     logger.begin(9600);
-#elif defined(HWSENDNSINK)
+#elif defined(HWSOURCESINK)
     serialIUT.begin(IUTBITRATE, SERIAL_8N1, D5, D6);
     serialIUT.setRxBufferSize(2 * BLOCKSIZE);
     logger.begin(9600);
@@ -105,7 +106,7 @@ void setup() {
     Serial.begin(9600);
 #endif
 
-#if !defined(HWSENDNSINK)
+#if !defined(HWSOURCESINK)
 #if defined(ESP8266)
     serialIUT.begin(IUTBITRATE, D5, D6, swSerialConfig, false, 4 * BLOCKSIZE);
 #ifdef HALFDUPLEX
@@ -138,12 +139,16 @@ void loop() {
     unsigned char inBuf[2 * BLOCKSIZE];
     for (int i = 0; i < BLOCKSIZE; ++i) {
 #ifndef HALFDUPLEX
+#ifdef HWSOURCESWSINK
+        hwSerial.write(c);
+#else
         serialIUT.write(c);
+#endif
 #ifdef HWLOOPBACK
-        int avail = hwLoopback.available();
+        int avail = hwSerial.available();
         while ((0 == (i % 8)) && avail > 0) {
-            int inCnt = hwLoopback.readBytes(inBuf, min(avail, min(BLOCKSIZE, hwLoopback.availableForWrite())));
-            hwLoopback.write(inBuf, inCnt);
+            int inCnt = hwSerial.readBytes(inBuf, min(avail, min(BLOCKSIZE, hwSerial.availableForWrite())));
+            hwSerial.write(inBuf, inCnt);
             avail -= inCnt;
         }
 #endif
@@ -154,9 +159,13 @@ void loop() {
         ++txCount;
     }
 #ifdef HALFDUPLEX
+#ifdef HWSOURCESWSINK
+    hwSerial.write(block, BLOCKSIZE);
+#else
     serialIUT.write(block, BLOCKSIZE);
 #endif
-#ifdef HWSENDNSINK
+#endif
+#ifdef HWSOURCESINK
 #if defined(ESP8266)
     if (Serial.hasOverrun()) { logger.println("Serial::overrun"); }
 #endif
@@ -172,17 +181,17 @@ void loop() {
     deadlineStart = ESP.getCycleCount();
     inCnt = 0;
     while ((ESP.getCycleCount() - deadlineStart) < (1000000 * 10 * BLOCKSIZE) / IUTBITRATE * 8 * ESP.getCpuFreqMHz()) {
-        int avail = hwLoopback.available();
+        int avail = hwSerial.available();
         if (0 >= avail) {
             delay(1);
             continue;
         }
-        inCnt += hwLoopback.readBytes(&inBuf[inCnt], min(avail, min(BLOCKSIZE - inCnt, hwLoopback.availableForWrite())));
+        inCnt += hwSerial.readBytes(&inBuf[inCnt], min(avail, min(BLOCKSIZE - inCnt, hwSerial.availableForWrite())));
         if (inCnt >= BLOCKSIZE) { break; }
         // wait for more outstanding bytes to trickle in
         deadlineStart = ESP.getCycleCount();
     }
-    hwLoopback.write(inBuf, inCnt);
+    hwSerial.write(inBuf, inCnt);
 #endif
 
     // starting deadline for the first bytes to come in
@@ -217,10 +226,9 @@ void loop() {
         logger.println(String("tx/rx: ") + txCount + "/" + rxCount);
         const long txCps = txCount * (1000000.0 / interval);
         const long rxCps = rxCount * (1000000.0 / interval);
-        const long errorCps = rxErrors * (1000000.0 / interval);
         logger.println(effTxTxt + 10 * txCps + "bps, "
             + effRxTxt + 10 * rxCps + "bps, "
-            + errorCps + "cps errors (" + 100.0 * rxErrors / (!rxErrors ? 1 : rxCount) + "%)");
+            + rxErrors + " errors (" + 100.0 * rxErrors / (!rxErrors ? 1 : rxCount) + "%)");
         txCount = 0;
         rxCount = 0;
         rxErrors = 0;

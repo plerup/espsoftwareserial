@@ -137,7 +137,7 @@ void SoftwareSerial::enableRx(bool on) {
             m_rxCurBit = m_dataBits;
             // Init to stop bit level and current cycle
             m_isrLastCycle = (ESP.getCycleCount() | 1) ^ m_invert;
-            if (m_bitCycles > (ESP.getCpuFreqMHz() * 1000000U + 74880U / 2) / 74880U)
+            if (m_bitCycles >= (ESP.getCpuFreqMHz() * 1000000U) / 74880U)
                 attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitISR), this, CHANGE);
             else
                 attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitSyncISR), this, m_invert ? RISING : FALLING);
@@ -177,22 +177,19 @@ int SoftwareSerial::available() {
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool asyn, uint32_t savedPS) {
-    if (asyn && !m_intTxEnabled) { xt_wsr_ps(savedPS); }
-    auto expired = ESP.getCycleCount() - m_periodStart;
-    auto micro_s = expired < m_periodDuration ? (m_periodDuration - expired) / ESP.getCpuFreqMHz() : 0;
-    if (asyn) {
-        if (micro_s) delay(micro_s / 1000);
-    }
-    else
+    if (asyn)
     {
-        if (micro_s > m_bit_us) delayMicroseconds(micro_s - m_bit_us);
+        if (!m_intTxEnabled) { xt_wsr_ps(savedPS); }
+        auto expired = ESP.getCycleCount() - m_periodStart;
+        auto micro_s = expired < m_periodDuration ? (m_periodDuration - expired) / ESP.getCpuFreqMHz() : 0;
+        delay(micro_s / 1000);
     }
     while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { if (asyn) optimistic_yield(10000); }
     if (asyn)
     {
         resetPeriodStart();
+        if (!m_intTxEnabled) { savedPS = xt_rsil(15); }
     }
-    if (asyn && !m_intTxEnabled) { savedPS = xt_rsil(15); }
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
@@ -373,19 +370,19 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial * self) {
 
     // Store level and cycle in the buffer unless we have an overflow
     // cycle's LSB is repurposed for the level bit
-    if (!self->m_isrBuffer->push((curCycle | 1) ^ !level)) self->m_isrOverflow.store(true);
+    if (!self->m_isrBuffer->push((curCycle | 1U) ^ !level)) self->m_isrOverflow.store(true);
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial * self) {
-    uint32_t wait = self->m_bitCycles - 130;
     uint32_t start = ESP.getCycleCount();
+    uint32_t wait = self->m_bitCycles - 172U;
 
     bool level = self->m_invert;
     // Store level and cycle in the buffer unless we have an overflow
     // cycle's LSB is repurposed for the level bit
-    if (!self->m_isrBuffer->push(((start + wait) | 1) ^ !level)) self->m_isrOverflow.store(true);
+    if (!self->m_isrBuffer->push(((start + wait) | 1U) ^ !level)) self->m_isrOverflow.store(true);
 
-    for (uint32_t i = 0; i < self->m_dataBits + 2U; ++i) {
+    for (uint32_t i = 0; i < self->m_dataBits + 1U; ++i) {
         while (ESP.getCycleCount() - start < wait) {};
         wait += self->m_bitCycles;
 
@@ -393,7 +390,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial * self) {
         // cycle's LSB is repurposed for the level bit
         if (digitalRead(self->m_rxPin) != level)
         {
-            if (!self->m_isrBuffer->push(((start + wait) | 1) ^ level)) self->m_isrOverflow.store(true);
+            if (!self->m_isrBuffer->push(((start + wait) | 1U) ^ level)) self->m_isrOverflow.store(true);
             level = !level;
         }
     }
