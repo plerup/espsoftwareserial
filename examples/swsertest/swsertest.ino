@@ -24,7 +24,7 @@ SoftwareSerial swSer;
 
 void setup() {
 	Serial.begin(115200);
-	swSer.begin(BAUD_RATE, D5, D6, SWSERIAL_8N1, false, 95, 11);
+	swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
 
 	Serial.println("\nSoftware serial test started");
 

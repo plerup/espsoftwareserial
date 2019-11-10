@@ -12,7 +12,7 @@ void setup() {
 	delay(2000);
 	Serial.begin(115200);
 	Serial.println("\nAlpha 1S Servo Tester");
-	swSer.begin(115200, 12, 12, SWSERIAL_8N1, false, 256);
+	swSer.begin(115200, SWSERIAL_8N1, 12, 12, false, 256);
 }
 
 void loop() {

@@ -34,6 +34,14 @@ SoftwareSerial::SoftwareSerial() {
     m_isrOverflow = false;
 }
 
+SoftwareSerial::SoftwareSerial(int8_t rxPin, int8_t txPin)
+{
+    m_isrOverflow = false;
+    m_rxPin = rxPin;
+    m_txPin = txPin;
+}
+
+
 SoftwareSerial::~SoftwareSerial() {
     end();
 }
@@ -49,12 +57,14 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 #endif
 }
 
-void SoftwareSerial::begin(uint32_t baud, int8_t rxPin, int8_t txPin,
-    SoftwareSerialConfig config, bool invert, int bufCapacity, int isrBufCapacity) {
-    m_oneWire = (rxPin == txPin);
+void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
+    int8_t rxPin, int8_t txPin,
+    bool invert, int bufCapacity, int isrBufCapacity) {
+    if (-1 != rxPin) m_rxPin = rxPin;
+    if (-1 != txPin) m_txPin = txPin;
+    m_oneWire = (m_rxPin == m_txPin);
     m_invert = invert;
-    if (isValidGPIOpin(rxPin)) {
-        m_rxPin = rxPin;
+    if (isValidGPIOpin(m_rxPin)) {
         std::unique_ptr<circular_queue<uint8_t> > buffer(new circular_queue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
         m_buffer = move(buffer);
         std::unique_ptr<circular_queue<uint32_t> > isrBuffer(new circular_queue<uint32_t>((isrBufCapacity > 0) ? isrBufCapacity : (sizeof(uint8_t) * 8 + 2) * bufCapacity));
@@ -64,14 +74,13 @@ void SoftwareSerial::begin(uint32_t baud, int8_t rxPin, int8_t txPin,
             pinMode(m_rxPin, INPUT_PULLUP);
         }
     }
-    if (isValidGPIOpin(txPin)
+    if (isValidGPIOpin(m_txPin)
 #ifdef ESP8266
-        || ((txPin == 16) && !m_oneWire)) {
+        || ((m_txPin == 16) && !m_oneWire)) {
 #else
         ) {
 #endif
         m_txValid = true;
-        m_txPin = txPin;
         if (!m_oneWire) {
             pinMode(m_txPin, OUTPUT);
             digitalWrite(m_txPin, !m_invert);

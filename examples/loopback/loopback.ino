@@ -86,7 +86,7 @@ void setup() {
     Serial.begin(IUTBITRATE);
     Serial.swap();
     Serial.setRxBufferSize(2 * BLOCKSIZE);
-    logger.begin(9600, -1, TX);
+    logger.begin(9600, swSerialConfig, -1, TX);
 #else
     Serial.begin(9600);
 #endif
@@ -96,7 +96,7 @@ void setup() {
     Serial2.setRxBufferSize(2 * BLOCKSIZE);
     logger.begin(9600);
 #elif defined(HWSOURCESINK)
-    serialIUT.begin(IUTBITRATE, SERIAL_8N1, D5, D6);
+    serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6);
     serialIUT.setRxBufferSize(2 * BLOCKSIZE);
     logger.begin(9600);
 #else
@@ -108,12 +108,12 @@ void setup() {
 
 #if !defined(HWSOURCESINK)
 #if defined(ESP8266)
-    serialIUT.begin(IUTBITRATE, D5, D6, swSerialConfig, false, 4 * BLOCKSIZE);
+    serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6, false, 4 * BLOCKSIZE);
 #ifdef HALFDUPLEX
     serialIUT.enableIntTx(false);
 #endif
 #elif defined(ESP32)
-    serialIUT.begin(IUTBITRATE, D5, D6, swSerialConfig, false, 2 * BLOCKSIZE);
+    serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6, false, 2 * BLOCKSIZE);
 #ifdef HALFDUPLEX
     serialIUT.enableIntTx(false);
 #endif

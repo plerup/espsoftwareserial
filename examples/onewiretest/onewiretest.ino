@@ -8,9 +8,9 @@ void setup() {
 	delay(2000);
 	Serial.begin(115200);
 	Serial.println("\nOne Wire Half Duplex Serial Tester");
-	swSer1.begin(115200, 12, 12, SWSERIAL_8N1, false, 256);
+	swSer1.begin(115200, SWSERIAL_8N1, 12, 12, false, 256);
 	swSer1.enableIntTx(true);
-	swSer2.begin(115200, 14, 14, SWSERIAL_8N1, false, 256);
+	swSer2.begin(115200, SWSERIAL_8N1, 14, 14, false, 256);
 	swSer2.enableIntTx(true);
 }
 
