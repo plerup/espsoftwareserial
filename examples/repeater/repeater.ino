@@ -56,7 +56,7 @@ void setup() {
 	repeater.begin(IUTBITRATE);
 	repeater.setRxBufferSize(2 * BLOCKSIZE);
 	repeater.swap();
-	logger.begin(9600, RX, TX);
+	logger.begin(9600, swSerialConfig, RX, TX);
 #elif defined(ESP32)
 	repeater.begin(IUTBITRATE, SERIAL_8N1, D7, D8);
 	repeater.setRxBufferSize(2 * BLOCKSIZE);
@@ -64,9 +64,9 @@ void setup() {
 #endif
 #else
 #if defined(ESP8266)
-	repeater.begin(IUTBITRATE, D7, D8, swSerialConfig, false, 2 * BLOCKSIZE);
+	repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, false, 2 * BLOCKSIZE);
 #elif defined(ESP32)
-	repeater.begin(IUTBITRATE, D7, D8, swSerialConfig, false, 2 * BLOCKSIZE);
+	repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, false, 2 * BLOCKSIZE);
 #endif
 #ifdef HALFDUPLEX
 	repeater.enableIntTx(false);

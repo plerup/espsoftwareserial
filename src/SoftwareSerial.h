@@ -28,9 +28,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <Stream.h>
 #include <functional>
 
-/// If only one tx or rx wanted then use this as parameter for the unused pin.
-constexpr int SW_SERIAL_UNUSED_PIN = -1;
-
 enum SoftwareSerialConfig {
     SWSERIAL_5N1 = 0,
     SWSERIAL_6N1,
@@ -47,11 +44,25 @@ enum SoftwareSerialConfig {
 class SoftwareSerial : public Stream {
 public:
     SoftwareSerial();
+    /// Ctor to set defaults for pins.
+    /// @param rxPin the GPIO pin used for RX
+    /// @param txPin -1 for onewire protocol, GPIO pin used for twowire TX
+    SoftwareSerial(int8_t rxPin, int8_t txPin = -1);
     SoftwareSerial(const SoftwareSerial&) = delete;
     SoftwareSerial& operator= (const SoftwareSerial&) = delete;
     virtual ~SoftwareSerial();
-    void begin(uint32_t baud, int8_t rxPin, int8_t txPin = -1,
-        SoftwareSerialConfig config = SWSERIAL_8N1,
+    /// Configure the SoftwareSerial object for use.
+    /// @param baud the TX/RX bitrate
+    /// @param config sets databits, parity, and stop bit count
+    /// @param rxPin -1 or default: either no RX pin, or keeps the rxPin set in the ctor
+    /// @param txPin -1 or default: either no TX pin (onewire), or keeps the txPin set in the ctor
+    /// @param invert true: uses invert line level logic
+    /// @param bufCapacity the capacity for the received bytes buffer
+    /// @param isrBufCapacity 0: derived from bufCapacity. The capacity of the internal asynchronous
+    ///	       bit receive buffer, a suggested size is bufCapacity times the sum of
+    ///	       start, data, parity and stop bit count.
+    void begin(uint32_t baud, SoftwareSerialConfig config = SWSERIAL_8N1,
+        int8_t rxPin = -1, int8_t txPin = -1,
         bool invert = false, int bufCapacity = 64, int isrBufCapacity = 0);
     uint32_t baudRate();
     /// Transmit control pin.
@@ -126,9 +137,9 @@ private:
 
     // Member variables
     bool m_oneWire;
-    int8_t m_rxPin = SW_SERIAL_UNUSED_PIN;
-    int8_t m_txPin = SW_SERIAL_UNUSED_PIN;
-    int8_t m_txEnablePin = SW_SERIAL_UNUSED_PIN;
+    int8_t m_rxPin = -1;
+    int8_t m_txPin = -1;
+    int8_t m_txEnablePin = -1;
     bool m_rxValid = false;
     bool m_rxEnabled = false;
     bool m_txValid = false;
