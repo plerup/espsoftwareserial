@@ -29,10 +29,54 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <functional>
 
 enum SoftwareSerialConfig {
-    SWSERIAL_5N1 = 0,
+    SWSERIAL_5N1 = 0000,
     SWSERIAL_6N1,
     SWSERIAL_7N1,
     SWSERIAL_8N1,
+    SWSERIAL_5E1 = 0010,
+    SWSERIAL_6E1,
+    SWSERIAL_7E1,
+    SWSERIAL_8E1,
+    SWSERIAL_5O1 = 0020,
+    SWSERIAL_6O1,
+    SWSERIAL_7O1,
+    SWSERIAL_8O1,
+    SWSERIAL_5M1 = 0030,
+    SWSERIAL_6M1,
+    SWSERIAL_7M1,
+    SWSERIAL_8M1,
+    SWSERIAL_5S1 = 0040,
+    SWSERIAL_6S1,
+    SWSERIAL_7S1,
+    SWSERIAL_8S1,
+    SWSERIAL_5N2 = 0100,
+    SWSERIAL_6N2,
+    SWSERIAL_7N2,
+    SWSERIAL_8N2,
+    SWSERIAL_5E2 = 0110,
+    SWSERIAL_6E2,
+    SWSERIAL_7E2,
+    SWSERIAL_8E2,
+    SWSERIAL_5O2 = 0120,
+    SWSERIAL_6O2,
+    SWSERIAL_7O2,
+    SWSERIAL_8O2,
+    SWSERIAL_5M2 = 0130,
+    SWSERIAL_6M2,
+    SWSERIAL_7M2,
+    SWSERIAL_8M2,
+    SWSERIAL_5S2 = 0140,
+    SWSERIAL_6S2,
+    SWSERIAL_7S2,
+    SWSERIAL_8S2,
+};
+
+enum SoftwareSerialParity {
+    SWSERIAL_PARITY_NONE = 0000,
+    SWSERIAL_PARITY_EVEN = 0010,
+    SWSERIAL_PARITY_ODD = 0020,
+    SWSERIAL_PARITY_MARK = 0030,
+    SWSERIAL_PARITY_SPACE = 0040,
 };
 
 /// This class is compatible with the corresponding AVR one, however,
@@ -92,6 +136,7 @@ public:
     }
     void flush() override;
     size_t write(uint8_t byte) override;
+    size_t write(uint8_t byte, SoftwareSerialParity parity);
     size_t write(const uint8_t* buffer, size_t size) override;
     size_t write(const char* buffer, size_t size) {
         return write(reinterpret_cast<const uint8_t*>(buffer), size);
@@ -152,6 +197,8 @@ private:
     bool m_invert;
     bool m_overflow = false;
     uint8_t m_dataBits;
+    SoftwareSerialParity m_parityMode;
+    uint8_t m_stopBits;
     uint32_t m_bit_us;
     uint32_t m_bitCycles;
     uint32_t m_periodStart;

@@ -90,7 +90,9 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
         }
     }
 
-    m_dataBits = 5 + config;
+    m_dataBits = 5 + (config & 07);
+    m_parityMode = static_cast<SoftwareSerialParity>(config & 070);
+    m_stopBits = 1 + (config & 0100);
     m_bit_us = (1000000 + baud / 2) / baud;
     m_bitCycles = (ESP.getCpuFreqMHz() * 1000000 + baud / 2) / baud;
     m_intTxEnabled = true;
