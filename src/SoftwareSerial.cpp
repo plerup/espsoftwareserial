@@ -92,7 +92,8 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
 
     m_dataBits = 5 + (config & 07);
     m_parityMode = static_cast<SoftwareSerialParity>(config & 070);
-    m_stopBits = 1 + (config & 0100);
+    m_stopBits = 1 + (config & 0300) ? 1 : 0;
+    m_pduBits = m_dataBits + static_cast<bool>(m_parityMode) + m_stopBits;
     m_bit_us = (1000000 + baud / 2) / baud;
     m_bitCycles = (ESP.getCpuFreqMHz() * 1000000 + baud / 2) / baud;
     m_intTxEnabled = true;
@@ -151,7 +152,7 @@ void SoftwareSerial::enableTx(bool on) {
 void SoftwareSerial::enableRx(bool on) {
     if (m_rxValid) {
         if (on) {
-            m_rxCurBit = m_dataBits;
+            m_rxCurBit = m_pduBits - 1;
             // Init to stop bit level and current cycle
             m_isrLastCycle = (ESP.getCycleCount() | 1) ^ m_invert;
             if (m_bitCycles >= (ESP.getCpuFreqMHz() * 1000000U) / 74880U)
@@ -246,11 +247,19 @@ void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
     }
 }
 
-size_t SoftwareSerial::write(uint8_t b) {
-    return write(&b, 1);
+size_t SoftwareSerial::write(uint8_t byte) {
+    return write(&byte, 1);
 }
 
-size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size) {
+size_t SoftwareSerial::write(uint8_t byte, SoftwareSerialParity parity) {
+    return write(&byte, 1, parity);
+}
+
+size_t SoftwareSerial::write(const uint8_t * buffer, size_t size) {
+    return write(buffer, size, m_parityMode);
+}
+
+size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size, SoftwareSerialParity parity) {
     if (m_rxValid) { rxBits(); }
     if (!m_txValid) { return -1; }
 
@@ -271,16 +280,42 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
     const uint32_t dataMask = ((1UL << m_dataBits) - 1);
     for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
         bool withStopBit = true;
-        // push LSB start-data-stop bit pattern into uint32_t
-        // Stop bit : LOW if inverted logic, otherwise HIGH
-        uint32_t word = (!m_invert) << m_dataBits;
-        word |= (m_invert ? ~*buffer : *buffer) & dataMask;
+        uint8_t byte = (m_invert ? ~*buffer : *buffer) & dataMask;
+        // push LSB start-data-parity-stop bit pattern into uint32_t
+        // Stop bits : LOW if inverted logic, otherwise HIGH
+        uint32_t word = m_invert ? 0UL : ~0UL << (m_dataBits + static_cast<bool>(parity));
+        // parity bit, if any
+        if (parity)
+        {
+            uint32_t parityBit;
+            switch (parity)
+            {
+            case SWSERIAL_PARITY_EVEN:
+                parityBit = parityEven(byte);
+                break;
+            case SWSERIAL_PARITY_ODD:
+                parityBit = !parityEven(byte);
+                break;
+            case SWSERIAL_PARITY_MARK:
+                parityBit = !m_invert;
+                break;
+            case SWSERIAL_PARITY_SPACE:
+                parityBit = m_invert;
+                break;
+            default:
+                // suppresses warning parityBit uninitialized
+                parityBit = 0;
+                break;
+            }
+            word |= parityBit << m_dataBits;
+        }
+        word |= byte;
         // Start bit : HIGH if inverted logic, otherwise LOW
         word <<= 1;
         word |= m_invert;
-        for (int i = 0; i < m_dataBits + 2; ++i) {
+        for (int i = 0; i <= m_pduBits; ++i) {
             bool pb = b;
-            b = (word >> i) & 1;
+            b = word & (1 << i);
             if (!pb && b) {
                 writePeriod(dutyCycle, offCycle, withStopBit, savedPS);
                 withStopBit = false;
@@ -345,8 +380,8 @@ void SoftwareSerial::rxBits() {
     // stop bit can go undetected if leading data bits are at same level
     // and there was also no next start bit yet, so one byte may be pending.
     // low-cost check first
-    if (!isrAvail && m_rxCurBit >= -1 && m_rxCurBit < m_dataBits) {
-        uint32_t detectionCycles = (m_dataBits - m_rxCurBit) * m_bitCycles;
+    if (!isrAvail && m_rxCurBit >= -1 && m_rxCurBit < m_pduBits - m_stopBits) {
+        uint32_t detectionCycles = (m_pduBits - m_stopBits - m_rxCurBit) * m_bitCycles;
         if (ESP.getCycleCount() - m_isrLastCycle > detectionCycles) {
             // Produce faux stop bit level, prevents start bit maldetection
             // cycle's LSB is repurposed for the level bit
@@ -368,7 +403,7 @@ void SoftwareSerial::rxBits(const uint32_t & isrCycle) {
     if (cycles % m_bitCycles > (m_bitCycles >> 1)) ++bits;
     while (bits > 0) {
         // start bit detection
-        if (m_rxCurBit >= m_dataBits) {
+        if (m_rxCurBit >= (m_pduBits - 1)) {
             // leading edge of start bit
             if (level) break;
             m_rxCurBit = -1;
@@ -377,24 +412,33 @@ void SoftwareSerial::rxBits(const uint32_t & isrCycle) {
         }
         // data bits
         if (m_rxCurBit >= -1 && m_rxCurBit < (m_dataBits - 1)) {
-            int8_t dataBits = min(bits, static_cast<uint8_t>(m_dataBits - m_rxCurBit - 1));
+            int8_t dataBits = min(bits, static_cast<uint8_t>(m_dataBits - 1 - m_rxCurBit));
             m_rxCurBit += dataBits;
             bits -= dataBits;
             m_rxCurByte >>= dataBits;
             if (level) { m_rxCurByte |= (BYTE_ALL_BITS_SET << (8 - dataBits)); }
             continue;
         }
-        // stop bit
-        if (m_rxCurBit == (m_dataBits - 1)) {
+        // parity bit
+        if (static_cast<bool>(m_parityMode) && m_rxCurBit == (m_dataBits - 1)) {
+            ++m_rxCurBit;
+            --bits;
+            m_rxCurParity = level;
+            continue;
+        }
+        // stop bits
+        if (m_rxCurBit < (m_pduBits - m_stopBits - 1)) {
+            ++m_rxCurBit;
+            --bits;
+            continue;
+        }
+        if (m_rxCurBit == (m_pduBits - m_stopBits - 1)) {
             // Store the received value in the buffer unless we have an overflow
             // if not high stop bit level, discard word
             if (level)
             {
                 m_rxCurByte >>= (sizeof(uint8_t) * 8 - m_dataBits);
-                uint8_t octet = m_rxCurByte;
-                octet ^= octet >> 4;
-                octet &= 0xf;
-                if ((0x6996 >> octet) & 1) {
+                if (m_rxCurParity) {
                     m_parityBuffer->pushpeek() |= m_parityInPos;
                 }
                 else {
@@ -408,9 +452,10 @@ void SoftwareSerial::rxBits(const uint32_t & isrCycle) {
                 }
                 m_buffer->push(m_rxCurByte);
             }
-            ++m_rxCurBit;
+            m_rxCurBit = m_pduBits;
             // reset to 0 is important for masked bit logic
             m_rxCurByte = 0;
+            m_rxCurParity = false;
             break;
         }
         break;
@@ -435,7 +480,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial * self) {
     // cycle's LSB is repurposed for the level bit
     if (!self->m_isrBuffer->push(((start + wait) | 1U) ^ !level)) self->m_isrOverflow.store(true);
 
-    for (uint32_t i = 0; i < self->m_dataBits + 1U; ++i) {
+    for (uint32_t i = 0; i < self->m_pduBits; ++i) {
         while (ESP.getCycleCount() - start < wait) {};
         wait += self->m_bitCycles;
 

@@ -38,6 +38,7 @@ constexpr int IUTBITRATE = 153600;
 
 #if defined(ESP8266) || defined(ESP32)
 constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
+constexpr SerialConfig hwSerialConfig = SERIAL_8N1;
 #else
 constexpr unsigned swSerialConfig = 3;
 #endif
@@ -51,6 +52,7 @@ int txCount;
 int rxCount;
 int expected;
 int rxErrors;
+int rxParityErrors;
 constexpr int ReportInterval = IUTBITRATE / 8;
 
 #if defined(ESP8266)
@@ -83,20 +85,20 @@ HardwareSerial& logger(Serial);
 void setup() {
 #if defined(ESP8266)
 #if defined(HWLOOPBACK) || defined(HWSOURCESINK) || defined(HWSOURCESWSINK)
-    Serial.begin(IUTBITRATE);
+    Serial.begin(IUTBITRATE, hwSerialConfig);
     Serial.swap();
     Serial.setRxBufferSize(2 * BLOCKSIZE);
-    logger.begin(9600, swSerialConfig, -1, TX);
+    logger.begin(9600, SWSERIAL_8N1, -1, TX);
 #else
     Serial.begin(9600);
 #endif
 #elif defined(ESP32)
 #if defined(HWLOOPBACK) || defined(HWSOURCESWSINK)
-    Serial2.begin(IUTBITRATE);
+    Serial2.begin(IUTBITRATE, hwSerialConfig);
     Serial2.setRxBufferSize(2 * BLOCKSIZE);
     logger.begin(9600);
 #elif defined(HWSOURCESINK)
-    serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6);
+    serialIUT.begin(IUTBITRATE, hwSerialConfig, D5, D6);
     serialIUT.setRxBufferSize(2 * BLOCKSIZE);
     logger.begin(9600);
 #else
@@ -126,6 +128,7 @@ void setup() {
     txCount = 0;
     rxCount = 0;
     rxErrors = 0;
+    rxParityErrors = 0;
 
     logger.println("Loopback example for EspSoftwareSerial");
 }
@@ -198,13 +201,10 @@ void loop() {
     deadlineStart = ESP.getCycleCount();
     inCnt = 0;
     while ((ESP.getCycleCount() - deadlineStart) < (1000000 * 10 * BLOCKSIZE) / IUTBITRATE * 2 * ESP.getCpuFreqMHz()) {
-        int avail;
-        if (0 >= (avail = serialIUT.available())) {
-            continue;
-        }
-        avail = serialIUT.readBytes(inBuf, min(avail, 2 * BLOCKSIZE));
-        for (int i = 0; i < avail; ++i) {
-            unsigned char r = inBuf[i];
+        int avail = serialIUT.available();
+        for (int i = 0; i < avail; ++i)
+        {
+            unsigned char r = serialIUT.read();
             if (expected == -1) { expected = r; }
             else {
                 expected = (expected + 1) % 256;
@@ -213,9 +213,14 @@ void loop() {
                 ++rxErrors;
                 expected = -1;
             }
+            if ((serialIUT.readParity() ^ static_cast<bool>(swSerialConfig & 010)) != serialIUT.parityEven(r))
+            {
+                ++rxParityErrors;
+            }
             ++rxCount;
             ++inCnt;
         }
+
         if (inCnt >= BLOCKSIZE) { break; }
         // wait for more outstanding bytes to trickle in
         deadlineStart = ESP.getCycleCount();
@@ -226,12 +231,21 @@ void loop() {
         logger.println(String("tx/rx: ") + txCount + "/" + rxCount);
         const long txCps = txCount * (1000000.0 / interval);
         const long rxCps = rxCount * (1000000.0 / interval);
-        logger.println(effTxTxt + 10 * txCps + "bps, "
+        logger.print(effTxTxt + 10 * txCps + "bps, "
             + effRxTxt + 10 * rxCps + "bps, "
             + rxErrors + " errors (" + 100.0 * rxErrors / (!rxErrors ? 1 : rxCount) + "%)");
+        if (0 != (swSerialConfig & 070))
+        {
+            logger.println(String(" (") + rxParityErrors + " parity errors)");
+        }
+        else
+        {
+            logger.println();
+        }
         txCount = 0;
         rxCount = 0;
         rxErrors = 0;
+        rxParityErrors = 0;
         expected = -1;
         // resync
         delay(static_cast<uint32_t>(1000 * 10 * BLOCKSIZE / IUTBITRATE * 16));
