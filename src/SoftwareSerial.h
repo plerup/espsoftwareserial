@@ -28,11 +28,55 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <Stream.h>
 #include <functional>
 
+enum SoftwareSerialParity {
+    SWSERIAL_PARITY_NONE = 000,
+    SWSERIAL_PARITY_EVEN = 020,
+    SWSERIAL_PARITY_ODD = 030,
+    SWSERIAL_PARITY_MARK = 040,
+    SWSERIAL_PARITY_SPACE = 070,
+};
+
 enum SoftwareSerialConfig {
-    SWSERIAL_5N1 = 0,
+    SWSERIAL_5N1 = SWSERIAL_PARITY_NONE,
     SWSERIAL_6N1,
     SWSERIAL_7N1,
     SWSERIAL_8N1,
+    SWSERIAL_5E1 = SWSERIAL_PARITY_EVEN,
+    SWSERIAL_6E1,
+    SWSERIAL_7E1,
+    SWSERIAL_8E1,
+    SWSERIAL_5O1 = SWSERIAL_PARITY_ODD,
+    SWSERIAL_6O1,
+    SWSERIAL_7O1,
+    SWSERIAL_8O1,
+    SWSERIAL_5M1 = SWSERIAL_PARITY_MARK,
+    SWSERIAL_6M1,
+    SWSERIAL_7M1,
+    SWSERIAL_8M1,
+    SWSERIAL_5S1 = SWSERIAL_PARITY_SPACE,
+    SWSERIAL_6S1,
+    SWSERIAL_7S1,
+    SWSERIAL_8S1,
+    SWSERIAL_5N2 = 0200 | SWSERIAL_PARITY_NONE,
+    SWSERIAL_6N2,
+    SWSERIAL_7N2,
+    SWSERIAL_8N2,
+    SWSERIAL_5E2 = 0200 | SWSERIAL_PARITY_EVEN,
+    SWSERIAL_6E2,
+    SWSERIAL_7E2,
+    SWSERIAL_8E2,
+    SWSERIAL_5O2 = 0200 | SWSERIAL_PARITY_ODD,
+    SWSERIAL_6O2,
+    SWSERIAL_7O2,
+    SWSERIAL_8O2,
+    SWSERIAL_5M2 = 0200 | SWSERIAL_PARITY_MARK,
+    SWSERIAL_6M2,
+    SWSERIAL_7M2,
+    SWSERIAL_8M2,
+    SWSERIAL_5S2 = 0200 | SWSERIAL_PARITY_SPACE,
+    SWSERIAL_6S2,
+    SWSERIAL_7S2,
+    SWSERIAL_8S2,
 };
 
 /// This class is compatible with the corresponding AVR one, however,
@@ -79,6 +123,21 @@ public:
     }
     int peek() override;
     int read() override;
+    /// @returns The verbatim parity bit associated with the last read() or peek() call
+    bool readParity()
+    {
+        return m_lastReadParity;
+    }
+    /// @returns The calculated bit for even parity of the parameter byte
+    bool parityEven(uint8_t byte) {
+        byte ^= byte >> 4;
+        byte &= 0xf;
+        return (0x6996 >> byte) & 1;
+    }
+    /// @returns The calculated bit for odd parity of the parameter byte
+    bool parityOdd(uint8_t byte) {
+        return !parityEven(byte);
+    }
     /// The readBytes functions are non-waiting, there is no timeout.
     size_t readBytes(uint8_t* buffer, size_t size) override;
     /// The readBytes functions are non-waiting, there is no timeout.
@@ -87,9 +146,14 @@ public:
     }
     void flush() override;
     size_t write(uint8_t byte) override;
+    size_t write(uint8_t byte, SoftwareSerialParity parity);
     size_t write(const uint8_t* buffer, size_t size) override;
     size_t write(const char* buffer, size_t size) {
         return write(reinterpret_cast<const uint8_t*>(buffer), size);
+    }
+    size_t write(const uint8_t* buffer, size_t size, SoftwareSerialParity parity);
+    size_t write(const char* buffer, size_t size, SoftwareSerialParity parity) {
+        return write(reinterpret_cast<const uint8_t*>(buffer), size, parity);
     }
     operator bool() const { return m_rxValid || m_txValid; }
 
@@ -147,19 +211,28 @@ private:
     bool m_invert;
     bool m_overflow = false;
     uint8_t m_dataBits;
+    /// PDU bits include data, parity and stop bits; the start bit is not counted.
+    uint8_t m_pduBits;
+    SoftwareSerialParity m_parityMode;
+    uint8_t m_stopBits;
     uint32_t m_bit_us;
     uint32_t m_bitCycles;
     uint32_t m_periodStart;
     uint32_t m_periodDuration;
     bool m_intTxEnabled;
     std::unique_ptr<circular_queue<uint8_t> > m_buffer;
+    std::unique_ptr<circular_queue<uint8_t> > m_parityBuffer;
+    uint8_t m_parityInPos;
+    uint8_t m_parityOutPos;
+    bool m_lastReadParity;
     // the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
     // 1 = positive including 0, 0 = negative.
     std::unique_ptr<circular_queue<uint32_t> > m_isrBuffer;
     std::atomic<bool> m_isrOverflow;
     uint32_t m_isrLastCycle;
-    int8_t m_rxCurBit; // 0 - 7: data bits. -1: start bit. 8: stop bit.
+    int8_t m_rxCurBit; // 0 thru (m_pduBits - m_stopBits - 1): data/parity bits. -1: start bit. (m_pduBits - 1): stop bit.
     uint8_t m_rxCurByte = 0;
+    bool m_rxCurParity = false;
 
     std::function<void(int available)> receiveHandler;
 };
