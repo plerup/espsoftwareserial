@@ -36,9 +36,12 @@ constexpr int IUTBITRATE = 64000;
 constexpr int IUTBITRATE = 153600;
 #endif
 
-#if defined(ESP8266) || defined(ESP32)
-constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
-constexpr SerialConfig hwSerialConfig = SERIAL_8N1;
+#if defined(ESP8266)
+constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8E2;
+constexpr SerialConfig hwSerialConfig = SERIAL_8E2;
+#elif defined(ESP32)
+constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8E2;
+constexpr uint32_t hwSerialConfig = SERIAL_8E2;
 #else
 constexpr unsigned swSerialConfig = 3;
 #endif
@@ -228,11 +231,12 @@ void loop() {
 
     const uint32_t interval = micros() - start;
     if (txCount >= ReportInterval && interval) {
+        uint8_t wordBits = (5 + swSerialConfig % 4) + static_cast<bool>(swSerialConfig & 070) + 1 + ((swSerialConfig & 0300) ? 1 : 0);
         logger.println(String("tx/rx: ") + txCount + "/" + rxCount);
         const long txCps = txCount * (1000000.0 / interval);
         const long rxCps = rxCount * (1000000.0 / interval);
-        logger.print(effTxTxt + 10 * txCps + "bps, "
-            + effRxTxt + 10 * rxCps + "bps, "
+        logger.print(effTxTxt + wordBits * txCps + "bps, "
+            + effRxTxt + wordBits * rxCps + "bps, "
             + rxErrors + " errors (" + 100.0 * rxErrors / (!rxErrors ? 1 : rxCount) + "%)");
         if (0 != (swSerialConfig & 070))
         {
