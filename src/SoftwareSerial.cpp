@@ -34,13 +34,13 @@ SoftwareSerial::SoftwareSerial() {
     m_isrOverflow = false;
 }
 
-SoftwareSerial::SoftwareSerial(int8_t rxPin, int8_t txPin)
+SoftwareSerial::SoftwareSerial(int8_t rxPin, int8_t txPin, bool invert)
 {
     m_isrOverflow = false;
     m_rxPin = rxPin;
     m_txPin = txPin;
+    m_invert = invert;
 }
-
 
 SoftwareSerial::~SoftwareSerial() {
     end();
@@ -98,6 +98,10 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     m_bitCycles = (ESP.getCpuFreqMHz() * 1000000 + baud / 2) / baud;
     m_intTxEnabled = true;
     if (!m_rxEnabled) { enableRx(true); }
+}
+
+void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config) {
+    begin(baud, config, -1, -1, m_invert);
 }
 
 void SoftwareSerial::end()
