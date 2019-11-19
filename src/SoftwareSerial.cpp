@@ -100,10 +100,6 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     if (!m_rxEnabled) { enableRx(true); }
 }
 
-void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config) {
-    begin(baud, config, -1, -1, m_invert);
-}
-
 void SoftwareSerial::end()
 {
     enableRx(false);

@@ -106,9 +106,20 @@ public:
     ///	       bit receive buffer, a suggested size is bufCapacity times the sum of
     ///	       start, data, parity and stop bit count.
     void begin(uint32_t baud, SoftwareSerialConfig config,
-        int8_t rxPin, int8_t txPin = -1,
-        bool invert = false, int bufCapacity = 64, int isrBufCapacity = 0);
-    void begin(uint32_t baud, SoftwareSerialConfig config = SWSERIAL_8N1);
+        int8_t rxPin, int8_t txPin, bool invert,
+        int bufCapacity = 64, int isrBufCapacity = 0);
+    void begin(uint32_t baud, SoftwareSerialConfig config,
+        int8_t rxPin, int8_t txPin) {
+        begin(baud, config, rxPin, txPin, m_invert);
+    }
+    void begin(uint32_t baud, SoftwareSerialConfig config,
+        int8_t rxPin) {
+        begin(baud, config, rxPin, m_txPin, m_invert);
+    }
+    void begin(uint32_t baud, SoftwareSerialConfig config = SWSERIAL_8N1) {
+        begin(baud, config, m_rxPin, m_txPin, m_invert);
+    }
+
     uint32_t baudRate();
     /// Transmit control pin.
     void setTransmitEnablePin(int8_t txEnablePin);
