@@ -31,17 +31,17 @@
 #define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 64000;
+constexpr int IUTBITRATE = 57600;
 #else
 constexpr int IUTBITRATE = 153600;
 #endif
 
 #if defined(ESP8266)
-constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8E2;
-constexpr SerialConfig hwSerialConfig = SERIAL_8E2;
+constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8E1;
+constexpr SerialConfig hwSerialConfig = SERIAL_8E1;
 #elif defined(ESP32)
-constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8E2;
-constexpr uint32_t hwSerialConfig = SERIAL_8E2;
+constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8E1;
+constexpr uint32_t hwSerialConfig = SERIAL_8E1;
 #else
 constexpr unsigned swSerialConfig = 3;
 #endif
@@ -97,7 +97,7 @@ void setup() {
 #endif
 #elif defined(ESP32)
 #if defined(HWLOOPBACK) || defined(HWSOURCESWSINK)
-    Serial2.begin(IUTBITRATE, hwSerialConfig);
+    Serial2.begin(IUTBITRATE, hwSerialConfig, D4, D3, false);
     Serial2.setRxBufferSize(2 * BLOCKSIZE);
     logger.begin(9600);
 #elif defined(HWSOURCESINK)
