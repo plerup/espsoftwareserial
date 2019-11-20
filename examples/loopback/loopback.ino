@@ -33,7 +33,7 @@
 #ifdef ESP32
 constexpr int IUTBITRATE = 57600;
 #else
-constexpr int IUTBITRATE = 153600;
+constexpr int IUTBITRATE = 74880;
 #endif
 
 #if defined(ESP8266)
@@ -45,6 +45,7 @@ constexpr uint32_t hwSerialConfig = SERIAL_8E1;
 #else
 constexpr unsigned swSerialConfig = 3;
 #endif
+constexpr bool invert = false;
 
 constexpr int BLOCKSIZE = 16; // use fractions of 256
 
@@ -88,7 +89,7 @@ HardwareSerial& logger(Serial);
 void setup() {
 #if defined(ESP8266)
 #if defined(HWLOOPBACK) || defined(HWSOURCESINK) || defined(HWSOURCESWSINK)
-    Serial.begin(IUTBITRATE, hwSerialConfig);
+    Serial.begin(IUTBITRATE, hwSerialConfig, SERIAL_FULL, 1, invert);
     Serial.swap();
     Serial.setRxBufferSize(2 * BLOCKSIZE);
     logger.begin(9600, SWSERIAL_8N1, -1, TX);
@@ -97,11 +98,11 @@ void setup() {
 #endif
 #elif defined(ESP32)
 #if defined(HWLOOPBACK) || defined(HWSOURCESWSINK)
-    Serial2.begin(IUTBITRATE, hwSerialConfig, D4, D3, false);
+    Serial2.begin(IUTBITRATE, hwSerialConfig, D4, D3, invert);
     Serial2.setRxBufferSize(2 * BLOCKSIZE);
     logger.begin(9600);
 #elif defined(HWSOURCESINK)
-    serialIUT.begin(IUTBITRATE, hwSerialConfig, D5, D6);
+    serialIUT.begin(IUTBITRATE, hwSerialConfig, D5, D6, invert);
     serialIUT.setRxBufferSize(2 * BLOCKSIZE);
     logger.begin(9600);
 #else
@@ -113,12 +114,12 @@ void setup() {
 
 #if !defined(HWSOURCESINK)
 #if defined(ESP8266)
-    serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6, false, 4 * BLOCKSIZE);
+    serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6, invert, 4 * BLOCKSIZE);
 #ifdef HALFDUPLEX
     serialIUT.enableIntTx(false);
 #endif
 #elif defined(ESP32)
-    serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6, false, 2 * BLOCKSIZE);
+    serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6, invert, 2 * BLOCKSIZE);
 #ifdef HALFDUPLEX
     serialIUT.enableIntTx(false);
 #endif

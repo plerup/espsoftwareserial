@@ -14,15 +14,16 @@
 #define D6 (12)
 #define D7 (13)
 #define D8 (15)
+#define TX (1)
 #endif
 
 //#define HWLOOPBACK 1
 //#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 19200;
+constexpr int IUTBITRATE = 57600;
 #else
-constexpr int IUTBITRATE = 19200;
+constexpr int IUTBITRATE = 74880;
 #endif
 
 constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
