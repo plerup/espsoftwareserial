@@ -213,6 +213,7 @@ int SoftwareSerial::available() {
 void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool asyn, uint32_t savedPS) {
     if (asyn)
     {
+        // Reenable interrupts while delaying to avoid other tasks piling up
         if (!m_intTxEnabled) { xt_wsr_ps(savedPS); }
         auto expired = ESP.getCycleCount() - m_periodStart;
         auto micro_s = expired < m_periodDuration ? (m_periodDuration - expired) / ESP.getCpuFreqMHz() : 0;
@@ -222,6 +223,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool asyn, uint32_t savedPS) {
     if (asyn)
     {
         resetPeriodStart();
+        // Disable interrupts again
         if (!m_intTxEnabled) { savedPS = xt_rsil(15); }
     }
 }
@@ -233,17 +235,13 @@ void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
         digitalWrite(m_txPin, HIGH);
         m_periodDuration += dutyCycle;
         bool asyn = withStopBit && !m_invert;
-        // Reenable interrupts while delaying to avoid other tasks piling up
         if (asyn || offCycle) preciseDelay(asyn, savedPS);
-        // Disable interrupts again
     }
     if (offCycle) {
         digitalWrite(m_txPin, LOW);
         m_periodDuration += offCycle;
         bool asyn = withStopBit && m_invert;
-        // Reenable interrupts while delaying to avoid other tasks piling up
         if (asyn) preciseDelay(asyn, savedPS);
-        // Disable interrupts again
     }
 }
 
