@@ -210,38 +210,26 @@ int SoftwareSerial::available() {
     return avail;
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool asyn, uint32_t savedPS) {
-    if (asyn)
+void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(uint32_t cycles, bool relaxed)
+{
+    m_periodDuration += cycles;
+    if (relaxed)
     {
         // Reenable interrupts while delaying to avoid other tasks piling up
-        if (!m_intTxEnabled) { xt_wsr_ps(savedPS); }
+        if (!m_intTxEnabled) { xt_wsr_ps(m_savedPS); }
         auto expired = ESP.getCycleCount() - m_periodStart;
-        auto micro_s = expired < m_periodDuration ? (m_periodDuration - expired) / ESP.getCpuFreqMHz() : 0;
-        delay(micro_s / 1000);
+        if (expired < m_periodDuration)
+        {
+            auto ms = (m_periodDuration - expired) / ESP.getCpuFreqMHz() / 1000UL;
+            if (ms) delay(ms);
+        }
     }
-    while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { if (asyn) optimistic_yield(10000); }
-    if (asyn)
+    while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { if (relaxed) optimistic_yield(10000); }
+    // Disable interrupts again
+    if (relaxed)
     {
         resetPeriodStart();
-        // Disable interrupts again
-        if (!m_intTxEnabled) { savedPS = xt_rsil(15); }
-    }
-}
-
-void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
-    uint32_t dutyCycle, uint32_t offCycle, bool withStopBit, uint32_t savedPS) {
-    preciseDelay(false, savedPS);
-    if (dutyCycle) {
-        digitalWrite(m_txPin, HIGH);
-        m_periodDuration += dutyCycle;
-        bool asyn = withStopBit && !m_invert;
-        if (asyn || offCycle) preciseDelay(asyn, savedPS);
-    }
-    if (offCycle) {
-        digitalWrite(m_txPin, LOW);
-        m_periodDuration += offCycle;
-        bool asyn = withStopBit && m_invert;
-        if (asyn) preciseDelay(asyn, savedPS);
+        if (!m_intTxEnabled) { m_savedPS = xt_rsil(15); }
     }
 }
 
@@ -264,24 +252,20 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
     if (m_txEnableValid) {
         digitalWrite(m_txEnablePin, HIGH);
     }
-    // Stop bit : LOW if inverted logic, otherwise HIGH
-    bool b = !m_invert;
-    // Force line level on entry
-    uint32_t dutyCycle = b;
-    uint32_t offCycle = m_invert;
-    uint32_t savedPS = 0;
+    // Stop bit: HIGH
+    bool b = true;
+    uint32_t curBitCycles = 0;
     if (!m_intTxEnabled) {
         // Disable interrupts in order to get a clean transmit timing
-        savedPS = xt_rsil(15);
+        m_savedPS = xt_rsil(15);
     }
     resetPeriodStart();
     const uint32_t dataMask = ((1UL << m_dataBits) - 1);
-    for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
-        bool withStopBit = true;
-        uint8_t byte = (m_invert ? ~*buffer : *buffer) & dataMask;
+    for (size_t cnt = 0; cnt < size; ++cnt) {
+        uint8_t byte = buffer[cnt] & dataMask;
         // push LSB start-data-parity-stop bit pattern into uint32_t
-        // Stop bits : LOW if inverted logic, otherwise HIGH
-        uint32_t word = m_invert ? 0UL : ~0UL << (m_dataBits + static_cast<bool>(parity));
+        // Stop bits: HIGH
+        uint32_t word = ~0UL << (m_dataBits + static_cast<bool>(parity));
         // parity bit, if any
         if (parity)
         {
@@ -295,42 +279,36 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
                 parityBit = !parityEven(byte);
                 break;
             case SWSERIAL_PARITY_MARK:
-                parityBit = !m_invert;
+                parityBit = 1;
                 break;
             case SWSERIAL_PARITY_SPACE:
-                parityBit = m_invert;
-                break;
-            default:
                 // suppresses warning parityBit uninitialized
+            default:
                 parityBit = 0;
                 break;
             }
             word |= parityBit << m_dataBits;
         }
         word |= byte;
-        // Start bit : HIGH if inverted logic, otherwise LOW
+        // Start bit: LOW
         word <<= 1;
-        word |= m_invert;
         for (int i = 0; i <= m_pduBits; ++i) {
             bool pb = b;
             b = word & (1 << i);
-            if (!pb && b) {
-                writePeriod(dutyCycle, offCycle, withStopBit, savedPS);
-                withStopBit = false;
-                dutyCycle = offCycle = 0;
+            if (pb != b)
+            {
+                preciseDelay(curBitCycles, false);
+                curBitCycles = 0;
+                digitalWrite(m_txPin, (b ^ m_invert) ? HIGH : LOW);
             }
-            if (b) {
-                dutyCycle += m_bitCycles;
-            }
-            else {
-                offCycle += m_bitCycles;
-            }
+            curBitCycles += m_bitCycles;
         }
+        preciseDelay(curBitCycles, true);
+        curBitCycles = 0;
     }
-    writePeriod(dutyCycle, offCycle, true, savedPS);
     if (!m_intTxEnabled) {
         // restore the interrupt state
-        xt_wsr_ps(savedPS);
+        xt_wsr_ps(m_savedPS);
     }
     if (m_txEnableValid) {
         digitalWrite(m_txEnablePin, LOW);

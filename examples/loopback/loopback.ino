@@ -33,7 +33,7 @@
 #ifdef ESP32
 constexpr int IUTBITRATE = 57600;
 #else
-constexpr int IUTBITRATE = 74880;
+constexpr int IUTBITRATE = 153600;
 #endif
 
 #if defined(ESP8266)
@@ -189,14 +189,10 @@ void loop() {
     inCnt = 0;
     while ((ESP.getCycleCount() - deadlineStart) < (1000000 * 10 * BLOCKSIZE) / IUTBITRATE * 8 * ESP.getCpuFreqMHz()) {
         int avail = hwSerial.available();
-        if (0 >= avail) {
-            delay(1);
-            continue;
-        }
         inCnt += hwSerial.readBytes(&inBuf[inCnt], min(avail, min(BLOCKSIZE - inCnt, hwSerial.availableForWrite())));
         if (inCnt >= BLOCKSIZE) { break; }
         // wait for more outstanding bytes to trickle in
-        deadlineStart = ESP.getCycleCount();
+        if (avail) deadlineStart = ESP.getCycleCount();
     }
     hwSerial.write(inBuf, inCnt);
 #endif
@@ -217,17 +213,19 @@ void loop() {
                 ++rxErrors;
                 expected = -1;
             }
+#ifndef HWSOURCESINK
             if ((serialIUT.readParity() ^ static_cast<bool>(swSerialConfig & 010)) != serialIUT.parityEven(r))
             {
                 ++rxParityErrors;
             }
+#endif
             ++rxCount;
             ++inCnt;
         }
 
         if (inCnt >= BLOCKSIZE) { break; }
         // wait for more outstanding bytes to trickle in
-        deadlineStart = ESP.getCycleCount();
+        if (avail) deadlineStart = ESP.getCycleCount();
     }
 
     const uint32_t interval = micros() - start;

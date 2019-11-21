@@ -195,14 +195,8 @@ private:
         m_periodDuration = 0;
         m_periodStart = ESP.getCycleCount();
     }
-    // If asyn, it's legal to exceed the deadline, for instance,
-    // by enabling interrupts.
-    void preciseDelay(bool asyn, uint32_t savedPS);
-    // If withStopBit is set, either cycle contains a stop bit.
-    // If dutyCycle == 0, the level is not forced to HIGH.
-    // If offCycle == 0, the level remains unchanged from dutyCycle.
-    void writePeriod(
-        uint32_t dutyCycle, uint32_t offCycle, bool withStopBit, uint32_t savedPS);
+    // If relaxed is true, may relax timing to exceed cycle counts, by yielding.
+    void preciseDelay(uint32_t cycles, bool relaxed);
     bool isValidGPIOpin(int8_t pin);
     /* check m_rxValid that calling is safe */
     void rxBits();
@@ -232,6 +226,7 @@ private:
     uint32_t m_periodStart;
     uint32_t m_periodDuration;
     bool m_intTxEnabled;
+    uint32_t m_savedPS = 0;
     std::unique_ptr<circular_queue<uint8_t> > m_buffer;
     std::unique_ptr<circular_queue<uint8_t> > m_parityBuffer;
     uint8_t m_parityInPos;
