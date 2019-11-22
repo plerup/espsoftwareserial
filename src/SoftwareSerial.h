@@ -226,13 +226,13 @@ private:
     /// PDU bits include data, parity and stop bits; the start bit is not counted.
     uint8_t m_pduBits;
     SoftwareSerialParity m_parityMode;
-    uint32_t m_savedPS = 0;
     uint8_t m_stopBits;
     uint32_t m_bit_us;
     uint32_t m_bitCycles;
     uint32_t m_periodStart;
     uint32_t m_periodDuration;
     bool m_intTxEnabled;
+    uint32_t m_savedPS = 0;
     std::unique_ptr<circular_queue<uint8_t> > m_buffer;
     std::unique_ptr<circular_queue<uint8_t> > m_parityBuffer;
     uint8_t m_parityInPos;

@@ -216,8 +216,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool asyn) {
         // Reenable interrupts while delaying to avoid other tasks piling up
         if (!m_intTxEnabled) { xt_wsr_ps(m_savedPS); }
         auto expired = ESP.getCycleCount() - m_periodStart;
-        auto micro_s = expired < m_periodDuration ? (m_periodDuration - expired) / ESP.getCpuFreqMHz() : 0;
-        delay(micro_s / 1000);
+        if (expired < m_periodDuration)
+        {
+            auto ms = (m_periodDuration - expired) / ESP.getCpuFreqMHz() / 1000UL;
+            if (ms) delay(ms);
+        }
     }
     while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { if (asyn) optimistic_yield(10000); }
     if (asyn)
@@ -235,7 +238,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
     {
         digitalWrite(m_txPin, m_invert ? LOW : HIGH);
         m_periodDuration += dutyCycle;
-        if (offCycle) preciseDelay(withStopBit);
+        preciseDelay(withStopBit);
     }
     if (offCycle)
     {
@@ -265,7 +268,6 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
     }
     // Stop bit: HIGH
     bool b = true;
-    // Force line level on entry
     uint32_t dutyCycle = 0;
     uint32_t offCycle = 0;
     if (!m_intTxEnabled) {
