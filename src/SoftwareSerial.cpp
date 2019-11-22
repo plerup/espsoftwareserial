@@ -276,10 +276,10 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
     bool withStopBit = true;
     resetPeriodStart();
     for (size_t cnt = 0; cnt < size; ++cnt) {
-        uint8_t byte = buffer[cnt] & dataMask;
+        uint8_t byte = ~buffer[cnt] & dataMask;
         // push LSB start-data-parity-stop bit pattern into uint32_t
-        // Stop bits : LOW if inverted logic, otherwise HIGH
-        uint32_t word = ~0UL << (m_dataBits + static_cast<bool>(parity));
+        // Stop bits: HIGH
+        uint32_t word = ~0UL;
         // parity bit, if any
         if (parity)
         {
@@ -287,24 +287,24 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
             switch (parity)
             {
             case SWSERIAL_PARITY_EVEN:
-                parityBit = parityEven(byte);
-                break;
-            case SWSERIAL_PARITY_ODD:
                 parityBit = !parityEven(byte);
                 break;
+            case SWSERIAL_PARITY_ODD:
+                parityBit = parityEven(byte);
+                break;
             case SWSERIAL_PARITY_MARK:
-                parityBit = 1UL;
+                parityBit = false;
                 break;
             case SWSERIAL_PARITY_SPACE:
-            default:
                 // suppresses warning parityBit uninitialized
-                parityBit = 0UL;
+            default:
+                parityBit = true;
                 break;
             }
-            word |= parityBit << m_dataBits;
+            word ^= parityBit << m_dataBits;
         }
-        word |= byte;
-        // Start bit: LOW
+        word ^= byte;
+        // Stop bit: LOW
         word <<= 1;
         for (int i = 0; i <= m_pduBits; ++i) {
             bool pb = b;
