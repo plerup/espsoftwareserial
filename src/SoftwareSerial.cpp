@@ -231,17 +231,16 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool asyn) {
 void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
     uint32_t dutyCycle, uint32_t offCycle, bool withStopBit) {
     preciseDelay(false);
-    if (dutyCycle) {
-        digitalWrite(m_txPin, HIGH);
+    if (dutyCycle)
+    {
+        digitalWrite(m_txPin, m_invert ? LOW : HIGH);
         m_periodDuration += dutyCycle;
-        bool asyn = withStopBit && !m_invert;
-        if (asyn || offCycle) preciseDelay(asyn);
+        if (offCycle) preciseDelay(withStopBit);
     }
-    if (offCycle) {
-        digitalWrite(m_txPin, LOW);
+    if (offCycle)
+    {
+        digitalWrite(m_txPin, m_invert ? HIGH : LOW);
         m_periodDuration += offCycle;
-        bool asyn = withStopBit && m_invert;
-        if (asyn) preciseDelay(asyn);
     }
 }
 
@@ -264,23 +263,23 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
     if (m_txEnableValid) {
         digitalWrite(m_txEnablePin, HIGH);
     }
-    // Stop bit : LOW if inverted logic, otherwise HIGH
-    bool b = !m_invert;
+    // Stop bit: HIGH
+    bool b = true;
     // Force line level on entry
-    uint32_t dutyCycle = b;
-    uint32_t offCycle = m_invert;
+    uint32_t dutyCycle = 0;
+    uint32_t offCycle = 0;
     if (!m_intTxEnabled) {
         // Disable interrupts in order to get a clean transmit timing
         m_savedPS = xt_rsil(15);
     }
-    resetPeriodStart();
     const uint32_t dataMask = ((1UL << m_dataBits) - 1);
-    for (size_t cnt = 0; cnt < size; ++cnt, ++buffer) {
-        bool withStopBit = true;
-        uint8_t byte = (m_invert ? ~*buffer : *buffer) & dataMask;
+    bool withStopBit = true;
+    resetPeriodStart();
+    for (size_t cnt = 0; cnt < size; ++cnt) {
+        uint8_t byte = buffer[cnt] & dataMask;
         // push LSB start-data-parity-stop bit pattern into uint32_t
         // Stop bits : LOW if inverted logic, otherwise HIGH
-        uint32_t word = m_invert ? 0UL : ~0UL << (m_dataBits + static_cast<bool>(parity));
+        uint32_t word = ~0UL << (m_dataBits + static_cast<bool>(parity));
         // parity bit, if any
         if (parity)
         {
@@ -294,25 +293,22 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
                 parityBit = !parityEven(byte);
                 break;
             case SWSERIAL_PARITY_MARK:
-                parityBit = !m_invert;
+                parityBit = 1UL;
                 break;
             case SWSERIAL_PARITY_SPACE:
-                parityBit = m_invert;
-                break;
             default:
                 // suppresses warning parityBit uninitialized
-                parityBit = 0;
+                parityBit = 0UL;
                 break;
             }
             word |= parityBit << m_dataBits;
         }
         word |= byte;
-        // Start bit : HIGH if inverted logic, otherwise LOW
+        // Start bit: LOW
         word <<= 1;
-        word |= m_invert;
         for (int i = 0; i <= m_pduBits; ++i) {
             bool pb = b;
-            b = word & (1 << i);
+            b = word & (1UL << i);
             if (!pb && b) {
                 writePeriod(dutyCycle, offCycle, withStopBit);
                 withStopBit = false;
@@ -325,8 +321,9 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
                 offCycle += m_bitCycles;
             }
         }
+        withStopBit = true;
     }
-    writePeriod(dutyCycle, offCycle, true);
+    writePeriod(dutyCycle, offCycle, withStopBit);
     if (!m_intTxEnabled) {
         // restore the interrupt state
         xt_wsr_ps(m_savedPS);
