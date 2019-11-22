@@ -23,7 +23,7 @@
 #ifdef ESP32
 constexpr int IUTBITRATE = 57600;
 #else
-constexpr int IUTBITRATE = 74880;
+constexpr int IUTBITRATE = 153600;
 #endif
 
 constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
@@ -54,83 +54,83 @@ HardwareSerial& logger(Serial);
 void setup() {
 #ifdef HWLOOPBACK
 #if defined(ESP8266)
-	repeater.begin(IUTBITRATE);
-	repeater.setRxBufferSize(2 * BLOCKSIZE);
-	repeater.swap();
-	logger.begin(9600, swSerialConfig, RX, TX);
+    repeater.begin(IUTBITRATE);
+    repeater.setRxBufferSize(2 * BLOCKSIZE);
+    repeater.swap();
+    logger.begin(9600, swSerialConfig, RX, TX);
 #elif defined(ESP32)
-	repeater.begin(IUTBITRATE, SERIAL_8N1, D7, D8);
-	repeater.setRxBufferSize(2 * BLOCKSIZE);
-	logger.begin(9600);
+    repeater.begin(IUTBITRATE, SERIAL_8N1, D7, D8);
+    repeater.setRxBufferSize(2 * BLOCKSIZE);
+    logger.begin(9600);
 #endif
 #else
 #if defined(ESP8266)
-	repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, false, 2 * BLOCKSIZE);
+    repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, false, 2 * BLOCKSIZE);
 #elif defined(ESP32)
-	repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, false, 2 * BLOCKSIZE);
+    repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, false, 2 * BLOCKSIZE);
 #endif
 #ifdef HALFDUPLEX
-	repeater.enableIntTx(false);
+    repeater.enableIntTx(false);
 #endif
-	Serial.begin(9600);
+    Serial.begin(9600);
 #endif
 
-	start = micros();
-	rxCount = 0;
-	seqErrors = 0;
+    start = micros();
+    rxCount = 0;
+    seqErrors = 0;
 }
 
 void loop() {
 #ifdef HALFDUPLEX
-	unsigned char block[BLOCKSIZE];
+    unsigned char block[BLOCKSIZE];
 #endif
-	int inCnt = 0;
-	// starting deadline for the first bytes to come in
-	uint32_t deadline = micros() + 200000;
-	while (static_cast<int32_t>(deadline - micros()) > 0) {
-		if (0 >= repeater.available()) {
-			delay(1);
-			continue;
-		}
-		int r = repeater.read();
-		if (r == -1) { logger.println("read() == -1"); }
-		if (expected == -1) { expected = r; }
-		else {
-			expected = (expected + 1) % 256;
-		}
-		if (r != (expected & ((1 << (5 + swSerialConfig % 4)) - 1))) {
-			++seqErrors;
-			expected = -1;
-		}
-		++rxCount;
+    // starting deadline for the first bytes to come in
+    uint32_t deadlineStart = ESP.getCycleCount();
+    int inCnt = 0;
+    while ((ESP.getCycleCount() - deadlineStart) < (1000000 * 10 * BLOCKSIZE) / IUTBITRATE * 2 * ESP.getCpuFreqMHz()) {
+    int avail = repeater.available();
+    for (int i = 0; i < avail; ++i)
+    {
+        int r = repeater.read();
+        if (r == -1) { logger.println("read() == -1"); }
+        if (expected == -1) { expected = r; }
+        else {
+            expected = (expected + 1) % 256;
+        }
+        if (r != (expected & ((1 << (5 + swSerialConfig % 4)) - 1))) {
+            ++seqErrors;
+            expected = -1;
+        }
+        ++rxCount;
 #ifdef HALFDUPLEX
-		block[inCnt] = r;
+        block[inCnt] = r;
 #else
-		repeater.write(r);
+        repeater.write(r);
 #endif
-		if (++inCnt >= BLOCKSIZE) { break; }
-		// wait for more outstanding bytes to trickle in
-		deadline = micros() + static_cast<uint32_t>(1000000 * 10 * BLOCKSIZE / IUTBITRATE * 32);
-	}
+    }
+    if (++inCnt >= BLOCKSIZE) { break; }
+    // wait for more outstanding bytes to trickle in
+    if (avail) deadlineStart = ESP.getCycleCount();
+    }
 
 #ifdef HALFDUPLEX
-	repeater.write(block, inCnt);
+    repeater.write(block, inCnt);
 #endif
 
-	if (inCnt != 0 && inCnt != BLOCKSIZE) {
-		logger.print("Got "); logger.print(inCnt); logger.println(" bytes during buffer interval");
-	}
+    if (inCnt != 0 && inCnt != BLOCKSIZE) {
+        logger.print("Got "); logger.print(inCnt); logger.println(" bytes during buffer interval");
+    }
 
-	if (rxCount >= ReportInterval) {
-		auto end = micros();
-		unsigned long interval = end - start;
-		long cps = rxCount * (1000000.0 / interval);
-		long seqErrorsps = seqErrors * (1000000.0 / interval);
-		logger.println(bitRateTxt + 10 * cps + "bps, "
-			+ seqErrorsps + "cps seq. errors (" + 100.0 * seqErrors / rxCount + "%)");
-		start = end;
-		rxCount = 0;
-		seqErrors = 0;
-		expected = -1;
-	}
+    if (rxCount >= ReportInterval) {
+        auto end = micros();
+        unsigned long interval = end - start;
+        long cps = rxCount * (1000000.0 / interval);
+        long seqErrorsps = seqErrors * (1000000.0 / interval);
+        logger.println(bitRateTxt + 10 * cps + "bps, "
+            + seqErrorsps + "cps seq. errors (" + 100.0 * seqErrors / rxCount + "%)");
+        start = end;
+        rxCount = 0;
+        seqErrors = 0;
+        expected = -1;
+    }
 }

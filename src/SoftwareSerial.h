@@ -197,12 +197,12 @@ private:
     }
     // If asyn, it's legal to exceed the deadline, for instance,
     // by enabling interrupts.
-    void preciseDelay(bool asyn, uint32_t savedPS);
+    void preciseDelay(bool asyn);
     // If withStopBit is set, either cycle contains a stop bit.
     // If dutyCycle == 0, the level is not forced to HIGH.
     // If offCycle == 0, the level remains unchanged from dutyCycle.
     void writePeriod(
-        uint32_t dutyCycle, uint32_t offCycle, bool withStopBit, uint32_t savedPS);
+        uint32_t dutyCycle, uint32_t offCycle, bool withStopBit);
     bool isValidGPIOpin(int8_t pin);
     /* check m_rxValid that calling is safe */
     void rxBits();
@@ -226,6 +226,7 @@ private:
     /// PDU bits include data, parity and stop bits; the start bit is not counted.
     uint8_t m_pduBits;
     SoftwareSerialParity m_parityMode;
+    uint32_t m_savedPS = 0;
     uint8_t m_stopBits;
     uint32_t m_bit_us;
     uint32_t m_bitCycles;
