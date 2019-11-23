@@ -210,8 +210,8 @@ int SoftwareSerial::available() {
     return avail;
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool asyn) {
-    if (asyn)
+void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
+    if (!sync)
     {
         // Reenable interrupts while delaying to avoid other tasks piling up
         if (!m_intTxEnabled) { xt_wsr_ps(m_savedPS); }
@@ -221,29 +221,27 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool asyn) {
             auto ms = (m_periodDuration - expired) / ESP.getCpuFreqMHz() / 1000UL;
             if (ms) delay(ms);
         }
-    }
-    while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { if (asyn) optimistic_yield(10000); }
-    if (asyn)
-    {
-        resetPeriodStart();
         // Disable interrupts again
         if (!m_intTxEnabled) { m_savedPS = xt_rsil(15); }
     }
+    while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { if (!sync) optimistic_yield(10000); }
+    resetPeriodStart();
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
     uint32_t dutyCycle, uint32_t offCycle, bool withStopBit) {
-    preciseDelay(false);
+    preciseDelay(true);
     if (dutyCycle)
     {
-        digitalWrite(m_txPin, m_invert ? LOW : HIGH);
+        digitalWrite(m_txPin, HIGH);
         m_periodDuration += dutyCycle;
-        preciseDelay(withStopBit);
+        if (offCycle || (withStopBit && !m_invert)) preciseDelay(!withStopBit || m_invert);
     }
     if (offCycle)
     {
-        digitalWrite(m_txPin, m_invert ? HIGH : LOW);
+        digitalWrite(m_txPin, LOW);
         m_periodDuration += offCycle;
+        if (withStopBit && m_invert) preciseDelay(false);
     }
 }
 
@@ -266,8 +264,8 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
     if (m_txEnableValid) {
         digitalWrite(m_txEnablePin, HIGH);
     }
-    // Stop bit: HIGH
-    bool b = true;
+    // Stop bit: if inverted, LOW, otherwise HIGH
+    bool b = !m_invert;
     uint32_t dutyCycle = 0;
     uint32_t offCycle = 0;
     if (!m_intTxEnabled) {
@@ -308,6 +306,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
         word ^= byte;
         // Stop bit: LOW
         word <<= 1;
+        if (m_invert) word = ~word;
         for (int i = 0; i <= m_pduBits; ++i) {
             bool pb = b;
             b = word & (1UL << i);
@@ -325,7 +324,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
         }
         withStopBit = true;
     }
-    writePeriod(dutyCycle, offCycle, withStopBit);
+    writePeriod(dutyCycle, offCycle, true);
     if (!m_intTxEnabled) {
         // restore the interrupt state
         xt_wsr_ps(m_savedPS);

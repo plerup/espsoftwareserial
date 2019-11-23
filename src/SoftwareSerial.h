@@ -195,9 +195,9 @@ private:
         m_periodDuration = 0;
         m_periodStart = ESP.getCycleCount();
     }
-    // If asyn, it's legal to exceed the deadline, for instance,
+    // If sync is false, it's legal to exceed the deadline, for instance,
     // by enabling interrupts.
-    void preciseDelay(bool asyn);
+    void preciseDelay(bool sync);
     // If withStopBit is set, either cycle contains a stop bit.
     // If dutyCycle == 0, the level is not forced to HIGH.
     // If offCycle == 0, the level remains unchanged from dutyCycle.
