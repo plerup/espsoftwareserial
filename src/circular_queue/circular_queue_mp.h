@@ -136,7 +136,7 @@ public:
                 Requeuing is dependent on the return boolean of the callback function. If it
                 returns true, the requeue occurs.
     */
-    bool for_each_requeue(const std::function<bool(T&)>& fun);
+    bool for_each_requeue(const Delegate<bool(T&), void*>& fun);
 
 #ifndef ESP8266
 protected:
@@ -165,7 +165,7 @@ T& circular_queue_mp<T>::pop_requeue()
 }
 
 template< typename T >
-bool circular_queue_mp<T>::for_each_requeue(const std::function<bool(T&)>& fun)
+bool circular_queue_mp<T>::for_each_requeue(const Delegate<bool(T&), void*>& fun)
 {
     auto inPos0 = circular_queue<T>::m_inPos.load(std::memory_order_acquire);
     auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
