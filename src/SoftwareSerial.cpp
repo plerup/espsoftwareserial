@@ -445,7 +445,7 @@ void SoftwareSerial::rxBits(const uint32_t & isrCycle) {
                     m_parityBuffer->push();
                     m_parityInPos = 1;
                 }
-                m_buffer->push(m_rxCurByte);
+                if (!m_buffer->push(m_rxCurByte)) m_overflow = true;
             }
             m_rxCurBit = m_pduBits;
             // reset to 0 is important for masked bit logic
