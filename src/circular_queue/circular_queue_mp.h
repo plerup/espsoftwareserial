@@ -34,25 +34,25 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
             pop(), and push() type functions, but is guarded to safely allow only a single producer
             at any instant.
 */
-template< typename T >
-class circular_queue_mp : protected circular_queue<T>
+template< typename T, typename ForEachArg = void >
+class circular_queue_mp : protected circular_queue<T, ForEachArg>
 {
 public:
     circular_queue_mp() = default;
-    circular_queue_mp(const size_t capacity) : circular_queue<T>(capacity)
+    circular_queue_mp(const size_t capacity) : circular_queue<T, ForEachArg>(capacity)
     {}
-    circular_queue_mp(circular_queue<T>&& cq) : circular_queue<T>(std::move(cq))
+    circular_queue_mp(circular_queue<T, ForEachArg>&& cq) : circular_queue<T, ForEachArg>(std::move(cq))
     {}
-    using circular_queue<T>::operator=;
-    using circular_queue<T>::capacity;
-    using circular_queue<T>::flush;
-    using circular_queue<T>::available;
-    using circular_queue<T>::available_for_push;
-    using circular_queue<T>::peek;
-    using circular_queue<T>::pop;
-    using circular_queue<T>::pop_n;
-    using circular_queue<T>::for_each;
-    using circular_queue<T>::for_each_rev_requeue;
+    using circular_queue<T, ForEachArg>::operator=;
+    using circular_queue<T, ForEachArg>::capacity;
+    using circular_queue<T, ForEachArg>::flush;
+    using circular_queue<T, ForEachArg>::available;
+    using circular_queue<T, ForEachArg>::available_for_push;
+    using circular_queue<T, ForEachArg>::peek;
+    using circular_queue<T, ForEachArg>::pop;
+    using circular_queue<T, ForEachArg>::pop_n;
+    using circular_queue<T, ForEachArg>::for_each;
+    using circular_queue<T, ForEachArg>::for_each_rev_requeue;
 
     /*!
         @brief	Resize the queue. The available elements in the queue are preserved.
@@ -68,7 +68,7 @@ public:
 #else
         std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
-        return circular_queue<T>::capacity(cap);
+        return circular_queue<T, ForEachArg>::capacity(cap);
     }
 
     bool IRAM_ATTR push() = delete;
@@ -86,7 +86,7 @@ public:
 #else
         std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
-        return circular_queue<T>::push(std::move(val));
+        return circular_queue<T, ForEachArg>::push(std::move(val));
     }
 
     /*!
@@ -102,7 +102,7 @@ public:
 #else
         std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
-        return circular_queue<T>::push(val);
+        return circular_queue<T, ForEachArg>::push(val);
     }
 
     /*!
@@ -119,7 +119,7 @@ public:
 #else
         std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
-        return circular_queue<T>::push_n(buffer, size);
+        return circular_queue<T, ForEachArg>::push_n(buffer, size);
     }
 
     /*!
@@ -136,7 +136,7 @@ public:
                 Requeuing is dependent on the return boolean of the callback function. If it
                 returns true, the requeue occurs.
     */
-    bool for_each_requeue(const Delegate<bool(T&), void*>& fun);
+    bool for_each_requeue(const Delegate<bool(T&), ForEachArg>& fun);
 
 #ifndef ESP8266
 protected:
@@ -144,7 +144,7 @@ protected:
 #endif
 };
 
-template< typename T >
+template< typename T, typename ForEachArg >
 T& circular_queue_mp<T>::pop_requeue()
 {
 #ifdef ESP8266
@@ -152,27 +152,27 @@ T& circular_queue_mp<T>::pop_requeue()
 #else
     std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
-    const auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_acquire);
-    const auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
+    const auto outPos = circular_queue<T, ForEachArg>::m_outPos.load(std::memory_order_acquire);
+    const auto inPos = circular_queue<T, ForEachArg>::m_inPos.load(std::memory_order_relaxed);
     std::atomic_thread_fence(std::memory_order_acquire);
-    if (inPos == outPos) return circular_queue<T>::defaultValue;
-    T& val = circular_queue<T>::m_buffer[inPos] = std::move(circular_queue<T>::m_buffer[outPos]);
-    const auto bufSize = circular_queue<T>::m_bufSize;
+    if (inPos == outPos) return circular_queue<T, ForEachArg>::defaultValue;
+    T& val = circular_queue<T, ForEachArg>::m_buffer[inPos] = std::move(circular_queue<T, ForEachArg>::m_buffer[outPos]);
+    const auto bufSize = circular_queue<T, ForEachArg>::m_bufSize;
     std::atomic_thread_fence(std::memory_order_release);
-    circular_queue<T>::m_outPos.store((outPos + 1) % bufSize, std::memory_order_relaxed);
-    circular_queue<T>::m_inPos.store((inPos + 1) % bufSize, std::memory_order_release);
+	circular_queue<T, ForEachArg>::m_outPos.store((outPos + 1) % bufSize, std::memory_order_relaxed);
+	circular_queue<T, ForEachArg>::m_inPos.store((inPos + 1) % bufSize, std::memory_order_release);
     return val;
 }
 
-template< typename T >
-bool circular_queue_mp<T>::for_each_requeue(const Delegate<bool(T&), void*>& fun)
+template< typename T, typename ForEachArg >
+bool circular_queue_mp<T>::for_each_requeue(const Delegate<bool(T&), ForEachArg>& fun)
 {
-    auto inPos0 = circular_queue<T>::m_inPos.load(std::memory_order_acquire);
-    auto outPos = circular_queue<T>::m_outPos.load(std::memory_order_relaxed);
+    auto inPos0 = circular_queue<T, ForEachArg>::m_inPos.load(std::memory_order_acquire);
+    auto outPos = circular_queue<T, ForEachArg>::m_outPos.load(std::memory_order_relaxed);
     std::atomic_thread_fence(std::memory_order_acquire);
     if (outPos == inPos0) return false;
     do {
-        T&& val = std::move(circular_queue<T>::m_buffer[outPos]);
+        T&& val = std::move(circular_queue<T, ForEachArg>::m_buffer[outPos]);
         if (fun(val))
         {
 #ifdef ESP8266
@@ -181,18 +181,18 @@ bool circular_queue_mp<T>::for_each_requeue(const Delegate<bool(T&), void*>& fun
             std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
             std::atomic_thread_fence(std::memory_order_release);
-            auto inPos = circular_queue<T>::m_inPos.load(std::memory_order_relaxed);
+            auto inPos = circular_queue<T, ForEachArg>::m_inPos.load(std::memory_order_relaxed);
             std::atomic_thread_fence(std::memory_order_acquire);
-            circular_queue<T>::m_buffer[inPos] = std::move(val);
+			circular_queue<T, ForEachArg>::m_buffer[inPos] = std::move(val);
             std::atomic_thread_fence(std::memory_order_release);
-            circular_queue<T>::m_inPos.store((inPos + 1) % circular_queue<T>::m_bufSize, std::memory_order_release);
+			circular_queue<T, ForEachArg>::m_inPos.store((inPos + 1) % circular_queue<T, ForEachArg>::m_bufSize, std::memory_order_release);
         }
         else
         {
             std::atomic_thread_fence(std::memory_order_release);
         }
-        outPos = (outPos + 1) % circular_queue<T>::m_bufSize;
-        circular_queue<T>::m_outPos.store(outPos, std::memory_order_release);
+        outPos = (outPos + 1) % circular_queue<T, ForEachArg>::m_bufSize;
+		circular_queue<T, ForEachArg>::m_outPos.store(outPos, std::memory_order_release);
     } while (outPos != inPos0);
     return true;
 }
