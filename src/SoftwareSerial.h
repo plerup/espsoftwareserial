@@ -195,8 +195,14 @@ private:
         m_periodDuration = 0;
         m_periodStart = ESP.getCycleCount();
     }
-    // If relaxed is true, may relax timing to exceed cycle counts, by yielding.
-    void preciseDelay(uint32_t cycles, bool relaxed);
+    // If sync is false, it's legal to exceed the deadline, for instance,
+    // by enabling interrupts.
+    void preciseDelay(bool sync);
+    // If withStopBit is set, either cycle contains a stop bit.
+    // If dutyCycle == 0, the level is not forced to HIGH.
+    // If offCycle == 0, the level remains unchanged from dutyCycle.
+    void writePeriod(
+        uint32_t dutyCycle, uint32_t offCycle, bool withStopBit);
     bool isValidGPIOpin(int8_t pin);
     /* check m_rxValid that calling is safe */
     void rxBits();
