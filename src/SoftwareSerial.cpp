@@ -64,15 +64,25 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     if (-1 != txPin) m_txPin = txPin;
     m_oneWire = (m_rxPin == m_txPin);
     m_invert = invert;
+    m_dataBits = 5 + (config & 07);
+    m_parityMode = static_cast<SoftwareSerialParity>(config & 070);
+    m_stopBits = 1 + ((config & 0300) ? 1 : 0);
+    m_pduBits = m_dataBits + static_cast<bool>(m_parityMode) + m_stopBits;
+    m_bit_us = (1000000 + baud / 2) / baud;
+    m_bitCycles = (ESP.getCpuFreqMHz() * 1000000 + baud / 2) / baud;
+    m_intTxEnabled = true;
     if (isValidGPIOpin(m_rxPin)) {
         std::unique_ptr<circular_queue<uint8_t> > buffer(new circular_queue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
         m_buffer = move(buffer);
-        std::unique_ptr<circular_queue<uint8_t> > parityBuffer(new circular_queue<uint8_t>((bufCapacity > 0) ? (bufCapacity + 7) / 8 : 8));
-        m_parityBuffer = move(parityBuffer);
-        m_parityInPos = m_parityOutPos = 1;
+        if (m_parityMode)
+        {
+            std::unique_ptr<circular_queue<uint8_t> > parityBuffer(new circular_queue<uint8_t>((bufCapacity > 0) ? (bufCapacity + 7) / 8 : 8));
+            m_parityBuffer = move(parityBuffer);
+            m_parityInPos = m_parityOutPos = 1;
+        }
         std::unique_ptr<circular_queue<uint32_t> > isrBuffer(new circular_queue<uint32_t>((isrBufCapacity > 0) ? isrBufCapacity : (sizeof(uint8_t) * 8 + 2) * bufCapacity));
         m_isrBuffer = move(isrBuffer);
-        if (m_buffer && m_parityBuffer && m_isrBuffer) {
+        if (m_buffer && (!m_parityMode || m_parityBuffer) && m_isrBuffer) {
             m_rxValid = true;
             pinMode(m_rxPin, INPUT_PULLUP);
         }
@@ -89,14 +99,6 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
             digitalWrite(m_txPin, !m_invert);
         }
     }
-
-    m_dataBits = 5 + (config & 07);
-    m_parityMode = static_cast<SoftwareSerialParity>(config & 070);
-    m_stopBits = 1 + ((config & 0300) ? 1 : 0);
-    m_pduBits = m_dataBits + static_cast<bool>(m_parityMode) + m_stopBits;
-    m_bit_us = (1000000 + baud / 2) / baud;
-    m_bitCycles = (ESP.getCpuFreqMHz() * 1000000 + baud / 2) / baud;
-    m_intTxEnabled = true;
     if (!m_rxEnabled) { enableRx(true); }
 }
 
@@ -107,9 +109,7 @@ void SoftwareSerial::end()
     if (m_buffer) {
         m_buffer.reset();
     }
-    if (m_parityBuffer) {
-        m_parityBuffer.reset();
-    }
+    m_parityBuffer.reset();
     if (m_isrBuffer) {
         m_isrBuffer.reset();
     }
@@ -174,12 +174,15 @@ int SoftwareSerial::read() {
         if (!m_buffer->available()) { return -1; }
     }
     auto val = m_buffer->pop();
-    m_lastReadParity = m_parityBuffer->peek() & m_parityOutPos;
-    m_parityOutPos <<= 1;
-    if (!m_parityOutPos)
+    if (m_parityBuffer)
     {
-        m_parityOutPos = 1;
-        m_parityBuffer->pop();
+        m_lastReadParity = m_parityBuffer->peek() & m_parityOutPos;
+        m_parityOutPos <<= 1;
+        if (!m_parityOutPos)
+        {
+            m_parityOutPos = 1;
+            m_parityBuffer->pop();
+        }
     }
     return val;
 }
@@ -190,7 +193,7 @@ size_t SoftwareSerial::readBytes(uint8_t * buffer, size_t size) {
         rxBits();
         size = m_buffer->pop_n(buffer, size);
     }
-    if (0 != size) {
+    if (m_parityBuffer && 0 != size) {
         uint32_t parityBits = size;
         while (m_parityOutPos >>= 1) ++parityBits;
         m_parityOutPos = (1 << (parityBits % 8));
@@ -281,7 +284,7 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
         // Stop bits: HIGH
         uint32_t word = ~0UL;
         // parity bit, if any
-        if (parity)
+        if (parity && m_parityMode)
         {
             uint32_t parityBit;
             switch (parity)
@@ -338,8 +341,11 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
 void SoftwareSerial::flush() {
     if (!m_rxValid) { return; }
     m_buffer->flush();
-    m_parityInPos = m_parityOutPos = 1;
-    m_parityBuffer->flush();
+    if (m_parityBuffer)
+    {
+        m_parityInPos = m_parityOutPos = 1;
+        m_parityBuffer->flush();
+    }
 }
 
 bool SoftwareSerial::overflow() {
@@ -355,7 +361,7 @@ int SoftwareSerial::peek() {
         if (!m_buffer->available()) return -1;
     }
     auto val = m_buffer->peek();
-    m_lastReadParity = m_parityBuffer->peek() & m_parityOutPos;
+    if (m_parityBuffer) m_lastReadParity = m_parityBuffer->peek() & m_parityOutPos;
     return val;
 }
 
@@ -415,7 +421,7 @@ void SoftwareSerial::rxBits(const uint32_t & isrCycle) {
             continue;
         }
         // parity bit
-        if (static_cast<bool>(m_parityMode) && m_rxCurBit == (m_dataBits - 1)) {
+        if (m_parityMode && m_rxCurBit == (m_dataBits - 1)) {
             ++m_rxCurBit;
             --bits;
             m_rxCurParity = level;
@@ -433,17 +439,20 @@ void SoftwareSerial::rxBits(const uint32_t & isrCycle) {
             if (level)
             {
                 m_rxCurByte >>= (sizeof(uint8_t) * 8 - m_dataBits);
-                if (m_rxCurParity) {
-                    m_parityBuffer->pushpeek() |= m_parityInPos;
-                }
-                else {
-                    m_parityBuffer->pushpeek() &= ~m_parityInPos;
-                }
-                m_parityInPos <<= 1;
-                if (!m_parityInPos)
+                if (m_parityBuffer)
                 {
-                    m_parityBuffer->push();
-                    m_parityInPos = 1;
+                    if (m_rxCurParity) {
+                        m_parityBuffer->pushpeek() |= m_parityInPos;
+                    }
+                    else {
+                        m_parityBuffer->pushpeek() &= ~m_parityInPos;
+                    }
+                    m_parityInPos <<= 1;
+                    if (!m_parityInPos)
+                    {
+                        m_parityBuffer->push();
+                        m_parityInPos = 1;
+                    }
                 }
                 if (!m_buffer->push(m_rxCurByte)) m_overflow = true;
             }
