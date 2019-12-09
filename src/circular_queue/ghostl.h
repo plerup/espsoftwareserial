@@ -51,9 +51,9 @@ namespace std
     template< typename T, unsigned long N > struct array
     {
         T _M_elems[N];
-        unsigned long size() const { return N; }
-        T& operator[](unsigned long i) { return _M_elems[i]; }
-        const T& operator[](unsigned long i) const { return _M_elems[i]; }
+        decltype(sizeof(0)) size() const { return N; }
+        T& operator[](decltype(sizeof(0)) i) { return _M_elems[i]; }
+        const T& operator[](decltype(sizeof(0)) i) const { return _M_elems[i]; }
     };
 
     template< typename T > class unique_ptr
@@ -63,7 +63,7 @@ namespace std
         unique_ptr() noexcept : ptr(nullptr) {}
         unique_ptr(pointer p) : ptr(p) {}
         pointer operator->() const noexcept { return ptr; }
-        T& operator[](size_t i) const { return ptr[i]; }
+        T& operator[](decltype(sizeof(0)) i) const { return ptr[i]; }
         void reset(pointer p = pointer()) noexcept
         {
             delete ptr;
@@ -75,6 +75,18 @@ namespace std
     };
 
     template< typename T > using function = T*;
+    using nullptr_t = decltype(nullptr);
+
+    template<typename T>
+    struct identity {
+        typedef T type;
+    };
+
+    template <typename T>
+    inline T&& forward(typename identity<T>::type& t) noexcept
+    {
+        return static_cast<typename identity<T>::type&&>(t);
+    }
 }
 
 #endif // __ghostl_h
