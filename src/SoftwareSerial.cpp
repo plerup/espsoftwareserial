@@ -194,14 +194,14 @@ size_t SoftwareSerial::readBytes(uint8_t * buffer, size_t size) {
         rxBits();
         avail = m_buffer->pop_n(buffer, size);
     }
-    if (m_parityBuffer && 0 != avail) {
+    if (!avail) return -1;
+    if (m_parityBuffer) {
         uint32_t parityBits = avail;
         while (m_parityOutPos >>= 1) ++parityBits;
         m_parityOutPos = (1 << (parityBits % 8));
         m_parityBuffer->pop_n(nullptr, parityBits / 8);
-        return avail;
     }
-    return -1;
+    return avail;
 }
 
 int SoftwareSerial::available() {
