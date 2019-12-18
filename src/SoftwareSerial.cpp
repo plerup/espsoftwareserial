@@ -68,8 +68,8 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     m_parityMode = static_cast<SoftwareSerialParity>(config & 070);
     m_stopBits = 1 + ((config & 0300) ? 1 : 0);
     m_pduBits = m_dataBits + static_cast<bool>(m_parityMode) + m_stopBits;
-    m_bit_us = (1000000 + baud / 2) / baud;
-    m_bitCycles = (ESP.getCpuFreqMHz() * 1000000 + baud / 2) / baud;
+    m_bit_us = (1000000UL + baud / 2) / baud;
+    m_bitCycles = (ESP.getCpuFreqMHz() * 1000000UL + baud / 2) / baud;
     m_intTxEnabled = true;
     if (isValidGPIOpin(m_rxPin)) {
         std::unique_ptr<circular_queue<uint8_t> > buffer(new circular_queue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
@@ -116,7 +116,7 @@ void SoftwareSerial::end()
 }
 
 uint32_t SoftwareSerial::baudRate() {
-    return ESP.getCpuFreqMHz() * 1000000 / m_bitCycles;
+    return ESP.getCpuFreqMHz() * 1000000UL / m_bitCycles;
 }
 
 void SoftwareSerial::setTransmitEnablePin(int8_t txEnablePin) {
@@ -155,7 +155,7 @@ void SoftwareSerial::enableRx(bool on) {
             m_rxCurBit = m_pduBits - 1;
             // Init to stop bit level and current cycle
             m_isrLastCycle = (ESP.getCycleCount() | 1) ^ m_invert;
-            if (m_bitCycles >= (ESP.getCpuFreqMHz() * 1000000U) / 74880U)
+            if (m_bitCycles >= (ESP.getCpuFreqMHz() * 1000000UL) / 74880UL)
                 attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitISR), this, CHANGE);
             else
                 attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitSyncISR), this, m_invert ? RISING : FALLING);
@@ -187,14 +187,14 @@ int SoftwareSerial::read() {
     return val;
 }
 
-size_t SoftwareSerial::readBytes(uint8_t * buffer, size_t size) {
-    if (!m_rxValid) { return -1; }
+size_t SoftwareSerial::read(uint8_t * buffer, size_t size) {
+    if (!m_rxValid) { return 0; }
     size_t avail;
     if (0 == (avail = m_buffer->pop_n(buffer, size))) {
         rxBits();
         avail = m_buffer->pop_n(buffer, size);
     }
-    if (!avail) return -1;
+    if (!avail) return 0;
     if (m_parityBuffer) {
         uint32_t parityBits = avail;
         while (m_parityOutPos >>= 1) ++parityBits;
@@ -204,12 +204,25 @@ size_t SoftwareSerial::readBytes(uint8_t * buffer, size_t size) {
     return avail;
 }
 
+size_t SoftwareSerial::readBytes(uint8_t * buffer, size_t size) {
+    if (!m_rxValid || !size) { return 0; }
+    size_t count = 0;
+    const auto timeout = _timeout * ESP.getCpuFreqMHz() * 1000UL;
+    const auto start = ESP.getCycleCount();
+    do {
+        count += read(&buffer[count], size - count);
+        if (count >= size) break;
+        yield();
+    } while (ESP.getCycleCount() - start < timeout);
+    return count;
+}
+
 int SoftwareSerial::available() {
     if (!m_rxValid) { return 0; }
     rxBits();
     int avail = m_buffer->available();
     if (!avail) {
-        optimistic_yield(10000);
+        optimistic_yield(10000UL);
     }
     return avail;
 }
@@ -228,7 +241,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
         // Disable interrupts again
         if (!m_intTxEnabled) { m_savedPS = xt_rsil(15); }
     }
-    while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { if (!sync) optimistic_yield(10000); }
+    while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { if (!sync) optimistic_yield(10000UL); }
     resetPeriodStart();
 }
 

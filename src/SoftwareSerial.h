@@ -150,9 +150,17 @@ public:
     bool parityOdd(uint8_t byte) {
         return !parityEven(byte);
     }
-    /// The readBytes functions are non-waiting, there is no timeout.
+    /// The read(buffer, size) functions are non-blocking, the same as readBytes but without timeout
+    size_t read(uint8_t* buffer, size_t size);
+    /// The read(buffer, size) functions are non-blocking, the same as readBytes but without timeout
+    size_t read(char* buffer, size_t size) {
+        return read(reinterpret_cast<uint8_t*>(buffer), size);
+    }
+    /// @returns The number of bytes read into buffer, up to size. Times out if the limit set through
+    ///          Stream::setTimeout() is reached. The maximum permissible timeout at 80MHz CPU freq. is ~26s.
     size_t readBytes(uint8_t* buffer, size_t size) override;
-    /// The readBytes functions are non-waiting, there is no timeout.
+    /// @returns The number of bytes read into buffer, up to size. Times out if the limit set through
+    ///          Stream::setTimeout() is reached. The maximum permissible timeout at 80MHz CPU freq. is ~26s.
     size_t readBytes(char* buffer, size_t size) override {
         return readBytes(reinterpret_cast<uint8_t*>(buffer), size);
     }
