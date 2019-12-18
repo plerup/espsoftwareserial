@@ -189,16 +189,17 @@ int SoftwareSerial::read() {
 
 size_t SoftwareSerial::readBytes(uint8_t * buffer, size_t size) {
     if (!m_rxValid) { return -1; }
-    if (0 == (size = m_buffer->pop_n(buffer, size))) {
+    size_t avail;
+    if (0 == (avail = m_buffer->pop_n(buffer, size))) {
         rxBits();
-        size = m_buffer->pop_n(buffer, size);
+        avail = m_buffer->pop_n(buffer, size);
     }
-    if (m_parityBuffer && 0 != size) {
-        uint32_t parityBits = size;
+    if (m_parityBuffer && 0 != avail) {
+        uint32_t parityBits = avail;
         while (m_parityOutPos >>= 1) ++parityBits;
         m_parityOutPos = (1 << (parityBits % 8));
         m_parityBuffer->pop_n(nullptr, parityBits / 8);
-        return size;
+        return avail;
     }
     return -1;
 }
