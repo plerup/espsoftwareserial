@@ -141,14 +141,16 @@ public:
         return m_lastReadParity;
     }
     /// @returns The calculated bit for even parity of the parameter byte
-    bool parityEven(uint8_t byte) {
+    static bool parityEven(uint8_t byte) {
         byte ^= byte >> 4;
         byte &= 0xf;
         return (0x6996 >> byte) & 1;
     }
     /// @returns The calculated bit for odd parity of the parameter byte
-    bool parityOdd(uint8_t byte) {
-        return !parityEven(byte);
+    static bool parityOdd(uint8_t byte) {
+        byte ^= byte >> 4;
+        byte &= 0xf;
+        return (0x9669 >> byte) & 1;
     }
     /// The read(buffer, size) functions are non-blocking, the same as readBytes but without timeout
     size_t read(uint8_t* buffer, size_t size);
@@ -198,11 +200,6 @@ public:
     using Print::write;
 
 private:
-    void resetPeriodStart()
-    {
-        m_periodDuration = 0;
-        m_periodStart = ESP.getCycleCount();
-    }
     // If sync is false, it's legal to exceed the deadline, for instance,
     // by enabling interrupts.
     void preciseDelay(bool sync);

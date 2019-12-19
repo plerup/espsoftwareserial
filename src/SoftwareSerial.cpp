@@ -237,11 +237,16 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
             auto ms = (m_periodDuration - expired) / ESP.getCpuFreqMHz() / 1000UL;
             if (ms) delay(ms);
         }
+        while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { optimistic_yield(10000); }
         // Disable interrupts again
         if (!m_intTxEnabled) { m_savedPS = xt_rsil(15); }
     }
-    while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { if (!sync) optimistic_yield(10000UL); }
-    resetPeriodStart();
+    else
+    {
+        while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) {}
+    }
+    m_periodDuration = 0;
+    m_periodStart = ESP.getCycleCount();
 }
 
 void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
@@ -290,7 +295,8 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
     }
     const uint32_t dataMask = ((1UL << m_dataBits) - 1);
     bool withStopBit = true;
-    resetPeriodStart();
+    m_periodDuration = 0;
+    m_periodStart = ESP.getCycleCount();
     for (size_t cnt = 0; cnt < size; ++cnt) {
         uint8_t byte = ~buffer[cnt] & dataMask;
         // push LSB start-data-parity-stop bit pattern into uint32_t
@@ -303,10 +309,18 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size
             switch (parity)
             {
             case SWSERIAL_PARITY_EVEN:
-                parityBit = !parityEven(byte);
+                // from inverted, so use odd parity
+                parityBit = byte;
+                parityBit ^= parityBit >> 4;
+                parityBit &= 0xf;
+                parityBit = (0x9669 >> parityBit) & 1;
                 break;
             case SWSERIAL_PARITY_ODD:
-                parityBit = parityEven(byte);
+                // from inverted, so use even parity
+                parityBit = byte;
+                parityBit ^= parityBit >> 4;
+                parityBit &= 0xf;
+                parityBit = (0x6996 >> parityBit) & 1;
                 break;
             case SWSERIAL_PARITY_MARK:
                 parityBit = false;

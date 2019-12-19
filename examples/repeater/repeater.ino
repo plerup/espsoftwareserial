@@ -43,6 +43,7 @@ unsigned long start;
 String bitRateTxt("Effective data rate: ");
 int rxCount;
 int seqErrors;
+int parityErrors;
 int expected;
 constexpr int ReportInterval = IUTBITRATE / 8;
 
@@ -100,6 +101,7 @@ void setup() {
     start = micros();
     rxCount = 0;
     seqErrors = 0;
+    parityErrors = 0;
     expected = -1;
 
     logger.println("Repeater example for EspSoftwareSerial");
@@ -126,6 +128,12 @@ void loop() {
                 ++seqErrors;
                 expected = -1;
             }
+#ifndef HWLOOPBACK
+            if ((repeater.readParity() ^ static_cast<bool>(swSerialConfig & 010)) != repeater.parityEven(r))
+            {
+                ++parityErrors;
+            }
+#endif
             ++rxCount;
 #ifdef HALFDUPLEX
             block[inCnt] = r;
@@ -148,8 +156,16 @@ void loop() {
         unsigned long interval = end - start;
         long cps = rxCount * (1000000.0 / interval);
         long seqErrorsps = seqErrors * (1000000.0 / interval);
-        logger.println(bitRateTxt + 10 * cps + "bps, "
+        logger.print(bitRateTxt + 10 * cps + "bps, "
             + seqErrorsps + "cps seq. errors (" + 100.0 * seqErrors / rxCount + "%)");
+        if (0 != (swSerialConfig & 070))
+        {
+            logger.println(String(" (") + parityErrors + " parity errors)");
+        }
+        else
+        {
+            logger.println();
+        }
         start = end;
         rxCount = 0;
         seqErrors = 0;
