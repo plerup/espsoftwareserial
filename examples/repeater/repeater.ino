@@ -158,11 +158,13 @@ void loop() {
         long seqErrorsps = seqErrors * (1000000.0 / interval);
         logger.print(bitRateTxt + 10 * cps + "bps, "
             + seqErrorsps + "cps seq. errors (" + 100.0 * seqErrors / rxCount + "%)");
+#ifndef HWLOOPBACK
         if (0 != (swSerialConfig & 070))
         {
             logger.println(String(" (") + parityErrors + " parity errors)");
         }
         else
+#endif
         {
             logger.println();
         }
