@@ -17,19 +17,27 @@
 #define TX (1)
 #endif
 
-//#define HWLOOPBACK 1
-//#define HALFDUPLEX 1
+#define HWLOOPBACK 1
+#define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 57600;
+constexpr int IUTBITRATE = 19200;
 #else
-constexpr int IUTBITRATE = 153600;
+constexpr int IUTBITRATE = 19200;
 #endif
 
-constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8N1;
+#if defined(ESP8266)
+constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8E1;
+constexpr SerialConfig hwSerialConfig = SERIAL_8E1;
+#elif defined(ESP32)
+constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8E1;
+constexpr uint32_t hwSerialConfig = SERIAL_8E1;
+#else
+constexpr unsigned swSerialConfig = 3;
+#endif
+constexpr bool invert = false;
 
 constexpr int BLOCKSIZE = 16; // use fractions of 256
-
 
 unsigned long start;
 String bitRateTxt("Effective data rate: ");
@@ -38,88 +46,102 @@ int seqErrors;
 int expected;
 constexpr int ReportInterval = IUTBITRATE / 8;
 
-#ifdef HWLOOPBACK
 #if defined(ESP8266)
+#if defined(HWLOOPBACK)
 HardwareSerial& repeater(Serial);
 SoftwareSerial logger;
-#elif defined(ESP32)
-HardwareSerial& repeater(Serial2);
-HardwareSerial& logger(Serial);
-#endif
 #else
 SoftwareSerial repeater;
 HardwareSerial& logger(Serial);
 #endif
+#elif defined(ESP32)
+#if defined(HWLOOPBACK)
+HardwareSerial& repeater(Serial2);
+#else
+SoftwareSerial repeater;
+#endif
+HardwareSerial& logger(Serial);
+#else
+SoftwareSerial repeater(14, 12);
+HardwareSerial& logger(Serial);
+#endif
 
 void setup() {
-#ifdef HWLOOPBACK
 #if defined(ESP8266)
-    repeater.begin(IUTBITRATE);
-    repeater.setRxBufferSize(2 * BLOCKSIZE);
+#if defined(HWLOOPBACK)
+    repeater.begin(IUTBITRATE, hwSerialConfig, SERIAL_FULL, 1, invert);
     repeater.swap();
-    logger.begin(9600, swSerialConfig, RX, TX);
-#elif defined(ESP32)
-    repeater.begin(IUTBITRATE, SERIAL_8N1, D7, D8);
     repeater.setRxBufferSize(2 * BLOCKSIZE);
-    logger.begin(9600);
-#endif
+    logger.begin(9600, SWSERIAL_8N1, -1, TX);
 #else
-#if defined(ESP8266)
-    repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, false, 2 * BLOCKSIZE);
-#elif defined(ESP32)
-    repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, false, 2 * BLOCKSIZE);
-#endif
+    repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, invert, 4 * BLOCKSIZE);
 #ifdef HALFDUPLEX
     repeater.enableIntTx(false);
 #endif
+    logger.begin(9600);
+#endif
+#elif defined(ESP32)
+#if defined(HWLOOPBACK)
+    repeater.begin(IUTBITRATE, hwSerialConfig, D7, D8, invert);
+    repeater.setRxBufferSize(2 * BLOCKSIZE);
+    logger.begin(9600);
+#else
+    repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, invert, 4 * BLOCKSIZE);
+#ifdef HALFDUPLEX
+    repeater.enableIntTx(false);
+#endif
+    Serial.begin(9600);
+#endif
+#else
+    repeater.begin(IUTBITRATE);
     Serial.begin(9600);
 #endif
 
     start = micros();
     rxCount = 0;
     seqErrors = 0;
+    expected = -1;
+
+    logger.println("Repeater example for EspSoftwareSerial");
 }
 
 void loop() {
 #ifdef HALFDUPLEX
-    unsigned char block[BLOCKSIZE];
+    char block[BLOCKSIZE];
 #endif
     // starting deadline for the first bytes to come in
     uint32_t deadlineStart = ESP.getCycleCount();
     int inCnt = 0;
-    while ((ESP.getCycleCount() - deadlineStart) < (1000000 * 10 * BLOCKSIZE) / IUTBITRATE * 2 * ESP.getCpuFreqMHz()) {
-    int avail = repeater.available();
-    for (int i = 0; i < avail; ++i)
-    {
-        int r = repeater.read();
-        if (r == -1) { logger.println("read() == -1"); }
-        if (expected == -1) { expected = r; }
-        else {
-            expected = (expected + 1) % 256;
-        }
-        if (r != (expected & ((1 << (5 + swSerialConfig % 4)) - 1))) {
-            ++seqErrors;
-            expected = -1;
-        }
-        ++rxCount;
+    while ((ESP.getCycleCount() - deadlineStart) < (1000000UL * 12 * BLOCKSIZE) / IUTBITRATE * 24 * ESP.getCpuFreqMHz()) {
+        int avail = repeater.available();
+        for (int i = 0; i < avail; ++i)
+        {
+            int r = repeater.read();
+            if (r == -1) { logger.println("read() == -1"); }
+            if (expected == -1) { expected = r; }
+            else {
+                expected = (expected + 1) % (1UL << (5 + swSerialConfig % 4));
+            }
+            if (r != expected) {
+                ++seqErrors;
+                expected = -1;
+            }
+            ++rxCount;
 #ifdef HALFDUPLEX
-        block[inCnt] = r;
+            block[inCnt] = r;
 #else
-        repeater.write(r);
+            repeater.write(r);
 #endif
-    }
-    if (++inCnt >= BLOCKSIZE) { break; }
-    // wait for more outstanding bytes to trickle in
-    if (avail) deadlineStart = ESP.getCycleCount();
+            if (++inCnt >= BLOCKSIZE) { break; }
+        }
+        if (inCnt >= BLOCKSIZE) { break; }
+        // wait for more outstanding bytes to trickle in
+        if (avail) deadlineStart = ESP.getCycleCount();
     }
 
 #ifdef HALFDUPLEX
     repeater.write(block, inCnt);
 #endif
-
-    if (inCnt != 0 && inCnt != BLOCKSIZE) {
-        logger.print("Got "); logger.print(inCnt); logger.println(" bytes during buffer interval");
-    }
 
     if (rxCount >= ReportInterval) {
         auto end = micros();

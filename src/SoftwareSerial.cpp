@@ -207,13 +207,12 @@ size_t SoftwareSerial::read(uint8_t * buffer, size_t size) {
 size_t SoftwareSerial::readBytes(uint8_t * buffer, size_t size) {
     if (!m_rxValid || !size) { return 0; }
     size_t count = 0;
-    const auto timeout = _timeout * ESP.getCpuFreqMHz() * 1000UL;
-    const auto start = ESP.getCycleCount();
+    const auto start = millis();
     do {
         count += read(&buffer[count], size - count);
         if (count >= size) break;
         yield();
-    } while (ESP.getCycleCount() - start < timeout);
+    } while (millis() - start < _timeout);
     return count;
 }
 

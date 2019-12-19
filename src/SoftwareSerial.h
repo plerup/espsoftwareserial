@@ -157,10 +157,10 @@ public:
         return read(reinterpret_cast<uint8_t*>(buffer), size);
     }
     /// @returns The number of bytes read into buffer, up to size. Times out if the limit set through
-    ///          Stream::setTimeout() is reached. The maximum permissible timeout at 80MHz CPU freq. is ~26s.
+    ///          Stream::setTimeout() is reached.
     size_t readBytes(uint8_t* buffer, size_t size) override;
     /// @returns The number of bytes read into buffer, up to size. Times out if the limit set through
-    ///          Stream::setTimeout() is reached. The maximum permissible timeout at 80MHz CPU freq. is ~26s.
+    ///          Stream::setTimeout() is reached.
     size_t readBytes(char* buffer, size_t size) override {
         return readBytes(reinterpret_cast<uint8_t*>(buffer), size);
     }

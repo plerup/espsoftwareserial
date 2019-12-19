@@ -25,15 +25,15 @@
 #endif
 
 // Pick only one of HWLOOPBACK, HWSOURCESWSINK, or HWSOURCESINK
-#define HWLOOPBACK 1
+//#define HWLOOPBACK 1
 //#define HWSOURCESWSINK 1
 //#define HWSOURCESINK 1
 #define HALFDUPLEX 1
 
 #ifdef ESP32
-constexpr int IUTBITRATE = 57600;
+constexpr int IUTBITRATE = 19200;
 #else
-constexpr int IUTBITRATE = 153600;
+constexpr int IUTBITRATE = 19200;
 #endif
 
 #if defined(ESP8266)
@@ -94,7 +94,13 @@ void setup() {
     Serial.setRxBufferSize(2 * BLOCKSIZE);
     logger.begin(9600, SWSERIAL_8N1, -1, TX);
 #else
-    Serial.begin(9600);
+    logger.begin(9600);
+#endif
+#if !defined(HWSOURCESINK)
+    serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6, invert, 2 * BLOCKSIZE);
+#ifdef HALFDUPLEX
+    serialIUT.enableIntTx(false);
+#endif
 #endif
 #elif defined(ESP32)
 #if defined(HWLOOPBACK) || defined(HWSOURCESWSINK)
@@ -108,22 +114,15 @@ void setup() {
 #else
     Serial.begin(9600);
 #endif
-#else
-    Serial.begin(9600);
-#endif
-
 #if !defined(HWSOURCESINK)
-#if defined(ESP8266)
-    serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6, invert, 4 * BLOCKSIZE);
-#ifdef HALFDUPLEX
-    serialIUT.enableIntTx(false);
-#endif
-#elif defined(ESP32)
     serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6, invert, 2 * BLOCKSIZE);
 #ifdef HALFDUPLEX
     serialIUT.enableIntTx(false);
 #endif
+#endif
 #else
+    Serial.begin(9600);
+#if !defined(HWSOURCESINK)
     serialIUT.begin(IUTBITRATE);
 #endif
 #endif
@@ -133,6 +132,7 @@ void setup() {
     rxCount = 0;
     rxErrors = 0;
     rxParityErrors = 0;
+    expected = -1;
 
     logger.println("Loopback example for EspSoftwareSerial");
 }
@@ -141,9 +141,9 @@ unsigned char c = 0;
 
 void loop() {
 #ifdef HALFDUPLEX
-    unsigned char block[2 * BLOCKSIZE];
+    char block[BLOCKSIZE];
 #endif
-    unsigned char inBuf[2 * BLOCKSIZE];
+    char inBuf[BLOCKSIZE];
     for (int i = 0; i < BLOCKSIZE; ++i) {
 #ifndef HALFDUPLEX
 #ifdef HWSOURCESWSINK
@@ -154,7 +154,7 @@ void loop() {
 #ifdef HWLOOPBACK
         int avail = hwSerial.available();
         while ((0 == (i % 8)) && avail > 0) {
-            int inCnt = hwSerial.readBytes(inBuf, min(avail, min(BLOCKSIZE, hwSerial.availableForWrite())));
+            int inCnt = hwSerial.read(inBuf, min(avail, min(BLOCKSIZE, hwSerial.availableForWrite())));
             hwSerial.write(inBuf, inCnt);
             avail -= inCnt;
         }
@@ -187,9 +187,9 @@ void loop() {
     // starting deadline for the first bytes to become readable
     deadlineStart = ESP.getCycleCount();
     inCnt = 0;
-    while ((ESP.getCycleCount() - deadlineStart) < (1000000 * 10 * BLOCKSIZE) / IUTBITRATE * 8 * ESP.getCpuFreqMHz()) {
+    while ((ESP.getCycleCount() - deadlineStart) < (1000000UL * 12 * BLOCKSIZE) / IUTBITRATE * 24 * ESP.getCpuFreqMHz()) {
         int avail = hwSerial.available();
-        inCnt += hwSerial.readBytes(&inBuf[inCnt], min(avail, min(BLOCKSIZE - inCnt, hwSerial.availableForWrite())));
+        inCnt += hwSerial.read(&inBuf[inCnt], min(avail, min(BLOCKSIZE - inCnt, hwSerial.availableForWrite())));
         if (inCnt >= BLOCKSIZE) { break; }
         // wait for more outstanding bytes to trickle in
         if (avail) deadlineStart = ESP.getCycleCount();
@@ -200,16 +200,24 @@ void loop() {
     // starting deadline for the first bytes to come in
     deadlineStart = ESP.getCycleCount();
     inCnt = 0;
-    while ((ESP.getCycleCount() - deadlineStart) < (1000000 * 10 * BLOCKSIZE) / IUTBITRATE * 2 * ESP.getCpuFreqMHz()) {
-        int avail = serialIUT.available();
+    while ((ESP.getCycleCount() - deadlineStart) < (1000000UL * 12 * BLOCKSIZE) / IUTBITRATE * 8 * ESP.getCpuFreqMHz()) {
+        int avail;
+        if (0 != (swSerialConfig & 070))
+            avail = serialIUT.available();
+        else
+            avail = serialIUT.read(inBuf, BLOCKSIZE);
         for (int i = 0; i < avail; ++i)
         {
-            unsigned char r = serialIUT.read();
+            unsigned char r;
+            if (0 != (swSerialConfig & 070))
+                r = serialIUT.read();
+            else
+                r = inBuf[i];
             if (expected == -1) { expected = r; }
             else {
-                expected = (expected + 1) % 256;
+                expected = (expected + 1) % (1UL << (5 + swSerialConfig % 4));
             }
-            if (r != (expected & ((1 << (5 + swSerialConfig % 4)) - 1))) {
+            if (r != expected) {
                 ++rxErrors;
                 expected = -1;
             }
@@ -251,7 +259,8 @@ void loop() {
         rxParityErrors = 0;
         expected = -1;
         // resync
-        delay(static_cast<uint32_t>(1000 * 10 * BLOCKSIZE / IUTBITRATE * 16));
+        delay(1000UL * 12 * BLOCKSIZE / IUTBITRATE * 16);
+        serialIUT.flush();
         start = micros();
     }
 }
