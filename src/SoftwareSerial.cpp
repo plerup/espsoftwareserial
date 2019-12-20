@@ -466,22 +466,26 @@ void SoftwareSerial::rxBits(const uint32_t & isrCycle) {
             if (level)
             {
                 m_rxCurByte >>= (sizeof(uint8_t) * 8 - m_dataBits);
-                if (m_parityBuffer)
-                {
-                    if (m_rxCurParity) {
-                        m_parityBuffer->pushpeek() |= m_parityInPos;
-                    }
-                    else {
-                        m_parityBuffer->pushpeek() &= ~m_parityInPos;
-                    }
-                    m_parityInPos <<= 1;
-                    if (!m_parityInPos)
+                if (!m_buffer->push(m_rxCurByte)) {
+                    m_overflow = true;
+                }
+                else {
+                    if (m_parityBuffer)
                     {
-                        m_parityBuffer->push();
-                        m_parityInPos = 1;
+                        if (m_rxCurParity) {
+                            m_parityBuffer->pushpeek() |= m_parityInPos;
+                        }
+                        else {
+                            m_parityBuffer->pushpeek() &= ~m_parityInPos;
+                        }
+                        m_parityInPos <<= 1;
+                        if (!m_parityInPos)
+                        {
+                            m_parityBuffer->push();
+                            m_parityInPos = 1;
+                        }
                     }
                 }
-                if (!m_buffer->push(m_rxCurByte)) m_overflow = true;
             }
             m_rxCurBit = m_pduBits;
             // reset to 0 is important for masked bit logic

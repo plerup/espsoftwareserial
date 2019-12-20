@@ -244,7 +244,7 @@ void loop() {
             + rxErrors + " errors (" + 100.0 * rxErrors / (!rxErrors ? 1 : rxCount) + "%)");
         if (0 != (swSerialConfig & 070))
         {
-            logger.print(" ("); logger.print(rxParityErrors) + logger.println(" parity errors)");
+            logger.print(" ("); logger.print(rxParityErrors); logger.println(" parity errors)");
         }
         else
         {
