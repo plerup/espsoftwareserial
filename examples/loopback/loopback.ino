@@ -89,30 +89,12 @@ HardwareSerial& logger(Serial);
 void setup() {
 #if defined(ESP8266)
 #if defined(HWLOOPBACK) || defined(HWSOURCESINK) || defined(HWSOURCESWSINK)
-    logger.begin(9600, SWSERIAL_8N1, -1, TX);
-#else
-    logger.begin(9600);
-#endif
-#elif defined(ESP32)
-#if defined(HWLOOPBACK) || defined(HWSOURCESWSINK)
-    logger.begin(9600);
-#elif defined(HWSOURCESINK)
-    logger.begin(9600);
-#else
-    logger.begin(9600);
-#endif
-#else
-    logger.begin(9600);
-#endif
-
-    logger.println("Loopback example for EspSoftwareSerial");
-
-
-#if defined(ESP8266)
-#if defined(HWLOOPBACK) || defined(HWSOURCESINK) || defined(HWSOURCESWSINK)
     Serial.begin(IUTBITRATE, hwSerialConfig, SERIAL_FULL, 1, invert);
     Serial.swap();
     Serial.setRxBufferSize(2 * BLOCKSIZE);
+    logger.begin(9600, SWSERIAL_8N1, -1, TX);
+#else
+    logger.begin(9600);
 #endif
 #if !defined(HWSOURCESINK)
     serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6, invert, 2 * BLOCKSIZE);
@@ -134,9 +116,15 @@ void setup() {
     serialIUT.enableIntTx(false);
 #endif
 #endif
-#elif !defined(HWSOURCESINK)
+    logger.begin(9600);
+#else
+#if !defined(HWSOURCESINK)
     serialIUT.begin(IUTBITRATE);
 #endif
+    logger.begin(9600);
+#endif
+
+    logger.println("Loopback example for EspSoftwareSerial");
 
     start = micros();
     txCount = 0;
@@ -183,10 +171,10 @@ void loop() {
 #endif
 #ifdef HWSOURCESINK
 #if defined(ESP8266)
-    if (Serial.hasOverrun()) { logger.println("Serial::overrun"); }
+    if (serialIUT.hasOverrun()) { logger.println("serialIUT.overrun"); }
 #endif
 #else
-    if (serialIUT.overflow()) { logger.println("SoftwareSerial::overflow"); }
+    if (serialIUT.overflow()) { logger.println("serialIUT.overflow"); }
 #endif
 
     int inCnt;
@@ -231,7 +219,7 @@ void loop() {
                 expected = -1;
             }
 #ifndef HWSOURCESINK
-            if ((serialIUT.readParity() ^ static_cast<bool>(swSerialConfig & 010)) != serialIUT.parityEven(r))
+            if (serialIUT.readParity() != (static_cast<bool>(swSerialConfig & 010) ? serialIUT.parityOdd(r) : serialIUT.parityEven(r)))
             {
                 ++rxParityErrors;
             }
@@ -256,7 +244,7 @@ void loop() {
             + rxErrors + " errors (" + 100.0 * rxErrors / (!rxErrors ? 1 : rxCount) + "%)");
         if (0 != (swSerialConfig & 070))
         {
-            logger.println(String(" (") + rxParityErrors + " parity errors)");
+            logger.print(" ("); logger.print(rxParityErrors) + logger.println(" parity errors)");
         }
         else
         {

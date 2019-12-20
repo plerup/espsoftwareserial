@@ -70,26 +70,16 @@ HardwareSerial& logger(Serial);
 void setup() {
 #if defined(ESP8266)
 #if defined(HWLOOPBACK)
-    logger.begin(9600, SWSERIAL_8N1, -1, TX);
-#else
-    logger.begin(9600);
-#endif
-#else
-    logger.begin(9600);
-#endif
-
-    logger.println("Repeater example for EspSoftwareSerial");
-
-#if defined(ESP8266)
-#if defined(HWLOOPBACK)
     repeater.begin(IUTBITRATE, hwSerialConfig, SERIAL_FULL, 1, invert);
     repeater.swap();
     repeater.setRxBufferSize(2 * BLOCKSIZE);
+    logger.begin(9600, SWSERIAL_8N1, -1, TX);
 #else
     repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, invert, 4 * BLOCKSIZE);
 #ifdef HALFDUPLEX
     repeater.enableIntTx(false);
 #endif
+    logger.begin(9600);
 #endif
 #elif defined(ESP32)
 #if defined(HWLOOPBACK)
@@ -101,10 +91,13 @@ void setup() {
     repeater.enableIntTx(false);
 #endif
 #endif
+    logger.begin(9600);
 #else
     repeater.begin(IUTBITRATE);
+    logger.begin(9600);
 #endif
 
+    logger.println("Repeater example for EspSoftwareSerial");
     start = micros();
     rxCount = 0;
     seqErrors = 0;
@@ -113,6 +106,14 @@ void setup() {
 }
 
 void loop() {
+#ifdef HWLOOPBACK
+#if defined(ESP8266)
+    if (repeater.hasOverrun()) { logger.println("repeater.overrun"); }
+#endif
+#else
+    if (repeater.overflow()) { logger.println("repeater.overflow"); }
+#endif
+
 #ifdef HALFDUPLEX
     char block[BLOCKSIZE];
 #endif
@@ -134,7 +135,7 @@ void loop() {
                 expected = -1;
             }
 #ifndef HWLOOPBACK
-            if ((repeater.readParity() ^ static_cast<bool>(swSerialConfig & 010)) != repeater.parityEven(r))
+            if (repeater.readParity() != (static_cast<bool>(swSerialConfig & 010) ? repeater.parityOdd(r) : repeater.parityEven(r)))
             {
                 ++parityErrors;
             }
@@ -166,7 +167,7 @@ void loop() {
 #ifndef HWLOOPBACK
         if (0 != (swSerialConfig & 070))
         {
-            logger.println(String(" (") + parityErrors + " parity errors)");
+            logger.print(" ("); logger.print(parityErrors) + logger.println(" parity errors)");
         }
         else
 #endif
