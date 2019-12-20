@@ -70,32 +70,39 @@ HardwareSerial& logger(Serial);
 void setup() {
 #if defined(ESP8266)
 #if defined(HWLOOPBACK)
+    logger.begin(9600, SWSERIAL_8N1, -1, TX);
+#else
+    logger.begin(9600);
+#endif
+#else
+    logger.begin(9600);
+#endif
+
+    logger.println("Repeater example for EspSoftwareSerial");
+
+#if defined(ESP8266)
+#if defined(HWLOOPBACK)
     repeater.begin(IUTBITRATE, hwSerialConfig, SERIAL_FULL, 1, invert);
     repeater.swap();
     repeater.setRxBufferSize(2 * BLOCKSIZE);
-    logger.begin(9600, SWSERIAL_8N1, -1, TX);
 #else
     repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, invert, 4 * BLOCKSIZE);
 #ifdef HALFDUPLEX
     repeater.enableIntTx(false);
 #endif
-    logger.begin(9600);
 #endif
 #elif defined(ESP32)
 #if defined(HWLOOPBACK)
     repeater.begin(IUTBITRATE, hwSerialConfig, D7, D8, invert);
     repeater.setRxBufferSize(2 * BLOCKSIZE);
-    logger.begin(9600);
 #else
     repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, invert, 4 * BLOCKSIZE);
 #ifdef HALFDUPLEX
     repeater.enableIntTx(false);
 #endif
-    Serial.begin(9600);
 #endif
 #else
     repeater.begin(IUTBITRATE);
-    Serial.begin(9600);
 #endif
 
     start = micros();
@@ -103,8 +110,6 @@ void setup() {
     seqErrors = 0;
     parityErrors = 0;
     expected = -1;
-
-    logger.println("Repeater example for EspSoftwareSerial");
 }
 
 void loop() {
@@ -171,6 +176,7 @@ void loop() {
         start = end;
         rxCount = 0;
         seqErrors = 0;
+        parityErrors = 0;
         expected = -1;
     }
 }

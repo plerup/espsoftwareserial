@@ -89,12 +89,30 @@ HardwareSerial& logger(Serial);
 void setup() {
 #if defined(ESP8266)
 #if defined(HWLOOPBACK) || defined(HWSOURCESINK) || defined(HWSOURCESWSINK)
-    Serial.begin(IUTBITRATE, hwSerialConfig, SERIAL_FULL, 1, invert);
-    Serial.swap();
-    Serial.setRxBufferSize(2 * BLOCKSIZE);
     logger.begin(9600, SWSERIAL_8N1, -1, TX);
 #else
     logger.begin(9600);
+#endif
+#elif defined(ESP32)
+#if defined(HWLOOPBACK) || defined(HWSOURCESWSINK)
+    logger.begin(9600);
+#elif defined(HWSOURCESINK)
+    logger.begin(9600);
+#else
+    logger.begin(9600);
+#endif
+#else
+    logger.begin(9600);
+#endif
+
+    logger.println("Loopback example for EspSoftwareSerial");
+
+
+#if defined(ESP8266)
+#if defined(HWLOOPBACK) || defined(HWSOURCESINK) || defined(HWSOURCESWSINK)
+    Serial.begin(IUTBITRATE, hwSerialConfig, SERIAL_FULL, 1, invert);
+    Serial.swap();
+    Serial.setRxBufferSize(2 * BLOCKSIZE);
 #endif
 #if !defined(HWSOURCESINK)
     serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6, invert, 2 * BLOCKSIZE);
@@ -106,13 +124,9 @@ void setup() {
 #if defined(HWLOOPBACK) || defined(HWSOURCESWSINK)
     Serial2.begin(IUTBITRATE, hwSerialConfig, D4, D3, invert);
     Serial2.setRxBufferSize(2 * BLOCKSIZE);
-    logger.begin(9600);
 #elif defined(HWSOURCESINK)
     serialIUT.begin(IUTBITRATE, hwSerialConfig, D5, D6, invert);
     serialIUT.setRxBufferSize(2 * BLOCKSIZE);
-    logger.begin(9600);
-#else
-    Serial.begin(9600);
 #endif
 #if !defined(HWSOURCESINK)
     serialIUT.begin(IUTBITRATE, swSerialConfig, D5, D6, invert, 2 * BLOCKSIZE);
@@ -120,11 +134,8 @@ void setup() {
     serialIUT.enableIntTx(false);
 #endif
 #endif
-#else
-    Serial.begin(9600);
-#if !defined(HWSOURCESINK)
+#elif !defined(HWSOURCESINK)
     serialIUT.begin(IUTBITRATE);
-#endif
 #endif
 
     start = micros();
@@ -133,8 +144,6 @@ void setup() {
     rxErrors = 0;
     rxParityErrors = 0;
     expected = -1;
-
-    logger.println("Loopback example for EspSoftwareSerial");
 }
 
 unsigned char c = 0;
