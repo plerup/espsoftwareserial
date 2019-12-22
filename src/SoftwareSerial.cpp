@@ -68,7 +68,6 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     m_parityMode = static_cast<SoftwareSerialParity>(config & 070);
     m_stopBits = 1 + ((config & 0300) ? 1 : 0);
     m_pduBits = m_dataBits + static_cast<bool>(m_parityMode) + m_stopBits;
-    m_bit_us = (1000000UL + baud / 2) / baud;
     m_bitCycles = (ESP.getCpuFreqMHz() * 1000000UL + baud / 2) / baud;
     m_intTxEnabled = true;
     if (isValidGPIOpin(m_rxPin)) {
@@ -529,7 +528,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial * self) {
     }
 }
 
-void SoftwareSerial::onReceive(std::function<void(int available)> handler) {
+void SoftwareSerial::onReceive(Delegate<void(int available), void*> handler) {
     receiveHandler = handler;
 }
 

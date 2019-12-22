@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <Stream.h>
 #include <functional>
 
-enum SoftwareSerialParity {
+enum SoftwareSerialParity : uint8_t {
     SWSERIAL_PARITY_NONE = 000,
     SWSERIAL_PARITY_EVEN = 020,
     SWSERIAL_PARITY_ODD = 030,
@@ -191,7 +191,7 @@ public:
     bool stopListening() { enableRx(false); return true; }
 
     /// Set an event handler for received data.
-    void onReceive(std::function<void(int available)> handler);
+    void onReceive(Delegate<void(int available), void*> handler);
 
     /// Run the internal processing and event engine. Can be iteratively called
     /// from loop, or otherwise scheduled.
@@ -217,42 +217,40 @@ private:
     static void rxBitSyncISR(SoftwareSerial* self);
 
     // Member variables
-    bool m_oneWire;
     int8_t m_rxPin = -1;
     int8_t m_txPin = -1;
     int8_t m_txEnablePin = -1;
+    uint8_t m_dataBits;
+    bool m_oneWire;
     bool m_rxValid = false;
     bool m_rxEnabled = false;
     bool m_txValid = false;
     bool m_txEnableValid = false;
     bool m_invert;
-    bool m_overflow = false;
-    uint8_t m_dataBits;
     /// PDU bits include data, parity and stop bits; the start bit is not counted.
     uint8_t m_pduBits;
+    bool m_intTxEnabled;
     SoftwareSerialParity m_parityMode;
     uint8_t m_stopBits;
-    uint32_t m_bit_us;
+    bool m_lastReadParity;
+    bool m_overflow = false;
     uint32_t m_bitCycles;
-    uint32_t m_periodStart;
-    uint32_t m_periodDuration;
-    bool m_intTxEnabled;
-    uint32_t m_savedPS = 0;
-    std::unique_ptr<circular_queue<uint8_t> > m_buffer;
-    std::unique_ptr<circular_queue<uint8_t> > m_parityBuffer;
     uint8_t m_parityInPos;
     uint8_t m_parityOutPos;
-    bool m_lastReadParity;
+    int8_t m_rxCurBit; // 0 thru (m_pduBits - m_stopBits - 1): data/parity bits. -1: start bit. (m_pduBits - 1): stop bit.
+    uint8_t m_rxCurByte = 0;
+    std::unique_ptr<circular_queue<uint8_t> > m_buffer;
+    std::unique_ptr<circular_queue<uint8_t> > m_parityBuffer;
+    uint32_t m_periodStart;
+    uint32_t m_periodDuration;
+    uint32_t m_savedPS = 0;
     // the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
     // 1 = positive including 0, 0 = negative.
     std::unique_ptr<circular_queue<uint32_t> > m_isrBuffer;
     std::atomic<bool> m_isrOverflow;
     uint32_t m_isrLastCycle;
-    int8_t m_rxCurBit; // 0 thru (m_pduBits - m_stopBits - 1): data/parity bits. -1: start bit. (m_pduBits - 1): stop bit.
-    uint8_t m_rxCurByte = 0;
     bool m_rxCurParity = false;
-
-    std::function<void(int available)> receiveHandler;
+    Delegate<void(int available), void*> receiveHandler;
 };
 
 #endif // __SoftwareSerial_h
