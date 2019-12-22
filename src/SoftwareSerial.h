@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <Stream.h>
 #include <functional>
 
-enum SoftwareSerialParity {
+enum SoftwareSerialParity : uint8_t {
     SWSERIAL_PARITY_NONE = 000,
     SWSERIAL_PARITY_EVEN = 020,
     SWSERIAL_PARITY_ODD = 030,
@@ -36,7 +36,7 @@ enum SoftwareSerialParity {
     SWSERIAL_PARITY_SPACE = 070,
 };
 
-enum SoftwareSerialConfig {
+enum SoftwareSerialConfig : uint8_t {
     SWSERIAL_5N1 = SWSERIAL_PARITY_NONE,
     SWSERIAL_6N1,
     SWSERIAL_7N1,
@@ -221,38 +221,45 @@ private:
     int8_t m_rxPin = -1;
     int8_t m_txPin = -1;
     int8_t m_txEnablePin = -1;
+
     bool m_rxValid = false;
     bool m_rxEnabled = false;
     bool m_txValid = false;
     bool m_txEnableValid = false;
+
     bool m_invert;
     bool m_overflow = false;
     uint8_t m_dataBits;
     /// PDU bits include data, parity and stop bits; the start bit is not counted.
     uint8_t m_pduBits;
-    SoftwareSerialParity m_parityMode;
-    uint8_t m_stopBits;
-    uint32_t m_bit_us;
+
     uint32_t m_bitCycles;
     uint32_t m_periodStart;
     uint32_t m_periodDuration;
-    bool m_intTxEnabled;
     uint32_t m_savedPS = 0;
     std::unique_ptr<circular_queue<uint8_t> > m_buffer;
     std::unique_ptr<circular_queue<uint8_t> > m_parityBuffer;
+
+    bool m_intTxEnabled;
+    uint8_t m_stopBits;
     uint8_t m_parityInPos;
     uint8_t m_parityOutPos;
+
+    std::atomic<bool> m_isrOverflow;
+    SoftwareSerialParity m_parityMode;
     bool m_lastReadParity;
+    bool m_rxCurParity = false;
+
     // the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
     // 1 = positive including 0, 0 = negative.
     std::unique_ptr<circular_queue<uint32_t> > m_isrBuffer;
-    std::atomic<bool> m_isrOverflow;
+    std::function<void(int available)> receiveHandler;
+
     uint32_t m_isrLastCycle;
     int8_t m_rxCurBit; // 0 thru (m_pduBits - m_stopBits - 1): data/parity bits. -1: start bit. (m_pduBits - 1): stop bit.
     uint8_t m_rxCurByte = 0;
-    bool m_rxCurParity = false;
 
-    std::function<void(int available)> receiveHandler;
+    uint8_t unused[2];
 };
 
 #endif // __SoftwareSerial_h
