@@ -26,7 +26,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "circular_queue/circular_queue.h"
 #include <Stream.h>
-#include <functional>
 
 enum SoftwareSerialParity : uint8_t {
     SWSERIAL_PARITY_NONE = 000,
