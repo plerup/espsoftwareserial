@@ -58,11 +58,13 @@ namespace detail
     public:
         DelegatePImpl()
         {
+            kind = FP;
             fn = nullptr;
         }
 
         DelegatePImpl(std::nullptr_t)
         {
+            kind = FP;
             fn = nullptr;
         }
 
@@ -74,7 +76,7 @@ namespace detail
                 obj.~A();
         }
 
-        DelegatePImpl(const DelegatePImpl& del)
+        DelegatePImpl(const DelegatePImpl<A, R, P...>& del)
         {
             kind = del.kind;
             if (FUNC == del.kind)
@@ -92,7 +94,7 @@ namespace detail
             }
         }
 
-        DelegatePImpl(DelegatePImpl&& del)
+        DelegatePImpl(DelegatePImpl<A, R, P...>&& del)
         {
             kind = del.kind;
             if (FUNC == del.kind)
@@ -130,19 +132,13 @@ namespace detail
             DelegatePImpl::fn = fn;
         }
 
-        template<typename F> DelegatePImpl(const F& functional)
+        template<typename F> DelegatePImpl(F functional)
         {
             kind = FUNC;
-            new (&this->functional) FunctionType(functional);
+            new (&this->functional) FunctionType(std::forward<F>(functional));
         }
 
-        template<typename F> DelegatePImpl(F&& functional)
-        {
-            kind = FUNC;
-            new (&this->functional) FunctionType(std::move(functional));
-        }
-
-        DelegatePImpl& operator=(const DelegatePImpl& del)
+        DelegatePImpl& operator=(const DelegatePImpl<A, R, P...>& del)
         {
             if (this == &del) return *this;
             if (kind != del.kind)
@@ -181,7 +177,7 @@ namespace detail
             return *this;
         }
 
-        DelegatePImpl& operator=(DelegatePImpl&& del)
+        DelegatePImpl& operator=(DelegatePImpl<A, R, P...>&& del)
         {
             if (this == &del) return *this;
             if (kind != del.kind)
@@ -235,7 +231,7 @@ namespace detail
             return *this;
         }
 
-        template<typename F> DelegatePImpl& operator=(const F& functional)
+        template<typename F> DelegatePImpl& operator=(F functional)
         {
             if (FUNC != kind)
             {
@@ -246,22 +242,7 @@ namespace detail
                 new (&this->functional) FunctionType();
                 kind = FUNC;
             }
-            this->functional = functional;
-            return *this;
-        }
-
-        template<typename F> DelegatePImpl& operator=(F&& functional)
-        {
-            if (FUNC != kind)
-            {
-                if (FPA == kind)
-                {
-                    obj.~A();
-                }
-                new (&this->functional) FunctionType();
-                kind = FUNC;
-            }
-            this->functional = std::move(functional);
+            this->functional = std::forward<F>(functional);
             return *this;
         }
 
@@ -367,7 +348,7 @@ namespace detail
         }
 
     protected:
-        enum { FUNC, FP, FPA } kind = FP;
+        enum { FUNC, FP, FPA } kind;
         union {
             FunctionType functional;
             FunPtr fn;
@@ -389,15 +370,17 @@ namespace detail
     public:
         DelegatePImpl()
         {
+            kind = FP;
             fn = nullptr;
         }
 
         DelegatePImpl(std::nullptr_t)
         {
+            kind = FP;
             fn = nullptr;
         }
 
-        DelegatePImpl(const DelegatePImpl& del)
+        DelegatePImpl(const DelegatePImpl<A, R, P...>& del)
         {
             kind = del.kind;
             if (FPA == del.kind)
@@ -411,7 +394,7 @@ namespace detail
             }
         }
 
-        DelegatePImpl(DelegatePImpl&& del)
+        DelegatePImpl(DelegatePImpl<A, R, P...>&& del)
         {
             kind = del.kind;
             if (FPA == del.kind)
@@ -445,13 +428,13 @@ namespace detail
             DelegatePImpl::fn = fn;
         }
 
-        template<typename F> DelegatePImpl(const F& fn)
+        template<typename F> DelegatePImpl(F fn)
         {
             kind = FP;
-            DelegatePImpl::fn = fn;
+            DelegatePImpl::fn = std::forward<F>(fn);
         }
 
-        DelegatePImpl& operator=(const DelegatePImpl& del)
+        DelegatePImpl& operator=(const DelegatePImpl<A, R, P...>& del)
         {
             if (this == &del) return *this;
             if (kind != del.kind)
@@ -474,7 +457,7 @@ namespace detail
             return *this;
         }
 
-        DelegatePImpl& operator=(DelegatePImpl&& del)
+        DelegatePImpl& operator=(DelegatePImpl<A, R, P...>&& del)
         {
             if (this == &del) return *this;
             if (kind != del.kind)
@@ -508,14 +491,14 @@ namespace detail
             return *this;
         }
 
-        template<typename F> DelegatePImpl& operator=(const F& fn)
+        template<typename F> DelegatePImpl& operator=(F fn)
         {
             if (FPA == kind)
             {
                 obj = {};
             }
             kind = FP;
-            this->fn = fn;
+            this->fn = std::forward<F>(fn);
             return *this;
         }
 
@@ -586,7 +569,7 @@ namespace detail
         }
 
     protected:
-        enum { FP, FPA } kind = FP;
+        enum { FP, FPA } kind;
         union {
             FunPtr fn;
             FunAPtr fnA;
@@ -607,11 +590,13 @@ namespace detail
     public:
         DelegatePImpl()
         {
+            kind = FP;
             fn = nullptr;
         }
 
         DelegatePImpl(std::nullptr_t)
         {
+            kind = FP;
             fn = nullptr;
         }
 
@@ -621,7 +606,7 @@ namespace detail
                 functional.~FunctionType();
         }
 
-        DelegatePImpl(const DelegatePImpl& del)
+        DelegatePImpl(const DelegatePImpl<void, R, P...>& del)
         {
             kind = del.kind;
             if (FUNC == del.kind)
@@ -634,7 +619,7 @@ namespace detail
             }
         }
 
-        DelegatePImpl(DelegatePImpl&& del)
+        DelegatePImpl(DelegatePImpl<void, R, P...>&& del)
         {
             kind = del.kind;
             if (FUNC == del.kind)
@@ -653,19 +638,13 @@ namespace detail
             DelegatePImpl::fn = fn;
         }
 
-        template<typename F> DelegatePImpl(const F& functional)
+        template<typename F> DelegatePImpl(F functional)
         {
             kind = FUNC;
-            new (&this->functional) FunctionType(functional);
+            new (&this->functional) FunctionType(std::forward<F>(functional));
         }
 
-        template<typename F> DelegatePImpl(F&& functional)
-        {
-            kind = FUNC;
-            new (&this->functional) FunctionType(std::move(functional));
-        }
-
-        DelegatePImpl& operator=(const DelegatePImpl& del)
+        DelegatePImpl& operator=(const DelegatePImpl<void, R, P...>& del)
         {
             if (this == &del) return *this;
             if (FUNC == kind && FUNC != del.kind)
@@ -688,7 +667,7 @@ namespace detail
             return *this;
         }
 
-        DelegatePImpl& operator=(DelegatePImpl&& del)
+        DelegatePImpl& operator=(DelegatePImpl<void, R, P...>&& del)
         {
             if (this == &del) return *this;
             if (FUNC == kind && FUNC != del.kind)
@@ -722,25 +701,14 @@ namespace detail
             return *this;
         }
 
-        template<typename F> DelegatePImpl& operator=(const F& functional)
+        template<typename F> DelegatePImpl& operator=(F functional)
         {
             if (FUNC != kind)
             {
                 new (&this->functional) FunctionType();
                 kind = FUNC;
             }
-            this->functional = functional;
-            return *this;
-        }
-
-        template<typename F> DelegatePImpl& operator=(F&& functional)
-        {
-            if (FUNC != kind)
-            {
-                new (&this->functional) FunctionType();
-                kind = FUNC;
-            }
-            this->functional = std::move(functional);
+            this->functional = std::forward<F>(functional);
             return *this;
         }
 
@@ -819,7 +787,7 @@ namespace detail
         }
 
     protected:
-        enum { FUNC, FP } kind = FP;
+        enum { FUNC, FP } kind;
         union {
             FunctionType functional;
             FunPtr fn;
@@ -844,12 +812,12 @@ namespace detail
             fn = nullptr;
         }
 
-        DelegatePImpl(const DelegatePImpl& del)
+        DelegatePImpl(const DelegatePImpl<void, R, P...>& del)
         {
             fn = del.fn;
         }
 
-        DelegatePImpl(DelegatePImpl&& del)
+        DelegatePImpl(DelegatePImpl<void, R, P...>&& del)
         {
             fn = std::move(del.fn);
         }
@@ -859,19 +827,19 @@ namespace detail
             DelegatePImpl::fn = fn;
         }
 
-        template<typename F> DelegatePImpl(const F& fn)
+        template<typename F> DelegatePImpl(F fn)
         {
-            DelegatePImpl::fn = fn;
+            DelegatePImpl::fn = std::forward<F>(fn);
         }
 
-        DelegatePImpl& operator=(const DelegatePImpl& del)
+        DelegatePImpl& operator=(const DelegatePImpl<void, R, P...>& del)
         {
             if (this == &del) return *this;
             fn = del.fn;
             return *this;
         }
 
-        DelegatePImpl& operator=(DelegatePImpl&& del)
+        DelegatePImpl& operator=(DelegatePImpl<void, R, P...>&& del)
         {
             if (this == &del) return *this;
             fn = std::move(del.fn);
@@ -884,9 +852,9 @@ namespace detail
             return *this;
         }
 
-        template<typename F> DelegatePImpl& operator=(const F& fn)
+        template<typename F> DelegatePImpl& operator=(F fn)
         {
-            DelegatePImpl::fn = fn;
+            DelegatePImpl::fn = std::forward<F>(fn);
             return *this;
         }
 
@@ -934,11 +902,13 @@ namespace detail
     public:
         DelegateImpl()
         {
+            kind = FP;
             fn = nullptr;
         }
 
         DelegateImpl(std::nullptr_t)
         {
+            kind = FP;
             fn = nullptr;
         }
 
@@ -950,7 +920,7 @@ namespace detail
                 obj.~A();
         }
 
-        DelegateImpl(const DelegateImpl& del)
+        DelegateImpl(const DelegateImpl<A, R>& del)
         {
             kind = del.kind;
             if (FUNC == del.kind)
@@ -968,7 +938,7 @@ namespace detail
             }
         }
 
-        DelegateImpl(DelegateImpl&& del)
+        DelegateImpl(DelegateImpl<A, R>&& del)
         {
             kind = del.kind;
             if (FUNC == del.kind)
@@ -1006,19 +976,13 @@ namespace detail
             DelegateImpl::fn = fn;
         }
 
-        template<typename F> DelegateImpl(const F& functional)
+        template<typename F> DelegateImpl(F functional)
         {
             kind = FUNC;
-            new (&this->functional) FunctionType(functional);
+            new (&this->functional) FunctionType(std::forward<F>(functional));
         }
 
-        template<typename F> DelegateImpl(F&& functional)
-        {
-            kind = FUNC;
-            new (&this->functional) FunctionType(std::move(functional));
-        }
-
-        DelegateImpl& operator=(const DelegateImpl& del)
+        DelegateImpl& operator=(const DelegateImpl<A, R>& del)
         {
             if (this == &del) return *this;
             if (kind != del.kind)
@@ -1057,7 +1021,7 @@ namespace detail
             return *this;
         }
 
-        DelegateImpl& operator=(DelegateImpl&& del)
+        DelegateImpl& operator=(DelegateImpl<A, R>&& del)
         {
             if (this == &del) return *this;
             if (kind != del.kind)
@@ -1111,7 +1075,7 @@ namespace detail
             return *this;
         }
 
-        template<typename F> DelegateImpl& operator=(const F& functional)
+        template<typename F> DelegateImpl& operator=(F functional)
         {
             if (FUNC != kind)
             {
@@ -1122,22 +1086,7 @@ namespace detail
                 new (&this->functional) FunctionType();
                 kind = FUNC;
             }
-            this->functional = functional;
-            return *this;
-        }
-
-        template<typename F> DelegateImpl& operator=(F&& functional)
-        {
-            if (FUNC != kind)
-            {
-                if (FPA == kind)
-                {
-                    obj.~A();
-                }
-                new (&this->functional) FunctionType();
-                kind = FUNC;
-            }
-            this->functional = std::move(functional);
+            this->functional = std::forward<F>(functional);
             return *this;
         }
 
@@ -1242,7 +1191,7 @@ namespace detail
         }
 
     protected:
-        enum { FUNC, FP, FPA } kind = FP;
+        enum { FUNC, FP, FPA } kind;
         union {
             FunctionType functional;
             FunPtr fn;
@@ -1264,15 +1213,17 @@ namespace detail
     public:
         DelegateImpl()
         {
+            kind = FP;
             fn = nullptr;
         }
 
         DelegateImpl(std::nullptr_t)
         {
+            kind = FP;
             fn = nullptr;
         }
 
-        DelegateImpl(const DelegateImpl& del)
+        DelegateImpl(const DelegateImpl<A, R>& del)
         {
             kind = del.kind;
             if (FPA == del.kind)
@@ -1286,7 +1237,7 @@ namespace detail
             }
         }
 
-        DelegateImpl(DelegateImpl&& del)
+        DelegateImpl(DelegateImpl<A, R>&& del)
         {
             kind = del.kind;
             if (FPA == del.kind)
@@ -1320,13 +1271,13 @@ namespace detail
             DelegateImpl::fn = fn;
         }
 
-        template<typename F> DelegateImpl(const F& fn)
+        template<typename F> DelegateImpl(F fn)
         {
             kind = FP;
-            DelegateImpl::fn = fn;
+            DelegateImpl::fn = std::forward<F>(fn);
         }
 
-        DelegateImpl& operator=(const DelegateImpl& del)
+        DelegateImpl& operator=(const DelegateImpl<A, R>& del)
         {
             if (this == &del) return *this;
             if (kind != del.kind)
@@ -1349,7 +1300,7 @@ namespace detail
             return *this;
         }
 
-        DelegateImpl& operator=(DelegateImpl&& del)
+        DelegateImpl& operator=(DelegateImpl<A, R>&& del)
         {
             if (this == &del) return *this;
             if (kind != del.kind)
@@ -1383,14 +1334,14 @@ namespace detail
             return *this;
         }
 
-        template<typename F> DelegateImpl& operator=(const F& fn)
+        template<typename F> DelegateImpl& operator=(F fn)
         {
             if (FPA == kind)
             {
                 obj = {};
             }
             kind = FP;
-            this->fn = fn;
+            this->fn = std::forward<F>(fn);
             return *this;
         }
 
@@ -1460,7 +1411,7 @@ namespace detail
         }
 
     protected:
-        enum { FP, FPA } kind = FP;
+        enum { FP, FPA } kind;
         union {
             FunPtr fn;
             FunAPtr fnA;
@@ -1481,11 +1432,13 @@ namespace detail
     public:
         DelegateImpl()
         {
+            kind = FP;
             fn = nullptr;
         }
 
         DelegateImpl(std::nullptr_t)
         {
+            kind = FP;
             fn = nullptr;
         }
 
@@ -1495,7 +1448,7 @@ namespace detail
                 functional.~FunctionType();
         }
 
-        DelegateImpl(const DelegateImpl& del)
+        DelegateImpl(const DelegateImpl<void, R>& del)
         {
             kind = del.kind;
             if (FUNC == del.kind)
@@ -1508,7 +1461,7 @@ namespace detail
             }
         }
 
-        DelegateImpl(DelegateImpl&& del)
+        DelegateImpl(DelegateImpl<void, R>&& del)
         {
             kind = del.kind;
             if (FUNC == del.kind)
@@ -1527,19 +1480,13 @@ namespace detail
             DelegateImpl::fn = fn;
         }
 
-        template<typename F> DelegateImpl(const F& functional)
+        template<typename F> DelegateImpl(F functional)
         {
             kind = FUNC;
-            new (&this->functional) FunctionType(functional);
+            new (&this->functional) FunctionType(std::forward<F>(functional));
         }
 
-        template<typename F> DelegateImpl(F&& functional)
-        {
-            kind = FUNC;
-            new (&this->functional) FunctionType(std::move(functional));
-        }
-
-        DelegateImpl& operator=(const DelegateImpl& del)
+        DelegateImpl& operator=(const DelegateImpl<void, R>& del)
         {
             if (this == &del) return *this;
             if (FUNC == kind && FUNC != del.kind)
@@ -1562,7 +1509,7 @@ namespace detail
             return *this;
         }
 
-        DelegateImpl& operator=(DelegateImpl&& del)
+        DelegateImpl& operator=(DelegateImpl<void, R>&& del)
         {
             if (this == &del) return *this;
             if (FUNC == kind && FUNC != del.kind)
@@ -1596,25 +1543,14 @@ namespace detail
             return *this;
         }
 
-        template<typename F> DelegateImpl& operator=(const F& functional)
+        template<typename F> DelegateImpl& operator=(F functional)
         {
             if (FUNC != kind)
             {
                 new (&this->functional) FunctionType();
                 kind = FUNC;
             }
-            this->functional = functional;
-            return *this;
-        }
-
-        template<typename F> DelegateImpl& operator=(F&& functional)
-        {
-            if (FUNC != kind)
-            {
-                new (&this->functional) FunctionType();
-                kind = FUNC;
-            }
-            this->functional = std::move(functional);
+            this->functional = std::forward<F>(functional);
             return *this;
         }
 
@@ -1693,7 +1629,7 @@ namespace detail
         }
 
     protected:
-        enum { FUNC, FP } kind = FP;
+        enum { FUNC, FP } kind;
         union {
             FunctionType functional;
             FunPtr fn;
@@ -1718,12 +1654,12 @@ namespace detail
             fn = nullptr;
         }
 
-        DelegateImpl(const DelegateImpl& del)
+        DelegateImpl(const DelegateImpl<void, R>& del)
         {
             fn = del.fn;
         }
 
-        DelegateImpl(DelegateImpl&& del)
+        DelegateImpl(DelegateImpl<void, R>&& del)
         {
             fn = std::move(del.fn);
         }
@@ -1733,19 +1669,19 @@ namespace detail
             DelegateImpl::fn = fn;
         }
 
-        template<typename F> DelegateImpl(const F& fn)
+        template<typename F> DelegateImpl(F fn)
         {
-            DelegateImpl::fn = fn;
+            DelegateImpl::fn = std::forward<F>(fn);
         }
 
-        DelegateImpl& operator=(const DelegateImpl& del)
+        DelegateImpl& operator=(const DelegateImpl<void, R>& del)
         {
             if (this == &del) return *this;
             fn = del.fn;
             return *this;
         }
 
-        DelegateImpl& operator=(DelegateImpl&& del)
+        DelegateImpl& operator=(DelegateImpl<void, R>&& del)
         {
             if (this == &del) return *this;
             fn = std::move(del.fn);
@@ -1758,9 +1694,9 @@ namespace detail
             return *this;
         }
 
-        template<typename F> DelegateImpl& operator=(const F& fn)
+        template<typename F> DelegateImpl& operator=(F fn)
         {
-            DelegateImpl::fn = fn;
+            DelegateImpl::fn = std::forward<F>(fn);
             return *this;
         }
 
