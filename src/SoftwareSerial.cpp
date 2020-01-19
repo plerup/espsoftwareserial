@@ -50,7 +50,7 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 #if defined(ESP8266)
     return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 15);
 #elif defined(ESP32)
-    return pin == 0 || pin == 2 || (pin >= 4 && pin <= 5) || (pin >= 12 && pin <= 19) ||
+    return pin == 1 || pin == 3 || pin == 0 || pin == 2 || (pin >= 4 && pin <= 5) || (pin >= 12 && pin <= 19) ||
         (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 35);
 #else
     return true;
@@ -70,7 +70,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     m_pduBits = m_dataBits + static_cast<bool>(m_parityMode) + m_stopBits;
     m_bitCycles = (ESP.getCpuFreqMHz() * 1000000UL + baud / 2) / baud;
     m_intTxEnabled = true;
-    if (isValidGPIOpin(m_rxPin)) {
+    if (isValidGPIOpin(m_rxPin) && (m_rxPin != 1) ) {
         std::unique_ptr<circular_queue<uint8_t> > buffer(new circular_queue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
         m_buffer = move(buffer);
         if (m_parityMode)
@@ -86,7 +86,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
             pinMode(m_rxPin, INPUT_PULLUP);
         }
     }
-    if (isValidGPIOpin(m_txPin)
+    if (isValidGPIOpin(m_txPin) && (m_txPin != 3)
 #ifdef ESP8266
         || ((m_txPin == 16) && !m_oneWire)) {
 #else
