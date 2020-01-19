@@ -224,14 +224,14 @@ public:
 
 protected:
     const T defaultValue = {};
-    unsigned m_bufSize;
+    size_t m_bufSize;
 #if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
     std::unique_ptr<T[]> m_buffer;
 #else
     std::unique_ptr<T> m_buffer;
 #endif
-    std::atomic<unsigned> m_inPos;
-    std::atomic<unsigned> m_outPos;
+    std::atomic<size_t> m_inPos;
+    std::atomic<size_t> m_outPos;
 };
 
 template< typename T, typename ForEachArg >
@@ -253,7 +253,7 @@ template< typename T, typename ForEachArg >
 bool IRAM_ATTR circular_queue<T, ForEachArg>::push()
 {
     const auto inPos = m_inPos.load(std::memory_order_acquire);
-    const unsigned next = (inPos + 1) % m_bufSize;
+    const size_t next = (inPos + 1) % m_bufSize;
     if (next == m_outPos.load(std::memory_order_relaxed)) {
         return false;
     }
@@ -268,7 +268,7 @@ template< typename T, typename ForEachArg >
 bool IRAM_ATTR circular_queue<T, ForEachArg>::push(T&& val)
 {
     const auto inPos = m_inPos.load(std::memory_order_acquire);
-    const unsigned next = (inPos + 1) % m_bufSize;
+    const size_t next = (inPos + 1) % m_bufSize;
     if (next == m_outPos.load(std::memory_order_relaxed)) {
         return false;
     }

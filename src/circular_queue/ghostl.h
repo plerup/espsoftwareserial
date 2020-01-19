@@ -26,6 +26,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <atomic>
 #endif
 
+using size_t = decltype(sizeof(char));
+
 namespace std
 {
 #if !defined(ARDUINO_ARCH_SAMD)
@@ -48,7 +50,7 @@ namespace std
     template< typename T >	T&& move(T& t) noexcept { return static_cast<T&&>(t); }
 #endif
 
-    template< typename T, unsigned long N > struct array
+    template< typename T, size_t long N > struct array
     {
         T _M_elems[N];
         decltype(sizeof(0)) size() const { return N; }
