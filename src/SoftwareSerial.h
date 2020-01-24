@@ -176,7 +176,9 @@ public:
     size_t write(const char* buffer, size_t size, SoftwareSerialParity parity) {
         return write(reinterpret_cast<const uint8_t*>(buffer), size, parity);
     }
-    operator bool() const { return m_rxValid || m_txValid; }
+    operator bool() const {
+        return (-1 == m_rxPin || m_rxValid) && (-1 == m_txPin || m_txValid) && !(-1 == m_rxPin && m_oneWire);
+    }
 
     /// Disable or enable interrupts on the rx pin.
     void enableRx(bool on);
@@ -208,6 +210,8 @@ private:
     void writePeriod(
         uint32_t dutyCycle, uint32_t offCycle, bool withStopBit);
     bool isValidGPIOpin(int8_t pin);
+    bool isValidRxGPIOpin(int8_t pin);
+    bool isValidTxGPIOpin(int8_t pin);
     /* check m_rxValid that calling is safe */
     void rxBits();
     void rxBits(const uint32_t& isrCycle);

@@ -48,13 +48,31 @@ SoftwareSerial::~SoftwareSerial() {
 
 bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 #if defined(ESP8266)
-    return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 15);
+    return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 16);
 #elif defined(ESP32)
-    return pin == 0 || pin == 2 || (pin >= 4 && pin <= 5) || (pin >= 12 && pin <= 19) ||
+    return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 19) ||
         (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 35);
 #else
     return true;
 #endif
+}
+
+bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) {
+    return isValidGPIOpin(pin)
+#if defined(ESP8266) || defined(ESP32)
+        && (pin != 1)
+#endif
+#if defined(ESP8266)
+        && (pin != 16)
+#endif
+        ;
+}
+bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) {
+    return isValidGPIOpin(pin)
+#if defined(ESP8266) || defined(ESP32)
+        && (pin != 3)
+#endif
+        ;
 }
 
 void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
@@ -70,7 +88,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     m_pduBits = m_dataBits + static_cast<bool>(m_parityMode) + m_stopBits;
     m_bitCycles = (ESP.getCpuFreqMHz() * 1000000UL + baud / 2) / baud;
     m_intTxEnabled = true;
-    if (isValidGPIOpin(m_rxPin)) {
+    if (isValidRxGPIOpin(m_rxPin)) {
         std::unique_ptr<circular_queue<uint8_t> > buffer(new circular_queue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
         m_buffer = move(buffer);
         if (m_parityMode)
@@ -86,12 +104,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
             pinMode(m_rxPin, INPUT_PULLUP);
         }
     }
-    if (isValidGPIOpin(m_txPin)
-#ifdef ESP8266
-        || ((m_txPin == 16) && !m_oneWire)) {
-#else
-        ) {
-#endif
+    if (isValidTxGPIOpin(m_txPin)) {
         m_txValid = true;
         if (!m_oneWire) {
             pinMode(m_txPin, OUTPUT);
@@ -119,7 +132,7 @@ uint32_t SoftwareSerial::baudRate() {
 }
 
 void SoftwareSerial::setTransmitEnablePin(int8_t txEnablePin) {
-    if (isValidGPIOpin(txEnablePin)) {
+    if (isValidTxGPIOpin(txEnablePin)) {
         m_txEnableValid = true;
         m_txEnablePin = txEnablePin;
         pinMode(m_txEnablePin, OUTPUT);
@@ -186,7 +199,7 @@ int SoftwareSerial::read() {
     return val;
 }
 
-size_t SoftwareSerial::read(uint8_t * buffer, size_t size) {
+size_t SoftwareSerial::read(uint8_t* buffer, size_t size) {
     if (!m_rxValid) { return 0; }
     size_t avail;
     if (0 == (avail = m_buffer->pop_n(buffer, size))) {
@@ -203,7 +216,7 @@ size_t SoftwareSerial::read(uint8_t * buffer, size_t size) {
     return avail;
 }
 
-size_t SoftwareSerial::readBytes(uint8_t * buffer, size_t size) {
+size_t SoftwareSerial::readBytes(uint8_t* buffer, size_t size) {
     if (!m_rxValid || !size) { return 0; }
     size_t count = 0;
     const auto start = millis();
@@ -273,11 +286,11 @@ size_t SoftwareSerial::write(uint8_t byte, SoftwareSerialParity parity) {
     return write(&byte, 1, parity);
 }
 
-size_t SoftwareSerial::write(const uint8_t * buffer, size_t size) {
+size_t SoftwareSerial::write(const uint8_t* buffer, size_t size) {
     return write(buffer, size, m_parityMode);
 }
 
-size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t * buffer, size_t size, SoftwareSerialParity parity) {
+size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t* buffer, size_t size, SoftwareSerialParity parity) {
     if (m_rxValid) { rxBits(); }
     if (!m_txValid) { return -1; }
 
@@ -419,7 +432,7 @@ void SoftwareSerial::rxBits() {
     m_isrBuffer->for_each([this](const uint32_t& isrCycle) { rxBits(isrCycle); });
 }
 
-void SoftwareSerial::rxBits(const uint32_t & isrCycle) {
+void SoftwareSerial::rxBits(const uint32_t& isrCycle) {
     bool level = (m_isrLastCycle & 1) ^ m_invert;
 
     // error introduced by edge value in LSB of isrCycle is negligible
@@ -496,7 +509,7 @@ void SoftwareSerial::rxBits(const uint32_t & isrCycle) {
     }
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial * self) {
+void ICACHE_RAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial* self) {
     uint32_t curCycle = ESP.getCycleCount();
     bool level = digitalRead(self->m_rxPin);
 
@@ -505,7 +518,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial * self) {
     if (!self->m_isrBuffer->push((curCycle | 1U) ^ !level)) self->m_isrOverflow.store(true);
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial * self) {
+void ICACHE_RAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
     uint32_t start = ESP.getCycleCount();
     uint32_t wait = self->m_bitCycles - 172U;
 
