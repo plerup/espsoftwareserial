@@ -219,11 +219,13 @@ size_t SoftwareSerial::read(uint8_t* buffer, size_t size) {
 size_t SoftwareSerial::readBytes(uint8_t* buffer, size_t size) {
     if (!m_rxValid || !size) { return 0; }
     size_t count = 0;
-    const auto start = millis();
+    auto start = millis();
     do {
-        count += read(&buffer[count], size - count);
+        auto readCnt = read(&buffer[count], size - count);
+        count += readCnt;
         if (count >= size) break;
-        yield();
+        if (readCnt) start = millis();
+        else optimistic_yield(1000UL);
     } while (millis() - start < _timeout);
     return count;
 }
@@ -249,7 +251,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
             auto ms = (m_periodDuration - expired) / ESP.getCpuFreqMHz() / 1000UL;
             if (ms) delay(ms);
         }
-        while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { optimistic_yield(10000); }
+        while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { optimistic_yield(10000UL); }
         // Disable interrupts again
         if (!m_intTxEnabled) { m_savedPS = xt_rsil(15); }
     }
