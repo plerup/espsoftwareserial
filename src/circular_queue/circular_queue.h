@@ -170,7 +170,8 @@ public:
     */
     bool IRAM_ATTR push(const T& val)
     {
-        return push(T(val));
+        T v(val);
+        return push(std::move(v));
     }
 
 #if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)

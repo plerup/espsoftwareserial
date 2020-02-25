@@ -145,7 +145,7 @@ protected:
 };
 
 template< typename T, typename ForEachArg >
-T& circular_queue_mp<T>::pop_requeue()
+T& circular_queue_mp<T, ForEachArg>::pop_requeue()
 {
 #ifdef ESP8266
     esp8266::InterruptLock lock;
@@ -165,7 +165,7 @@ T& circular_queue_mp<T>::pop_requeue()
 }
 
 template< typename T, typename ForEachArg >
-bool circular_queue_mp<T>::for_each_requeue(const Delegate<bool(T&), ForEachArg>& fun)
+bool circular_queue_mp<T, ForEachArg>::for_each_requeue(const Delegate<bool(T&), ForEachArg>& fun)
 {
     auto inPos0 = circular_queue<T, ForEachArg>::m_inPos.load(std::memory_order_acquire);
     auto outPos = circular_queue<T, ForEachArg>::m_outPos.load(std::memory_order_relaxed);
