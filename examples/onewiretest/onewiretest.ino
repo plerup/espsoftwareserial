@@ -9,9 +9,11 @@ void setup() {
 	Serial.begin(115200);
 	Serial.println("\nOne Wire Half Duplex Serial Tester");
 	swSer1.begin(115200, SWSERIAL_8N1, 12, 12, false, 256);
-	swSer1.enableIntTx(true);
+	// high speed half duplex, turn off interrupts during tx
+	swSer1.enableIntTx(false);
 	swSer2.begin(115200, SWSERIAL_8N1, 14, 14, false, 256);
-	swSer2.enableIntTx(true);
+	// high speed half duplex, turn off interrupts during tx
+	swSer2.enableIntTx(false);
 }
 
 void loop() {
