@@ -16,12 +16,20 @@
 // Hardware Serial2 defaults to D4 (rx), D3 (tx).
 // For local hardware loopback, connect D5 (rx) to D3 (tx), D6 (tx) to D4 (rx).
 
-#if defined(ESP8266) && !defined(D5)
+#ifndef D5
+#if defined(ESP8266)
 #define D5 (14)
 #define D6 (12)
 #define D7 (13)
 #define D8 (15)
 #define TX (1)
+#elif defined(ESP32)
+#define D5 (18)
+#define D6 (19)
+#define D7 (23)
+#define D8 (5)
+#define TX (1)
+#endif
 #endif
 
 // Pick only one of HWLOOPBACK, HWSOURCESWSINK, or HWSOURCESINK

@@ -211,7 +211,6 @@ private:
         uint32_t dutyCycle, uint32_t offCycle, bool withStopBit);
     bool isValidGPIOpin(int8_t pin);
     bool isValidRxGPIOpin(int8_t pin);
-    bool isValidTxGPIOpin(int8_t pin);
     /* check m_rxValid that calling is safe */
     void rxBits();
     void rxBits(const uint32_t& isrCycle);

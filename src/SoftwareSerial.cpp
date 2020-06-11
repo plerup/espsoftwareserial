@@ -59,18 +59,8 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 
 bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) {
     return isValidGPIOpin(pin)
-#if defined(ESP8266) || defined(ESP32)
-        && (pin != 1)
-#endif
 #if defined(ESP8266)
         && (pin != 16)
-#endif
-        ;
-}
-bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) {
-    return isValidGPIOpin(pin)
-#if defined(ESP8266) || defined(ESP32)
-        && (pin != 3)
 #endif
         ;
 }
@@ -102,7 +92,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
             pinMode(m_rxPin, INPUT_PULLUP);
         }
     }
-    if (isValidTxGPIOpin(m_txPin)) {
+    if (isValidGPIOpin(m_txPin)) {
         m_txValid = true;
         if (!m_oneWire) {
             pinMode(m_txPin, OUTPUT);
@@ -130,7 +120,7 @@ uint32_t SoftwareSerial::baudRate() {
 }
 
 void SoftwareSerial::setTransmitEnablePin(int8_t txEnablePin) {
-    if (isValidTxGPIOpin(txEnablePin)) {
+    if (isValidGPIOpin(txEnablePin)) {
         m_txEnableValid = true;
         m_txEnablePin = txEnablePin;
         pinMode(m_txEnablePin, OUTPUT);
