@@ -300,11 +300,11 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t* buffer, size_t size,
     m_periodDuration = 0;
     m_periodStart = ESP.getCycleCount();
     for (size_t cnt = 0; cnt < size; ++cnt) {
-        uint8_t byte = ~buffer[cnt] & dataMask;
+        uint8_t byte = buffer[cnt] & dataMask;
         // push LSB start-data-parity-stop bit pattern into uint32_t
         // Stop bits: HIGH
         uint32_t word = ~0UL;
-        // parity bit, if any
+        // inverted parity bit, performance tweak for xor all-bits-set word
         if (parity && m_parityMode)
         {
             uint32_t parityBit;
@@ -325,18 +325,19 @@ size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t* buffer, size_t size,
                 parityBit = (0x6996 >> parityBit) & 1;
                 break;
             case SWSERIAL_PARITY_MARK:
-                parityBit = false;
+                parityBit = 0;
                 break;
             case SWSERIAL_PARITY_SPACE:
                 // suppresses warning parityBit uninitialized
             default:
-                parityBit = true;
+                parityBit = 1;
                 break;
             }
-            word ^= parityBit << m_dataBits;
+            word ^= parityBit;
         }
-        word ^= byte;
-        // Stop bit: LOW
+        word <<= m_dataBits;
+        word |= byte;
+        // Start bit: LOW
         word <<= 1;
         if (m_invert) word = ~word;
         for (int i = 0; i <= m_pduBits; ++i) {
