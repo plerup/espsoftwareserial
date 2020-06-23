@@ -231,6 +231,12 @@ void loop() {
             {
                 ++rxParityErrors;
             }
+#elif defined(ESP8266)
+            // current ESP8266 API does not flag parity errors separately
+            if (serialIUT.hasRxError())
+            {
+                ++rxParityErrors;
+            }
 #endif
             ++rxCount;
             ++inCnt;
