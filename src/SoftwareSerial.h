@@ -78,6 +78,12 @@ enum SoftwareSerialConfig {
     SWSERIAL_8S2,
 };
 
+#if STREAM_READ_RETURNS_INT // stream:to*()
+using streamInt = int;
+#else
+using streamInt = size_t;
+#endif
+
 /// This class is compatible with the corresponding AVR one, however,
 /// the constructor takes no arguments, for compatibility with the
 /// HardwareSerial class.
@@ -152,9 +158,9 @@ public:
         return (0x9669 >> byte) & 1;
     }
     /// The read(buffer, size) functions are non-blocking, the same as readBytes but without timeout
-    size_t read(uint8_t* buffer, size_t size);
+    streamInt read(uint8_t* buffer, size_t size);
     /// The read(buffer, size) functions are non-blocking, the same as readBytes but without timeout
-    size_t read(char* buffer, size_t size) {
+    streamInt read(char* buffer, size_t size) {
         return read(reinterpret_cast<uint8_t*>(buffer), size);
     }
     /// @returns The number of bytes read into buffer, up to size. Times out if the limit set through
