@@ -42,7 +42,7 @@ void checkSwSerial(SoftwareSerial* ss) {
 		Serial.print("\nResult:");
 		while (ss->available()) {
 			ch = (byte)ss->read();
-			Serial.print(ch < 0x01 ? " 0" : " ");
+			Serial.print(ch < 0x10 ? " 0" : " ");
 			Serial.print(ch, HEX);
 		}
 		Serial.println();
