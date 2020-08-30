@@ -3,15 +3,14 @@
 
 SoftwareSerial swSer;
 
-byte buf[10] = { 0xFA, 0xAF,0x00,0x00,0x00, 0x00, 0x00, 0x00, 0x00, 0xED };
-byte cmd[10] = { 0xFA, 0xAF,0x00,0x00,0x00, 0x00, 0x00, 0x00, 0x00, 0xED };
-byte ver[10] = { 0xFC, 0xCF,0x00,0xAA,0x41, 0x16, 0x51, 0x01, 0x00, 0xED };
+byte buf[10] =               { 0xFA, 0xAF,0x00,0x00,0x00, 0x00, 0x00, 0x00, 0x00, 0xED };
+const byte cmd[10] PROGMEM = { 0xFA, 0xAF,0x00,0x00,0x00, 0x00, 0x00, 0x00, 0x00, 0xED };
 
 
 void setup() {
 	delay(2000);
 	Serial.begin(115200);
-	Serial.println("\nAlpha 1S Servo Tester");
+	Serial.println(PSTR("\nAlpha 1S Servo Tester"));
 	swSer.begin(115200, SWSERIAL_8N1, 12, 12, false, 256);
 }
 
@@ -35,7 +34,7 @@ void loop() {
 
 
 void GetVersion(byte id) {
-	memcpy(buf, cmd, 10);
+	memcpy_P(buf, cmd, 10);
 	buf[0] = 0xFC;
 	buf[1] = 0xCF;
 	buf[2] = id;
@@ -45,7 +44,7 @@ void GetVersion(byte id) {
 
 
 void GoPos(byte id, byte Pos, byte Time) {
-	memcpy(buf, cmd, 10);
+	memcpy_P(buf, cmd, 10);
 	buf[2] = id;
 	buf[3] = 0x01;
 	buf[4] = Pos;
@@ -56,7 +55,7 @@ void GoPos(byte id, byte Pos, byte Time) {
 }
 
 void GetPos(byte id) {
-	memcpy(buf, cmd, 10);
+	memcpy_P(buf, cmd, 10);
 	buf[2] = id;
 	buf[3] = 0x02;
 	SendCommand();
@@ -64,7 +63,7 @@ void GetPos(byte id) {
 
 
 void SetLED(byte id, byte mode) {
-	memcpy(buf, cmd, 10);
+	memcpy_P(buf, cmd, 10);
 	buf[2] = id;
 	buf[3] = 0x04;
 	buf[4] = mode;
@@ -91,9 +90,9 @@ void SendCommand(bool checkResult) {
 
 void ShowCommand() {
 	Serial.print(millis());
-	Serial.print(" OUT>>");
+	Serial.print(PSTR(" OUT>>"));
 	for (int i = 0; i < 10; i++) {
-		Serial.print((buf[i] < 0x10 ? " 0" : " "));
+		Serial.print(buf[i] < 0x10 ? PSTR(" 0") : PSTR(" "));
 		Serial.print(buf[i], HEX);
 	}
 	Serial.println();
@@ -104,10 +103,10 @@ void checkReturn() {
 	while (((millis() - startMs) < 500) && (!swSer.available()));
 	if (swSer.available()) {
 		Serial.print(millis());
-		Serial.print(" IN>>>");
+		Serial.print(PSTR(" IN>>>"));
 		while (swSer.available()) {
 			byte ch = (byte)swSer.read();
-			Serial.print((ch < 0x10 ? " 0" : " "));
+			Serial.print((ch < 0x10 ? PSTR(" 0") : PSTR(" ")));
 			Serial.print(ch, HEX);
 		}
 		Serial.println();

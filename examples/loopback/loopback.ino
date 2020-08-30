@@ -58,8 +58,8 @@ constexpr bool invert = false;
 constexpr int BLOCKSIZE = 16; // use fractions of 256
 
 unsigned long start;
-String effTxTxt("eff. tx: ");
-String effRxTxt("eff. rx: ");
+const char effTxTxt[] PROGMEM = "eff. tx: ";
+const char effRxTxt[] PROGMEM = "eff. rx: ";
 int txCount;
 int rxCount;
 int expected;
@@ -132,7 +132,7 @@ void setup() {
     logger.begin(9600);
 #endif
 
-    logger.println("Loopback example for EspSoftwareSerial");
+    logger.println(PSTR("Loopback example for EspSoftwareSerial"));
 
     start = micros();
     txCount = 0;
@@ -179,10 +179,10 @@ void loop() {
 #endif
 #ifdef HWSOURCESINK
 #if defined(ESP8266)
-    if (serialIUT.hasOverrun()) { logger.println("serialIUT.overrun"); }
+    if (serialIUT.hasOverrun()) { logger.println(PSTR("serialIUT.overrun")); }
 #endif
 #else
-    if (serialIUT.overflow()) { logger.println("serialIUT.overflow"); }
+    if (serialIUT.overflow()) { logger.println(PSTR("serialIUT.overflow")); }
 #endif
 
     int inCnt;
@@ -250,15 +250,15 @@ void loop() {
     const uint32_t interval = micros() - start;
     if (txCount >= ReportInterval && interval) {
         uint8_t wordBits = (5 + swSerialConfig % 4) + static_cast<bool>(swSerialConfig & 070) + 1 + ((swSerialConfig & 0300) ? 1 : 0);
-        logger.println(String("tx/rx: ") + txCount + "/" + rxCount);
+        logger.println(String(PSTR("tx/rx: ")) + txCount + PSTR("/") + rxCount);
         const long txCps = txCount * (1000000.0 / interval);
         const long rxCps = rxCount * (1000000.0 / interval);
-        logger.print(effTxTxt + wordBits * txCps + "bps, "
-            + effRxTxt + wordBits * rxCps + "bps, "
-            + rxErrors + " errors (" + 100.0 * rxErrors / (!rxErrors ? 1 : rxCount) + "%)");
+        logger.print(String(FPSTR(effTxTxt)) + wordBits * txCps + PSTR("bps, ")
+            + effRxTxt + wordBits * rxCps + PSTR("bps, ")
+            + rxErrors + PSTR(" errors (") + 100.0 * rxErrors / (!rxErrors ? 1 : rxCount) + PSTR("%)"));
         if (0 != (swSerialConfig & 070))
         {
-            logger.print(" ("); logger.print(rxParityErrors); logger.println(" parity errors)");
+            logger.print(PSTR(" (")); logger.print(rxParityErrors); logger.println(PSTR(" parity errors)"));
         }
         else
         {

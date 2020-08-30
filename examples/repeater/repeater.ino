@@ -48,7 +48,7 @@ constexpr bool invert = false;
 constexpr int BLOCKSIZE = 16; // use fractions of 256
 
 unsigned long start;
-String bitRateTxt("Effective data rate: ");
+const char bitRateTxt[] PROGMEM = "Effective data rate: ";
 int rxCount;
 int seqErrors;
 int parityErrors;
@@ -105,7 +105,7 @@ void setup() {
     logger.begin(9600);
 #endif
 
-    logger.println("Repeater example for EspSoftwareSerial");
+    logger.println(PSTR("Repeater example for EspSoftwareSerial"));
     start = micros();
     rxCount = 0;
     seqErrors = 0;
@@ -116,10 +116,10 @@ void setup() {
 void loop() {
 #ifdef HWLOOPBACK
 #if defined(ESP8266)
-    if (repeater.hasOverrun()) { logger.println("repeater.overrun"); }
+    if (repeater.hasOverrun()) { logger.println(PSTR("repeater.overrun")); }
 #endif
 #else
-    if (repeater.overflow()) { logger.println("repeater.overflow"); }
+    if (repeater.overflow()) { logger.println(PSTR("repeater.overflow")); }
 #endif
 
 #ifdef HALFDUPLEX
@@ -133,7 +133,7 @@ void loop() {
         for (int i = 0; i < avail; ++i)
         {
             int r = repeater.read();
-            if (r == -1) { logger.println("read() == -1"); }
+            if (r == -1) { logger.println(PSTR("read() == -1")); }
             if (expected == -1) { expected = r; }
             else {
                 expected = (expected + 1) % (1UL << (5 + swSerialConfig % 4));
@@ -176,12 +176,12 @@ void loop() {
         unsigned long interval = end - start;
         long cps = rxCount * (1000000.0 / interval);
         long seqErrorsps = seqErrors * (1000000.0 / interval);
-        logger.print(bitRateTxt + 10 * cps + "bps, "
-            + seqErrorsps + "cps seq. errors (" + 100.0 * seqErrors / rxCount + "%)");
+        logger.print(String(FPSTR(bitRateTxt)) + 10 * cps + PSTR("bps, ")
+            + seqErrorsps + PSTR("cps seq. errors (") + 100.0 * seqErrors / rxCount + PSTR("%)"));
 #ifndef HWLOOPBACK
         if (0 != (swSerialConfig & 070))
         {
-            logger.print(" ("); logger.print(parityErrors); logger.println(" parity errors)");
+            logger.print(PSTR(" (")); logger.print(parityErrors); logger.println(PSTR(" parity errors)"));
         }
         else
 #endif

@@ -7,7 +7,7 @@ SoftwareSerial swSer2;
 void setup() {
 	delay(2000);
 	Serial.begin(115200);
-	Serial.println("\nOne Wire Half Duplex Serial Tester");
+	Serial.println(PSTR("\nOne Wire Half Duplex Serial Tester"));
 	swSer1.begin(115200, SWSERIAL_8N1, 12, 12, false, 256);
 	// high speed half duplex, turn off interrupts during tx
 	swSer1.enableIntTx(false);
@@ -17,12 +17,12 @@ void setup() {
 }
 
 void loop() {
-	Serial.println("\n\nTesting on swSer1");
-	Serial.print("Enter something to send using swSer1.");
+	Serial.println(PSTR("\n\nTesting on swSer1"));
+	Serial.print(PSTR("Enter something to send using swSer1."));
 	checkSwSerial(&swSer1);
 
-	Serial.println("\n\nTesting on swSer2");
-	Serial.print("Enter something to send using swSer2.");
+	Serial.println(PSTR("\n\nTesting on swSer2"));
+	Serial.print(PSTR("Enter something to send using swSer2."));
 	checkSwSerial(&swSer2);
 
 }
@@ -39,10 +39,10 @@ void checkSwSerial(SoftwareSerial* ss) {
 	// wait 1 second for the reply from SOftwareSerial if any
 	delay(1000);
 	if (ss->available()) {
-		Serial.print("\nResult:");
+		Serial.print(PSTR("\nResult:"));
 		while (ss->available()) {
 			ch = (byte)ss->read();
-			Serial.print(ch < 0x10 ? " 0" : " ");
+			Serial.print(ch < 0x10 ? PSTR(" 0") : PSTR(" "));
 			Serial.print(ch, HEX);
 		}
 		Serial.println();

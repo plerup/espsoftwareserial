@@ -35,12 +35,12 @@ void setup() {
 	Serial.begin(115200);
 	swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
 
-	Serial.println("\nSoftware serial test started");
+	Serial.println(PSTR("\nSoftware serial test started"));
 
 	for (char ch = ' '; ch <= 'z'; ch++) {
 		swSer.write(ch);
 	}
-	swSer.println("");
+	swSer.println();
 }
 
 void loop() {
