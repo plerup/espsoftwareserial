@@ -233,13 +233,20 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
     {
         // Reenable interrupts while delaying to avoid other tasks piling up
         if (!m_intTxEnabled) { xt_wsr_ps(m_savedPS); }
-        auto expired = ESP.getCycleCount() - m_periodStart;
-        if (expired < m_periodDuration)
+        const auto expired = ESP.getCycleCount() - m_periodStart;
+        const auto ms = (m_periodDuration - expired) / ESP.getCpuFreqMHz() / 1000UL;
+        if (ms)
         {
-            auto ms = (m_periodDuration - expired) / ESP.getCpuFreqMHz() / 1000UL;
-            if (ms) delay(ms);
+            delay(ms);
         }
-        while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) { optimistic_yield(10000UL); }
+        else
+        {
+            do
+            {
+                optimistic_yield(10000UL);
+            }
+            while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration);
+        }
         // Disable interrupts again
         if (!m_intTxEnabled) { m_savedPS = xt_rsil(15); }
     }
