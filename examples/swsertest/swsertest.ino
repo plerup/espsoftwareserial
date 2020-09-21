@@ -26,21 +26,23 @@
 #define BAUD_RATE 57600
 #endif
 
-// Reminder: the buffer size optimizations here, in particular the isrBufSize that only accommodates
-// a single 8N1 word, are on the basis that any char written to the loopback SoftwareSerial adapter gets read
-// before another write is performed. Block writes with a size greater than 1 would usually fail. 
 SoftwareSerial swSer;
 
 void setup() {
 	Serial.begin(115200);
+	// Important: the buffer size optimizations here, in particular the isrBufSize (11) that is only sufficiently
+	// large to hold a single 8N1 word, are on the basis that any char written to the loopback SoftwareSerial
+	// adapter gets read before another write is performed.
+	// Block writes with a size greater than 1 would usually fail. Do not copy this into your own project without
+	// reading the documentation.
 	swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
 
-	Serial.println("\nSoftware serial test started");
+	Serial.println(PSTR("\nSoftware serial test started"));
 
 	for (char ch = ' '; ch <= 'z'; ch++) {
 		swSer.write(ch);
 	}
-	swSer.println("");
+	swSer.println();
 }
 
 void loop() {
