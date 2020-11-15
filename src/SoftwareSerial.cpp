@@ -51,7 +51,7 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
     return (pin >= 0 && pin <= 16) && !isFlashInterfacePin(pin);
 #elif defined(ESP32)
     return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 19) ||
-        (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 35);
+        (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin < 39);
 #else
     return true;
 #endif
@@ -61,6 +61,8 @@ bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) {
     return isValidGPIOpin(pin)
 #if defined(ESP8266)
         && (pin != 16)
+#elif defined(ESP32)
+        && (pin < 34)
 #endif
         ;
 }
