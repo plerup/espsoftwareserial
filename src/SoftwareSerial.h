@@ -128,7 +128,11 @@ public:
     bool overflow();
 
     int available() override;
+#if defined(ESP8266)
+    int availableForWrite() override {
+#else
     int availableForWrite() {
+#endif
         if (!m_txValid) return 0;
         return 1;
     }
