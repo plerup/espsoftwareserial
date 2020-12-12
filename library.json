@@ -1,6 +1,6 @@
 {
     "name": "EspSoftwareSerial",
-    "version": "6.10.0",
+    "version": "6.10.1",
     "keywords": [
       "serial", "io", "softwareserial"
     ],
