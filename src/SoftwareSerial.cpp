@@ -237,8 +237,9 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
         // Reenable interrupts while delaying to avoid other tasks piling up
         if (!m_intTxEnabled) { xt_wsr_ps(m_savedPS); }
         const auto expired = ESP.getCycleCount() - m_periodStart;
-        const auto ms = (m_periodDuration - expired) / ESP.getCpuFreqMHz() / 1000UL;
-        if (ms)
+        const int32_t remaining = m_periodDuration - expired;
+        const auto ms = remaining / ESP.getCpuFreqMHz() / 1000UL;
+        if (remaining > 0 && ms)
         {
             delay(ms);
         }
