@@ -51,7 +51,7 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
     return (pin >= 0 && pin <= 16) && !isFlashInterfacePin(pin);
 #elif defined(ESP32)
     return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 19) ||
-        (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin < 39);
+        (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 39);
 #else
     return true;
 #endif
@@ -61,10 +61,24 @@ bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) {
     return isValidGPIOpin(pin)
 #if defined(ESP8266)
         && (pin != 16)
-#elif defined(ESP32)
+#endif
+        ;
+}
+
+bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) {
+    return isValidGPIOpin(pin)
+#if defined(ESP32)
         && (pin < 34)
 #endif
         ;
+}
+
+bool SoftwareSerial::hasRxGPIOPullUp(int8_t pin) {
+#if defined(ESP32)
+    return !(pin >= 34 && pin <= 39);
+#else
+    return true;
+#endif
 }
 
 void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
@@ -91,10 +105,10 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
             isrBufCapacity : m_buffer->capacity() * (2 + m_dataBits + static_cast<bool>(m_parityMode))));
         if (m_buffer && (!m_parityMode || m_parityBuffer) && m_isrBuffer) {
             m_rxValid = true;
-            pinMode(m_rxPin, INPUT_PULLUP);
+            pinMode(m_rxPin, hasRxGPIOPullUp(m_rxPin) ? INPUT_PULLUP : INPUT);
         }
     }
-    if (isValidGPIOpin(m_txPin)) {
+    if (isValidTxGPIOpin(m_txPin)) {
         m_txValid = true;
         if (!m_oneWire) {
             pinMode(m_txPin, OUTPUT);
@@ -122,7 +136,7 @@ uint32_t SoftwareSerial::baudRate() {
 }
 
 void SoftwareSerial::setTransmitEnablePin(int8_t txEnablePin) {
-    if (isValidGPIOpin(txEnablePin)) {
+    if (isValidTxGPIOpin(txEnablePin)) {
         m_txEnableValid = true;
         m_txEnablePin = txEnablePin;
         pinMode(m_txEnablePin, OUTPUT);
@@ -145,7 +159,7 @@ void SoftwareSerial::enableTx(bool on) {
             digitalWrite(m_txPin, !m_invert);
         }
         else {
-            pinMode(m_rxPin, INPUT_PULLUP);
+            pinMode(m_rxPin, hasRxGPIOPullUp(m_rxPin) ? INPUT_PULLUP : INPUT);
             enableRx(true);
         }
     }
