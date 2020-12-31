@@ -77,6 +77,7 @@ bool SoftwareSerial::hasRxGPIOPullUp(int8_t pin) {
 #if defined(ESP32)
     return !(pin >= 34 && pin <= 39);
 #else
+    (void)pin;
     return true;
 #endif
 }
