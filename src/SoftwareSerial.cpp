@@ -204,9 +204,9 @@ int SoftwareSerial::read() {
     return val;
 }
 
-size_t SoftwareSerial::read(uint8_t* buffer, size_t size) {
+int SoftwareSerial::read(uint8_t* buffer, size_t size) {
     if (!m_rxValid) { return 0; }
-    size_t avail;
+    int avail;
     if (0 == (avail = m_buffer->pop_n(buffer, size))) {
         rxBits();
         avail = m_buffer->pop_n(buffer, size);
