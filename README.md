@@ -57,9 +57,10 @@ data until the next read call.
 For the swsertest.ino example, this results in the following optimized
 constructor arguments to spend only the minimum RAM on buffers required:
 
-The octet buffer capacity (``bufCapacity``) is 93 (91 characters net plus two tolerance).
-The signal edge detection buffer capacity (``isrBufCapacity``) is 10, as each octet has
-10 bits on the wire, which are immediately received during the write, and each
+The octet buffer capacity (``bufCapacity``) is 95 (93 characters net plus two tolerance).
+The signal edge detection buffer capacity (``isrBufCapacity``) is 11, as each
+single octet can have up to 11 bits on the wire,
+which are immediately received during the write, and each
 write call causes the signal edge detection to promote the previously sent and
 received bits to the octet buffer.
 
