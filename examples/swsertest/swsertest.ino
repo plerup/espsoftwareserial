@@ -31,8 +31,8 @@ SoftwareSerial swSer;
 void setup() {
 	Serial.begin(115200);
 	// Important: the buffer size optimizations here, in particular the isrBufSize (11) that is only sufficiently
-	// large to hold up to a single word (up to 8E2), are on the basis that any char written to the loopback SoftwareSerial
-	// adapter gets read before another write is performed.
+	// large to hold a single word (up to start - 8 data - parity - stop), are on the basis that any char written
+	// to the loopback SoftwareSerial adapter gets read before another write is performed.
 	// Block writes with a size greater than 1 would usually fail. Do not copy this into your own project without
 	// reading the documentation.
 	swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
