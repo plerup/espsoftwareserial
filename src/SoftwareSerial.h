@@ -129,7 +129,7 @@ public:
 
     int available() override;
 #if defined(ESP8266)
-    int availableForWrite() override {
+    int availableForWrite() {
 #else
     int availableForWrite() {
 #endif
