@@ -35,7 +35,6 @@ using std::min;
 #endif
 
 #if !defined(ESP32) && !defined(ESP8266)
-#define ICACHE_RAM_ATTR
 #define IRAM_ATTR
 #endif
 
