@@ -245,7 +245,7 @@ int SoftwareSerial::available() {
     return avail;
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
+void IRAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
     if (!sync)
     {
         // Reenable interrupts while delaying to avoid other tasks piling up
@@ -276,7 +276,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
     m_periodStart = ESP.getCycleCount();
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::writePeriod(
+void IRAM_ATTR SoftwareSerial::writePeriod(
     uint32_t dutyCycle, uint32_t offCycle, bool withStopBit) {
     preciseDelay(true);
     if (dutyCycle)
@@ -305,7 +305,7 @@ size_t SoftwareSerial::write(const uint8_t* buffer, size_t size) {
     return write(buffer, size, m_parityMode);
 }
 
-size_t ICACHE_RAM_ATTR SoftwareSerial::write(const uint8_t* buffer, size_t size, SoftwareSerialParity parity) {
+size_t IRAM_ATTR SoftwareSerial::write(const uint8_t* buffer, size_t size, SoftwareSerialParity parity) {
     if (m_rxValid) { rxBits(); }
     if (!m_txValid) { return -1; }
 
@@ -525,7 +525,7 @@ void SoftwareSerial::rxBits(const uint32_t& isrCycle) {
     }
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial* self) {
+void IRAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial* self) {
     uint32_t curCycle = ESP.getCycleCount();
     bool level = digitalRead(self->m_rxPin);
 
@@ -534,7 +534,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial* self) {
     if (!self->m_isrBuffer->push((curCycle | 1U) ^ !level)) self->m_isrOverflow.store(true);
 }
 
-void ICACHE_RAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
+void IRAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
     uint32_t start = ESP.getCycleCount();
     uint32_t wait = self->m_bitCycles - 172U;
 
