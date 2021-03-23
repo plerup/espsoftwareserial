@@ -138,7 +138,7 @@ public:
     }
     int peek() override;
     int read() override;
-    /// @returns The verbatim parity bit associated with the last read() or peek() call
+    /// @returns The verbatim parity bit associated with the last successful read() or peek() call
     bool readParity()
     {
         return m_lastReadParity;
