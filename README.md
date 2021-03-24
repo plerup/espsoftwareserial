@@ -95,7 +95,7 @@ parity bit to every byte sent, setting it to logical zero (SPACE parity).
 
 To detect incoming bytes with the parity bit set (MARK parity), use the
 ``readParity()`` function. To send a byte with the parity bit set, just add
-``MARK`` as the second argument when writing, e.g. ``write(ch, MARK)``.
+``MARK`` as the second argument when writing, e.g. ``write(ch, SWSERIAL_PARITY_MARK)``.
 
 ## Using and updating EspSoftwareSerial in the esp8266com/esp8266 Arduino build environment
 
