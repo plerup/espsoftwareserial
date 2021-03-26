@@ -79,9 +79,10 @@ argument to ``begin()``. Word lengths can be set to between 5 and 8 bits, parity
 can be N(one), O(dd) or E(ven) and 1 or 2 stop bits can be used. The default is
 ``SWSERIAL_8N1`` using 8 bits, no parity and 1 stop bit but any combination can
 be used, e.g. ``SWSERIAL_7E2``. If using EVEN or ODD parity, any parity errors
-can be detected with the ``peekParityError()`` function. Note that parity 
-checking must be done before ``read()``, as the parity information is removed
-from the buffer when reading the corresponding byte.
+can be detected with the ``readParity()`` and ``parityEven()`` or ``parityOdd()``
+functions respectively. Note that the result of ``readParity()`` always applies
+to the preceding ``read()`` or ``peek()`` call, and is undefined if they report
+no data or an error.
 
 To allow flexible 9-bit and data/addressing protocols, the additional parity
 modes MARK and SPACE are also available. Furthermore, the parity mode can be
@@ -93,8 +94,8 @@ up SoftwareSerial with parity mode SPACE, e.g. ``SWSERIAL_8S1``. This will add a
 parity bit to every byte sent, setting it to logical zero (SPACE parity).
 
 To detect incoming bytes with the parity bit set (MARK parity), use the
-``peekParityError()`` function. To send a byte with the parity bit set, just add
-``MARK`` as the second argument when writing, e.g. ``write(ch, MARK)``.
+``readParity()`` function. To send a byte with the parity bit set, just add
+``MARK`` as the second argument when writing, e.g. ``write(ch, SWSERIAL_PARITY_MARK)``.
 
 ## Using and updating EspSoftwareSerial in the esp8266com/esp8266 Arduino build environment
 

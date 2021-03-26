@@ -421,7 +421,6 @@ int SoftwareSerial::peek() {
 }
 
 void SoftwareSerial::rxBits() {
-    int isrAvail = m_isrBuffer->available();
 #ifdef ESP8266
     if (m_isrOverflow.load()) {
         m_overflow = true;
@@ -433,10 +432,11 @@ void SoftwareSerial::rxBits() {
     }
 #endif
 
+    m_isrBuffer->for_each([this](const uint32_t& isrCycle) { rxBits(isrCycle); });
+
     // stop bit can go undetected if leading data bits are at same level
     // and there was also no next start bit yet, so one byte may be pending.
-    // low-cost check first
-    if (!isrAvail && m_rxCurBit >= -1 && m_rxCurBit < m_pduBits - m_stopBits) {
+    if (m_rxCurBit >= -1 && m_rxCurBit < m_pduBits - m_stopBits) {
         uint32_t detectionCycles = (m_pduBits - m_stopBits - m_rxCurBit) * m_bitCycles;
         if (ESP.getCycleCount() - m_isrLastCycle > detectionCycles) {
             // Produce faux stop bit level, prevents start bit maldetection
@@ -444,8 +444,6 @@ void SoftwareSerial::rxBits() {
             rxBits(((m_isrLastCycle + detectionCycles) | 1) ^ m_invert);
         }
     }
-
-    m_isrBuffer->for_each([this](const uint32_t& isrCycle) { rxBits(isrCycle); });
 }
 
 void SoftwareSerial::rxBits(const uint32_t& isrCycle) {
