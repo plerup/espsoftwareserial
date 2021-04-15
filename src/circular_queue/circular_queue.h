@@ -141,7 +141,7 @@ public:
         @brief	Peek at the next pending input value.
         @return A reference to the next element that can be pushed.
     */
-    T& IRAM_ATTR pushpeek()
+    inline T& IRAM_ATTR pushpeek() __attribute__((always_inline))
     {
         const auto inPos = m_inPos.load(std::memory_order_relaxed);
         std::atomic_thread_fence(std::memory_order_acquire);
@@ -153,21 +153,49 @@ public:
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
-    bool IRAM_ATTR push();
+    inline bool IRAM_ATTR push() __attribute__((always_inline))
+    {
+        const auto inPos = m_inPos.load(std::memory_order_acquire);
+        const size_t next = (inPos + 1) % m_bufSize;
+        if (next == m_outPos.load(std::memory_order_relaxed)) {
+            return false;
+        }
+    
+        std::atomic_thread_fence(std::memory_order_acquire);
+    
+        m_inPos.store(next, std::memory_order_release);
+        return true;
+    }
 
     /*!
         @brief	Move the rvalue parameter into the queue.
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
-    bool IRAM_ATTR push(T&& val);
+    inline bool IRAM_ATTR push(T&& val) __attribute__((always_inline))
+    {
+        const auto inPos = m_inPos.load(std::memory_order_acquire);
+        const size_t next = (inPos + 1) % m_bufSize;
+        if (next == m_outPos.load(std::memory_order_relaxed)) {
+            return false;
+        }
+    
+        std::atomic_thread_fence(std::memory_order_acquire);
+    
+        m_buffer[inPos] = std::move(val);
+    
+        std::atomic_thread_fence(std::memory_order_release);
+    
+        m_inPos.store(next, std::memory_order_release);
+        return true;
+    }
 
     /*!
         @brief	Push a copy of the parameter into the queue.
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
-    bool IRAM_ATTR push(const T& val)
+    inline bool IRAM_ATTR push(const T& val) __attribute__((always_inline))
     {
         T v(val);
         return push(std::move(v));
@@ -246,40 +274,6 @@ bool circular_queue<T, ForEachArg>::capacity(const size_t cap)
     std::atomic_thread_fence(std::memory_order_release);
     m_inPos.store(available, std::memory_order_relaxed);
     m_outPos.store(0, std::memory_order_release);
-    return true;
-}
-
-template< typename T, typename ForEachArg >
-bool IRAM_ATTR circular_queue<T, ForEachArg>::push()
-{
-    const auto inPos = m_inPos.load(std::memory_order_acquire);
-    const size_t next = (inPos + 1) % m_bufSize;
-    if (next == m_outPos.load(std::memory_order_relaxed)) {
-        return false;
-    }
-
-    std::atomic_thread_fence(std::memory_order_acquire);
-
-    m_inPos.store(next, std::memory_order_release);
-    return true;
-}
-
-template< typename T, typename ForEachArg >
-bool IRAM_ATTR circular_queue<T, ForEachArg>::push(T&& val)
-{
-    const auto inPos = m_inPos.load(std::memory_order_acquire);
-    const size_t next = (inPos + 1) % m_bufSize;
-    if (next == m_outPos.load(std::memory_order_relaxed)) {
-        return false;
-    }
-
-    std::atomic_thread_fence(std::memory_order_acquire);
-
-    m_buffer[inPos] = std::move(val);
-
-    std::atomic_thread_fence(std::memory_order_release);
-
-    m_inPos.store(next, std::memory_order_release);
     return true;
 }
 
