@@ -1,4 +1,3 @@
-#include <ESP8266WiFi.h>
 #include "SoftwareSerial.h"
 
 #ifndef D5
