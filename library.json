@@ -19,7 +19,7 @@
         }
     ],
     "license": "LGPL-2.1+",
-    "frameworks": "*",
+    "frameworks": "arduino",
     "platforms": [
         "espressif8266", "espressif32"
     ]
