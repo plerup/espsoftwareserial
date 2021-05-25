@@ -259,7 +259,8 @@ private:
     uint32_t m_savedPS = 0;
     // the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
     // 1 = positive including 0, 0 = negative.
-    std::unique_ptr<circular_queue<uint32_t> > m_isrBuffer;
+    std::unique_ptr<circular_queue<uint32_t, SoftwareSerial*> > m_isrBuffer;
+    const Delegate<void(unsigned int&&), SoftwareSerial*> m_isrBufferForEachDel = { [](SoftwareSerial* self, uint32_t&& isrCycle) { self->rxBits(isrCycle); }, this };
     std::atomic<bool> m_isrOverflow;
     uint32_t m_isrLastCycle;
     bool m_rxCurParity = false;

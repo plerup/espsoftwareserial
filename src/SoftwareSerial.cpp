@@ -102,7 +102,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
             m_parityBuffer.reset(new circular_queue<uint8_t>((m_buffer->capacity() + 7) / 8));
             m_parityInPos = m_parityOutPos = 1;
         }
-        m_isrBuffer.reset(new circular_queue<uint32_t>((isrBufCapacity > 0) ?
+        m_isrBuffer.reset(new circular_queue<uint32_t, SoftwareSerial*>((isrBufCapacity > 0) ?
             isrBufCapacity : m_buffer->capacity() * (2 + m_dataBits + static_cast<bool>(m_parityMode))));
         if (m_buffer && (!m_parityMode || m_parityBuffer) && m_isrBuffer) {
             m_rxValid = true;
@@ -432,7 +432,7 @@ void SoftwareSerial::rxBits() {
     }
 #endif
 
-    m_isrBuffer->for_each([this](const uint32_t& isrCycle) { rxBits(isrCycle); });
+    m_isrBuffer->for_each(m_isrBufferForEachDel);
 
     // stop bit can go undetected if leading data bits are at same level
     // and there was also no next start bit yet, so one byte may be pending.
