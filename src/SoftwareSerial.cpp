@@ -252,26 +252,19 @@ void IRAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
         if (!m_intTxEnabled) { xt_wsr_ps(m_savedPS); }
         const auto expired = ESP.getCycleCount() - m_periodStart;
         const int32_t remaining = m_periodDuration - expired;
-        const auto ms = remaining / ESP.getCpuFreqMHz() / 1000UL;
-        if (remaining > 0 && ms)
+        const int32_t ms = remaining / 1000L / ESP.getCpuFreqMHz();
+        if (ms > 0)
         {
             delay(ms);
         }
         else
         {
-            do
-            {
-                optimistic_yield(10000UL);
-            }
-            while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration);
+            optimistic_yield(10000UL);
         }
-        // Disable interrupts again
-        if (!m_intTxEnabled) { m_savedPS = xt_rsil(15); }
     }
-    else
-    {
-        while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) {}
-    }
+    while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) {}
+    // Disable interrupts again if applicable
+    if (!sync && !m_intTxEnabled) { m_savedPS = xt_rsil(15); }
     m_periodDuration = 0;
     m_periodStart = ESP.getCycleCount();
 }
