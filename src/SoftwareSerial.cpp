@@ -429,8 +429,8 @@ void SoftwareSerial::rxBits() {
 
     // stop bit can go undetected if leading data bits are at same level
     // and there was also no next start bit yet, so one byte may be pending.
-    if (m_rxCurBit >= -1 && m_rxCurBit < m_pduBits - m_stopBits) {
-        uint32_t detectionCycles = (m_pduBits - m_stopBits - m_rxCurBit) * m_bitCycles;
+    if (m_rxCurBit > -1 && m_rxCurBit < m_pduBits - m_stopBits) {
+        const uint32_t detectionCycles = (m_pduBits - m_stopBits - m_rxCurBit) * m_bitCycles;
         if (ESP.getCycleCount() - m_isrLastCycle > detectionCycles) {
             // Produce faux stop bit level, prevents start bit maldetection
             // cycle's LSB is repurposed for the level bit
