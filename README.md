@@ -1,6 +1,6 @@
 # EspSoftwareSerial
 
-## Implementation of the Arduino software serial library for the ESP8266 / ESP32
+## Implementation of the Arduino software serial library for the ESP8266 / ESP32 family
 
 This fork implements interrupt service routine best practice.
 In the receive interrupt, instead of blocking for whole bytes
@@ -26,6 +26,8 @@ Please note that due to the fact that the ESPs always have other activities
 ongoing, there will be some inexactness in interrupt timings. This may
 lead to inevitable, but few, bit errors when having heavy data traffic
 at high baud rates.
+
+This library supports ESP8266, ESP32, ESP32-S2 and ESP32-C3 devices
 
 ## Resource optimization
 
@@ -96,6 +98,43 @@ parity bit to every byte sent, setting it to logical zero (SPACE parity).
 To detect incoming bytes with the parity bit set (MARK parity), use the
 ``readParity()`` function. To send a byte with the parity bit set, just add
 ``MARK`` as the second argument when writing, e.g. ``write(ch, SWSERIAL_PARITY_MARK)``.
+
+## Checking for correct pin selection / configuration 
+In general, most pins on the ESP8266 and ESP32 devices can be used by SoftwareSerial, 
+however each device has a number of pins that have special functions or require careful
+handling to prevent undesirable situations, for example they are connected to the 
+on-board SPI flash memory or they are used to determine boot and programming modes 
+after powerup or brownouts. These pins are not able to be configured by this library.
+
+The exact list for each device can be found in the [ESP32 data sheet](https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf)
+in sections 2.2 (Pin Descriptions) and 2.4 (Strapping pins) or by referring to the
+``isValidGPIOpin()``, ``isValidRxGPIOpin()`` and ``isValidTxGPIOpin()`` functions
+
+The easiest and safest method is to test the object returned at runtime, to see if 
+its valid. For example:
+
+```
+#include <SoftwareSerial.h>
+
+#define MYPORT_TX	12
+#define MYPORT_RX	13
+
+SoftwareSerial myPort;
+
+
+....
+
+
+Serial.begin(115200);		// Standard hardware serial port
+
+myPort.begin(38400, SWSERIAL_8N1, MYPORT_RX, MYPORT_TX, false, 256, 256);
+if (!myPort) {
+  Serial.println("Invalid pin configuration, check config"); 
+  while (1) ;
+} 
+
+....
+```
 
 ## Using and updating EspSoftwareSerial in the esp8266com/esp8266 Arduino build environment
 

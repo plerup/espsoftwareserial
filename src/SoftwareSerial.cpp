@@ -50,8 +50,27 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 #if defined(ESP8266)
     return (pin >= 0 && pin <= 16) && !isFlashInterfacePin(pin);
 #elif defined(ESP32)
+
+  #ifdef CONFIG_IDF_TARGET_ESP32
+    // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf,
+    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg
     return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 19) ||
         (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 39);
+
+  #elif CONFIG_IDF_TARGET_ESP32S2
+    // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf,
+    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/_images/esp32-s2_saola1-pinout.jpg
+    return (pin >= 1 && pin <= 21) || (pin >= 33 && pin <= 44);
+  
+  #elif CONFIG_IDF_TARGET_ESP32C3
+	// Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf, 
+	// Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/_images/esp32-c3-devkitm-1-v1-pinout.jpg
+    return (pin >= 0 && pin <= 1) || (pin >= 3 && pin <= 7) || (pin >= 18 && pin <= 21);
+  
+  #else 
+    return true;
+  #endif
+	
 #else
     return true;
 #endif
@@ -68,7 +87,16 @@ bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) {
 bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) {
     return isValidGPIOpin(pin)
 #if defined(ESP32)
-        && (pin < 34)
+	#ifdef CONFIG_IDF_TARGET_ESP32
+        && (pin < 34)			
+    
+	#elif CONFIG_IDF_TARGET_ESP32S2
+        && (pin < 45)        
+	
+	#elif CONFIG_IDF_TARGET_ESP32C3
+		// Nothing to do
+	#endif
+
 #endif
         ;
 }
