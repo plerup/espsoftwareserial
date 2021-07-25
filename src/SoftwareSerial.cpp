@@ -49,13 +49,16 @@ SoftwareSerial::~SoftwareSerial() {
 bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 #if defined(ESP8266)
     return (pin >= 0 && pin <= 16) && !isFlashInterfacePin(pin);
-#elif defined(ESP32)
 
+#elif defined(ESP32)
+  // Remove the strapping pins as defined in the datasheets, they affect bootup and other critical operations
+  // Remmove the flash memory pins on related devices, since using these causes memory access issues.
   #ifdef CONFIG_IDF_TARGET_ESP32
     // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf,
-    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg
-    return (pin >= 0 && pin <= 5) || (pin >= 12 && pin <= 19) ||
-        (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 39);
+    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg    
+	return (pin >= 1  && pin <= 1)  || (pin >= 3  && pin <= 4)  || (pin >= 13 && pin <= 14) ||
+		   (pin >= 16 && pin <= 19) || (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || 
+		   (pin >= 32 && pin <= 39);
 
   #elif CONFIG_IDF_TARGET_ESP32S2
     // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf,
@@ -88,10 +91,10 @@ bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) {
     return isValidGPIOpin(pin)
 #if defined(ESP32)
 	#ifdef CONFIG_IDF_TARGET_ESP32
-        && (pin < 34)			
+        && (pin < 34)		// GPIO34 and above are input only, so cannot transmit	
     
 	#elif CONFIG_IDF_TARGET_ESP32S2
-        && (pin < 45)        
+        && (pin < 46)       // GPIO46 is an input only, so cannot transmit 
 	
 	#elif CONFIG_IDF_TARGET_ESP32C3
 		// Nothing to do

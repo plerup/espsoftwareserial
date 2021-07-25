@@ -27,7 +27,7 @@ ongoing, there will be some inexactness in interrupt timings. This may
 lead to inevitable, but few, bit errors when having heavy data traffic
 at high baud rates.
 
-This library supports ESP8266, ESP32, ESP32-S2 and ESP32-C3 devices
+This library supports ESP8266, ESP32, ESP32-S2 and ESP32-C3 devices.
 
 ## Resource optimization
 
@@ -127,10 +127,13 @@ SoftwareSerial myPort;
 
 Serial.begin(115200);		// Standard hardware serial port
 
-myPort.begin(38400, SWSERIAL_8N1, MYPORT_RX, MYPORT_TX, false, 256, 256);
-if (!myPort) {
-  Serial.println("Invalid pin configuration, check config"); 
-  while (1) ;
+myPort.begin(38400, SWSERIAL_8N1, MYPORT_RX, MYPORT_TX, false);
+if (!myPort) {			// If the object did not initilaise, then its configuration is invalid
+  Serial.println("Invalid SoftwareSerial pin configuration, check config"); 
+  while (1) {			// Can't continue with invalid configuration
+	yield();
+	delay (1000);
+  }
 } 
 
 ....
