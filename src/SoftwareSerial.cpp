@@ -55,9 +55,9 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 #ifdef CONFIG_IDF_TARGET_ESP32
     // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf,
     // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg    
-    return (pin == 1) || (pin >= 3 && pin <= 4) || (pin >= 13 && pin <= 14) ||
-        (pin >= 16 && pin <= 19) || (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || 
-        (pin >= 32 && pin <= 39);
+    return (pin == 1) || (pin >= 3 && pin <= 4) ||
+        (pin >= 13 && pin <= 14) || (pin >= 16 && pin <= 19) ||
+        (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 39);
 #elif CONFIG_IDF_TARGET_ESP32S2
     // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf,
     // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/_images/esp32-s2_saola1-pinout.jpg
@@ -86,11 +86,11 @@ bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) {
     return isValidGPIOpin(pin)
 #if defined(ESP32)
 #ifdef CONFIG_IDF_TARGET_ESP32
-        && (pin < 34) // GPIO34 and above are input only
+        && (pin < 34)
 #elif CONFIG_IDF_TARGET_ESP32S2
-        && (pin <= 45) // GPIO46 is input only 
+        && (pin <= 45)
 #elif CONFIG_IDF_TARGET_ESP32C3
-        // they are all input and output
+        // no restrictions
 #endif
 #endif
         ;
