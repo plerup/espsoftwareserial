@@ -116,27 +116,24 @@ its valid. For example:
 ```
 #include <SoftwareSerial.h>
 
-#define MYPORT_TX	12
-#define MYPORT_RX	13
+#define MYPORT_TX 12
+#define MYPORT_RX 13
 
 SoftwareSerial myPort;
 
+[...]
 
-....
-
-
-Serial.begin(115200);		// Standard hardware serial port
+Serial.begin(115200); // Standard hardware serial port
 
 myPort.begin(38400, SWSERIAL_8N1, MYPORT_RX, MYPORT_TX, false);
-if (!myPort) {			// If the object did not initilaise, then its configuration is invalid
+if (!myPort) { // If the object did not initialize, then its configuration is invalid
   Serial.println("Invalid SoftwareSerial pin configuration, check config"); 
-  while (1) {			// Can't continue with invalid configuration
-	yield();
-	delay (1000);
+  while (1) { // Don't continue with invalid configuration
+    delay (1000);
   }
 } 
 
-....
+[...]
 ```
 
 ## Using and updating EspSoftwareSerial in the esp8266com/esp8266 Arduino build environment
