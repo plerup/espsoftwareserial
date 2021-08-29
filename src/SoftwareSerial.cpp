@@ -55,8 +55,8 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 #ifdef CONFIG_IDF_TARGET_ESP32
     // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf,
     // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg    
-    return (pin == 1) || (pin >= 3 && pin <= 4) ||
-        (pin >= 13 && pin <= 14) || (pin >= 16 && pin <= 19) ||
+    return (pin == 1) || (pin >= 3 && pin <= 5) ||
+        (pin >= 13 && pin <= 15) || (pin >= 18 && pin <= 19) ||
         (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 39);
 #elif CONFIG_IDF_TARGET_ESP32S2
     // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf,

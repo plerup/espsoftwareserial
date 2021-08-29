@@ -111,7 +111,7 @@ in sections 2.2 (Pin Descriptions) and 2.4 (Strapping pins) or by referring to t
 ``isValidGPIOpin()``, ``isValidRxGPIOpin()`` and ``isValidTxGPIOpin()`` functions
 
 The easiest and safest method is to test the object returned at runtime, to see if 
-its valid. For example:
+it is valid. For example:
 
 ```
 #include <SoftwareSerial.h>
