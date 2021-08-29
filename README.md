@@ -12,12 +12,12 @@ Except at high bitrates, depending on other ongoing activity,
 interrupts in particular, this software serial adapter
 supports full duplex receive and send. At high bitrates (115200bps)
 send bit timing can be improved at the expense of blocking concurrent
-full duplex receives, with the ``SoftwareSerial::enableIntTx(false)`` function call.
+full duplex receives, with the `SoftwareSerial::enableIntTx(false)` function call.
 
 The same functionality is given as the corresponding AVR library but
 several instances can be active at the same time. Speed up to 115200 baud
 is supported. Besides a constructor compatible to the AVR SoftwareSerial class,
-and updated constructor that takes no arguments exists, instead the ``begin()``
+and updated constructor that takes no arguments exists, instead the `begin()`
 function can handle the pin assignments and logic inversion.
 It also has optional input buffer capacity arguments for byte buffer and ISR bit buffer.
 This way, it is a better drop-in replacement for the hardware serial APIs on the ESP MCUs.
@@ -33,7 +33,7 @@ This library supports ESP8266, ESP32, ESP32-S2 and ESP32-C3 devices.
 
 The memory footprint can be optimized to just fit the amount of expected
 incoming asynchronous data.
-For this, the ``SoftwareSerial`` constructor provides two arguments. First, the
+For this, the `SoftwareSerial` constructor provides two arguments. First, the
 octet buffer capacity for assembled received octets can be set. Read calls are
 satisfied from this buffer, freeing it in return.
 Second, the signal edge detection buffer of 32bit fields can be resized.
@@ -59,8 +59,8 @@ data until the next read call.
 For the swsertest.ino example, this results in the following optimized
 constructor arguments to spend only the minimum RAM on buffers required:
 
-The octet buffer capacity (``bufCapacity``) is 95 (93 characters net plus two tolerance).
-The signal edge detection buffer capacity (``isrBufCapacity``) is 11, as each
+The octet buffer capacity (`bufCapacity`) is 95 (93 characters net plus two tolerance).
+The signal edge detection buffer capacity (`isrBufCapacity`) is 11, as each
 single octet can have up to 11 bits on the wire,
 which are immediately received during the write, and each
 write call causes the signal edge detection to promote the previously sent and
@@ -68,36 +68,36 @@ received bits to the octet buffer.
 
 In a more generalized scenario, calculate the bits (use message size in octets
 times 10) that may be asynchronously received to determine the value for
-``isrBufCapacity`` in the constructor. Also use the number of received octets
-that must be buffered for reading as the value of ``bufCapacity``.
+`isrBufCapacity` in the constructor. Also use the number of received octets
+that must be buffered for reading as the value of `bufCapacity`.
 The more frequently your code calls write or read functions, the greater the
-chances are that you can reduce the ``isrBufCapacity`` footprint without losing data,
+chances are that you can reduce the `isrBufCapacity` footprint without losing data,
 and each time you call read to fetch from the octet buffer, you reduce the
 need for space there.
 
 ## SoftwareSerialConfig and parity
-The configuration of the data stream is done via a ``SoftwareSerialConfig``
-argument to ``begin()``. Word lengths can be set to between 5 and 8 bits, parity
+The configuration of the data stream is done via a `SoftwareSerialConfig`
+argument to `begin()`. Word lengths can be set to between 5 and 8 bits, parity
 can be N(one), O(dd) or E(ven) and 1 or 2 stop bits can be used. The default is
-``SWSERIAL_8N1`` using 8 bits, no parity and 1 stop bit but any combination can
-be used, e.g. ``SWSERIAL_7E2``. If using EVEN or ODD parity, any parity errors
-can be detected with the ``readParity()`` and ``parityEven()`` or ``parityOdd()``
-functions respectively. Note that the result of ``readParity()`` always applies
-to the preceding ``read()`` or ``peek()`` call, and is undefined if they report
+`SWSERIAL_8N1` using 8 bits, no parity and 1 stop bit but any combination can
+be used, e.g. `SWSERIAL_7E2`. If using EVEN or ODD parity, any parity errors
+can be detected with the `readParity()` and `parityEven()` or `parityOdd()`
+functions respectively. Note that the result of `readParity()` always applies
+to the preceding `read()` or `peek()` call, and is undefined if they report
 no data or an error.
 
 To allow flexible 9-bit and data/addressing protocols, the additional parity
 modes MARK and SPACE are also available. Furthermore, the parity mode can be
-individually set in each call to ``write()``.
+individually set in each call to `write()`.
 
 This allows a simple implementation of protocols where the parity bit is used to
 distinguish between data and addresses/commands ("9-bit" protocols). First set
-up SoftwareSerial with parity mode SPACE, e.g. ``SWSERIAL_8S1``. This will add a
+up SoftwareSerial with parity mode SPACE, e.g. `SWSERIAL_8S1`. This will add a
 parity bit to every byte sent, setting it to logical zero (SPACE parity).
 
 To detect incoming bytes with the parity bit set (MARK parity), use the
-``readParity()`` function. To send a byte with the parity bit set, just add
-``MARK`` as the second argument when writing, e.g. ``write(ch, SWSERIAL_PARITY_MARK)``.
+`readParity()` function. To send a byte with the parity bit set, just add
+`MARK` as the second argument when writing, e.g. `write(ch, SWSERIAL_PARITY_MARK)`.
 
 ## Checking for correct pin selection / configuration 
 In general, most pins on the ESP8266 and ESP32 devices can be used by SoftwareSerial, 
@@ -106,9 +106,13 @@ handling to prevent undesirable situations, for example they are connected to th
 on-board SPI flash memory or they are used to determine boot and programming modes 
 after powerup or brownouts. These pins are not able to be configured by this library.
 
-The exact list for each device can be found in the [ESP32 data sheet](https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf)
-in sections 2.2 (Pin Descriptions) and 2.4 (Strapping pins) or by referring to the
-``isValidGPIOpin()``, ``isValidRxGPIOpin()`` and ``isValidTxGPIOpin()`` functions
+The exact list for each device can be found in the
+[ESP32 data sheet](https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf)
+in sections 2.2 (Pin Descriptions) and 2.4 (Strapping pins). There is a discussion
+dedicated to the use of GPIO12 in this
+[note about GPIO12](https://github.com/espressif/esp-idf/tree/release/v3.2/examples/storage/sd_card#note-about-gpio12).
+Refer to the `isValidGPIOpin()`, `isValidRxGPIOpin()` and `isValidTxGPIOpin()`
+functions for the GPIO restrictions enforced by this library by default.
 
 The easiest and safest method is to test the object returned at runtime, to see if 
 it is valid. For example:
@@ -140,7 +144,7 @@ if (!myPort) { // If the object did not initialize, then its configuration is in
 
 EspSoftwareSerial is both part of the BSP download for ESP8266 in Arduino,
 and it is set up as a Git submodule in the esp8266 source tree,
-specifically in ``.../esp8266/libraries/SoftwareSerial`` when using a Github
+specifically in `.../esp8266/libraries/SoftwareSerial` when using a Github
 repository clone in your Arduino sketchbook hardware directory.
 This supersedes any version of EspSoftwareSerial installed for instance via
 the Arduino library manager, it is not required to install EspSoftwareSerial
