@@ -32,11 +32,13 @@ constexpr uint8_t BYTE_ALL_BITS_SET = ~static_cast<uint8_t>(0);
 
 SoftwareSerial::SoftwareSerial() {
     m_isrOverflow = false;
+    m_rxGPIOPullupEnabled = true;
 }
 
 SoftwareSerial::SoftwareSerial(int8_t rxPin, int8_t txPin, bool invert)
 {
     m_isrOverflow = false;
+    m_rxGPIOPullupEnabled = true;
     m_rxPin = rxPin;
     m_txPin = txPin;
     m_invert = invert;
@@ -126,7 +128,6 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     m_pduBits = m_dataBits + static_cast<bool>(m_parityMode) + m_stopBits;
     m_bitCycles = (ESP.getCpuFreqMHz() * 1000000UL + baud / 2) / baud;
     m_intTxEnabled = true;
-    m_rxGPIOPullupEnabled = true;
     if (isValidRxGPIOpin(m_rxPin)) {
         m_buffer.reset(new circular_queue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
         if (m_parityMode)
