@@ -107,6 +107,12 @@ bool SoftwareSerial::hasRxGPIOPullUp(int8_t pin) {
 #endif
 }
 
+void SoftwareSerial::setRxGPIOPullUp() {
+    if (m_rxValid) {
+        pinMode(m_rxPin, hasRxGPIOPullUp(m_rxPin) && m_rxGPIOPullupEnabled ? INPUT_PULLUP : INPUT);
+    }
+}
+
 void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     int8_t rxPin, int8_t txPin,
     bool invert, int bufCapacity, int isrBufCapacity) {
@@ -120,6 +126,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     m_pduBits = m_dataBits + static_cast<bool>(m_parityMode) + m_stopBits;
     m_bitCycles = (ESP.getCpuFreqMHz() * 1000000UL + baud / 2) / baud;
     m_intTxEnabled = true;
+    m_rxGPIOPullupEnabled = true;
     if (isValidRxGPIOpin(m_rxPin)) {
         m_buffer.reset(new circular_queue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
         if (m_parityMode)
@@ -131,7 +138,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
             isrBufCapacity : m_buffer->capacity() * (2 + m_dataBits + static_cast<bool>(m_parityMode))));
         if (m_buffer && (!m_parityMode || m_parityBuffer) && m_isrBuffer) {
             m_rxValid = true;
-            pinMode(m_rxPin, hasRxGPIOPullUp(m_rxPin) ? INPUT_PULLUP : INPUT);
+            setRxGPIOPullUp();
         }
     }
     if (isValidTxGPIOpin(m_txPin)) {
@@ -177,6 +184,11 @@ void SoftwareSerial::enableIntTx(bool on) {
     m_intTxEnabled = on;
 }
 
+void SoftwareSerial::enableRxGPIOPullup(bool on) {
+    m_rxGPIOPullupEnabled = on;
+    setRxGPIOPullUp();
+}
+
 void SoftwareSerial::enableTx(bool on) {
     if (m_txValid && m_oneWire) {
         if (on) {
@@ -185,7 +197,7 @@ void SoftwareSerial::enableTx(bool on) {
             digitalWrite(m_txPin, !m_invert);
         }
         else {
-            pinMode(m_rxPin, hasRxGPIOPullUp(m_rxPin) ? INPUT_PULLUP : INPUT);
+            setRxGPIOPullUp();
             enableRx(true);
         }
     }

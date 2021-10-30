@@ -122,8 +122,10 @@ public:
     uint32_t baudRate();
     /// Transmit control pin.
     void setTransmitEnablePin(int8_t txEnablePin);
-    /// Enable or disable interrupts during tx.
+    /// Enable (default) or disable interrupts during tx.
     void enableIntTx(bool on);
+    /// Enable (default) or disable internal rx GPIO pullup.
+    void enableRxGPIOPullup(bool on);
 
     bool overflow();
 
@@ -222,6 +224,8 @@ private:
     bool isValidTxGPIOpin(int8_t pin);
     // result is only defined for a valid Rx GPIO pin
     bool hasRxGPIOPullUp(int8_t pin);
+    // safely set the pin mode for the Rx GPIO pin
+    void setRxGPIOPullUp();
     /* check m_rxValid that calling is safe */
     void rxBits();
     void rxBits(const uint32_t& isrCycle);
@@ -243,6 +247,7 @@ private:
     /// PDU bits include data, parity and stop bits; the start bit is not counted.
     uint8_t m_pduBits;
     bool m_intTxEnabled;
+    bool m_rxGPIOPullupEnabled;
     SoftwareSerialParity m_parityMode;
     uint8_t m_stopBits;
     bool m_lastReadParity;

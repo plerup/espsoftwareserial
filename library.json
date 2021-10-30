@@ -1,6 +1,6 @@
 {
     "name": "EspSoftwareSerial",
-    "version": "6.13.2",
+    "version": "6.14.0",
     "description": "Implementation of the Arduino software serial for ESP8266/ESP32.",
     "keywords": [
         "serial", "io", "softwareserial"
