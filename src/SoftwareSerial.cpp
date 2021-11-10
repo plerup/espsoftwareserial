@@ -479,14 +479,14 @@ void SoftwareSerial::rxBits() {
     }
 }
 
-void SoftwareSerial::rxBits(const uint32_t& isrCycle) {
+void SoftwareSerial::rxBits(uint32_t isrCycle) {
     bool level = (m_isrLastCycle & 1) ^ m_invert;
 
     // error introduced by edge value in LSB of isrCycle is negligible
-    int32_t cycles = isrCycle - m_isrLastCycle;
+    uint32_t cycles = isrCycle - m_isrLastCycle;
     m_isrLastCycle = isrCycle;
 
-    uint8_t bits = cycles / m_bitCycles;
+    uint32_t bits = cycles / m_bitCycles;
     if (cycles % m_bitCycles > (m_bitCycles >> 1)) ++bits;
     while (bits > 0) {
         // start bit detection
@@ -499,7 +499,7 @@ void SoftwareSerial::rxBits(const uint32_t& isrCycle) {
         }
         // data bits
         if (m_rxCurBit >= -1 && m_rxCurBit < (m_dataBits - 1)) {
-            int8_t dataBits = min(bits, static_cast<uint8_t>(m_dataBits - 1 - m_rxCurBit));
+            uint8_t dataBits = min(bits, static_cast<uint32_t>(m_dataBits - 1 - m_rxCurBit));
             m_rxCurBit += dataBits;
             bits -= dataBits;
             m_rxCurByte >>= dataBits;
