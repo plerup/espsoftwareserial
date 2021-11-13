@@ -469,7 +469,7 @@ void SoftwareSerial::rxBits() {
     // and there was also no next start bit yet, so one word may be pending.
     // Check that there was no new ISR data received in the meantime, inserting an
     // extraneous stop level bit out of sequence breaks rx.
-    if (m_rxCurBit > -1 && m_rxCurBit < m_pduBits - m_stopBits) {
+    if (m_rxCurBit >= -1 && m_rxCurBit < m_pduBits - m_stopBits) {
         const uint32_t detectionCycles = (m_pduBits - m_stopBits - m_rxCurBit) * m_bitCycles;
         if (!m_isrBuffer->available() && ESP.getCycleCount() - m_isrLastCycle > detectionCycles) {
             // Produce faux stop bit level, prevents start bit maldetection
