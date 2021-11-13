@@ -228,7 +228,7 @@ private:
     void setRxGPIOPullUp();
     /* check m_rxValid that calling is safe */
     void rxBits();
-    void rxBits(uint32_t isrCycle);
+    void rxBits(const uint32_t isrCycle);
 
     static void rxBitISR(SoftwareSerial* self);
     static void rxBitSyncISR(SoftwareSerial* self);

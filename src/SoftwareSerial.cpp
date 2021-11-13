@@ -469,8 +469,8 @@ void SoftwareSerial::rxBits() {
     // and there was also no next start bit yet, so one word may be pending.
     // Check that there was no new ISR data received in the meantime, inserting an
     // extraneous stop level bit out of sequence breaks rx.
-    if (m_rxCurBit >= -1 && m_rxCurBit < m_pduBits - m_stopBits) {
-        const uint32_t detectionCycles = (m_pduBits - m_stopBits - m_rxCurBit) * m_bitCycles;
+    if (m_rxCurBit >= -1 && m_rxCurBit < m_pduBits - 1) {
+        const uint32_t detectionCycles = (m_pduBits - 1 - m_rxCurBit) * m_bitCycles;
         if (!m_isrBuffer->available() && ESP.getCycleCount() - m_isrLastCycle > detectionCycles) {
             // Produce faux stop bit level, prevents start bit maldetection
             // cycle's LSB is repurposed for the level bit
@@ -479,8 +479,8 @@ void SoftwareSerial::rxBits() {
     }
 }
 
-void SoftwareSerial::rxBits(uint32_t isrCycle) {
-    bool level = (m_isrLastCycle & 1) ^ m_invert;
+void SoftwareSerial::rxBits(const uint32_t isrCycle) {
+    const bool level = (m_isrLastCycle & 1) ^ m_invert;
 
     // error introduced by edge value in LSB of isrCycle is negligible
     uint32_t cycles = isrCycle - m_isrLastCycle;
@@ -491,7 +491,7 @@ void SoftwareSerial::rxBits(uint32_t isrCycle) {
     while (bits > 0) {
         // start bit detection
         if (m_rxCurBit >= (m_pduBits - 1)) {
-            // leading edge of start bit
+            // leading edge of start bit?
             if (level) break;
             m_rxCurBit = -1;
             --bits;
@@ -514,44 +514,35 @@ void SoftwareSerial::rxBits(uint32_t isrCycle) {
             continue;
         }
         // stop bits
-        if (m_rxCurBit < (m_pduBits - m_stopBits - 1)) {
-            ++m_rxCurBit;
-            --bits;
-            continue;
-        }
-        if (m_rxCurBit == (m_pduBits - m_stopBits - 1)) {
-            // Store the received value in the buffer unless we have an overflow
-            // if not high stop bit level, discard word
-            if (level)
-            {
-                m_rxCurByte >>= (sizeof(uint8_t) * 8 - m_dataBits);
-                if (!m_buffer->push(m_rxCurByte)) {
-                    m_overflow = true;
-                }
-                else {
-                    if (m_parityBuffer)
+        // Store the received value in the buffer unless we have an overflow
+        // if not high stop bit level, discard word
+        if (bits >= static_cast<uint32_t>(m_pduBits - 1 - m_rxCurBit) && level) {
+            m_rxCurByte >>= (sizeof(uint8_t) * 8 - m_dataBits);
+            if (!m_buffer->push(m_rxCurByte)) {
+                m_overflow = true;
+            }
+            else {
+                if (m_parityBuffer)
+                {
+                    if (m_rxCurParity) {
+                        m_parityBuffer->pushpeek() |= m_parityInPos;
+                    }
+                    else {
+                        m_parityBuffer->pushpeek() &= ~m_parityInPos;
+                    }
+                    m_parityInPos <<= 1;
+                    if (!m_parityInPos)
                     {
-                        if (m_rxCurParity) {
-                            m_parityBuffer->pushpeek() |= m_parityInPos;
-                        }
-                        else {
-                            m_parityBuffer->pushpeek() &= ~m_parityInPos;
-                        }
-                        m_parityInPos <<= 1;
-                        if (!m_parityInPos)
-                        {
-                            m_parityBuffer->push();
-                            m_parityInPos = 1;
-                        }
+                        m_parityBuffer->push();
+                        m_parityInPos = 1;
                     }
                 }
             }
-            m_rxCurBit = m_pduBits;
-            // reset to 0 is important for masked bit logic
-            m_rxCurByte = 0;
-            m_rxCurParity = false;
-            break;
         }
+        m_rxCurBit = m_pduBits - 1;
+        // reset to 0 is important for masked bit logic
+        m_rxCurByte = 0;
+        m_rxCurParity = false;
         break;
     }
 }
