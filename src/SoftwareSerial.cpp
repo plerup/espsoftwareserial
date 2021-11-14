@@ -207,7 +207,7 @@ void SoftwareSerial::enableTx(bool on) {
 void SoftwareSerial::enableRx(bool on) {
     if (m_rxValid) {
         if (on) {
-            m_rxCurBit = m_pduBits - 1;
+            m_rxLastBit = m_pduBits - 1;
             // Init to stop bit level and current cycle
             m_isrLastCycle = (ESP.getCycleCount() | 1) ^ m_invert;
             if (m_bitCycles >= (ESP.getCpuFreqMHz() * 1000000UL) / 74880UL)
@@ -469,8 +469,8 @@ void SoftwareSerial::rxBits() {
     // and there was also no next start bit yet, so one word may be pending.
     // Check that there was no new ISR data received in the meantime, inserting an
     // extraneous stop level bit out of sequence breaks rx.
-    if (m_rxCurBit >= -1 && m_rxCurBit < m_pduBits - 1) {
-        const uint32_t detectionCycles = (m_pduBits - 1 - m_rxCurBit) * m_bitCycles;
+    if (m_rxLastBit < m_pduBits - 1) {
+        const uint32_t detectionCycles = (m_pduBits - 1 - m_rxLastBit) * m_bitCycles;
         if (!m_isrBuffer->available() && ESP.getCycleCount() - m_isrLastCycle > detectionCycles) {
             // Produce faux stop bit level, prevents start bit maldetection
             // cycle's LSB is repurposed for the level bit
@@ -490,25 +490,25 @@ void SoftwareSerial::rxBits(const uint32_t isrCycle) {
     if (cycles % m_bitCycles > (m_bitCycles >> 1)) ++bits;
     while (bits > 0) {
         // start bit detection
-        if (m_rxCurBit >= (m_pduBits - 1)) {
+        if (m_rxLastBit >= (m_pduBits - 1)) {
             // leading edge of start bit?
             if (level) break;
-            m_rxCurBit = -1;
+            m_rxLastBit = -1;
             --bits;
             continue;
         }
         // data bits
-        if (m_rxCurBit >= -1 && m_rxCurBit < (m_dataBits - 1)) {
-            uint8_t dataBits = min(bits, static_cast<uint32_t>(m_dataBits - 1 - m_rxCurBit));
-            m_rxCurBit += dataBits;
+        if (m_rxLastBit < (m_dataBits - 1)) {
+            uint8_t dataBits = min(bits, static_cast<uint32_t>(m_dataBits - 1 - m_rxLastBit));
+            m_rxLastBit += dataBits;
             bits -= dataBits;
             m_rxCurByte >>= dataBits;
             if (level) { m_rxCurByte |= (BYTE_ALL_BITS_SET << (8 - dataBits)); }
             continue;
         }
         // parity bit
-        if (m_parityMode && m_rxCurBit == (m_dataBits - 1)) {
-            ++m_rxCurBit;
+        if (m_parityMode && m_rxLastBit == (m_dataBits - 1)) {
+            ++m_rxLastBit;
             --bits;
             m_rxCurParity = level;
             continue;
@@ -516,7 +516,7 @@ void SoftwareSerial::rxBits(const uint32_t isrCycle) {
         // stop bits
         // Store the received value in the buffer unless we have an overflow
         // if not high stop bit level, discard word
-        if (bits >= static_cast<uint32_t>(m_pduBits - 1 - m_rxCurBit) && level) {
+        if (bits >= static_cast<uint32_t>(m_pduBits - 1 - m_rxLastBit) && level) {
             m_rxCurByte >>= (sizeof(uint8_t) * 8 - m_dataBits);
             if (!m_buffer->push(m_rxCurByte)) {
                 m_overflow = true;
@@ -539,7 +539,7 @@ void SoftwareSerial::rxBits(const uint32_t isrCycle) {
                 }
             }
         }
-        m_rxCurBit = m_pduBits - 1;
+        m_rxLastBit = m_pduBits - 1;
         // reset to 0 is important for masked bit logic
         m_rxCurByte = 0;
         m_rxCurParity = false;
