@@ -290,7 +290,7 @@ void IRAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
         if (!m_intTxEnabled) { xt_wsr_ps(m_savedPS); }
         const auto expired = ESP.getCycleCount() - m_periodStart;
         const int32_t remaining = m_periodDuration - expired;
-        const int32_t ms = remaining / 1000L / ESP.getCpuFreqMHz();
+        const int32_t ms = remaining / 1000L / static_cast<int32_t>(ESP.getCpuFreqMHz());
         if (ms > 0)
         {
             delay(ms);
