@@ -23,10 +23,29 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "SoftwareSerial.h"
 #include <Arduino.h>
 
-#ifdef ESP32
-#define xt_rsil(a) (a)
-#define xt_wsr_ps(a)
+#ifndef ESP32
+uint32_t SoftwareSerial::m_savedPS = 0;
+#else
+portMUX_TYPE SoftwareSerial::m_interruptsMux = portMUX_INITIALIZER_UNLOCKED;
 #endif
+
+inline void IRAM_ATTR SoftwareSerial::disableInterrupts()
+{
+#ifndef ESP32
+    m_savedPS = xt_rsil(15);
+#else
+    taskENTER_CRITICAL(&m_interruptsMux);
+#endif
+}
+
+inline void IRAM_ATTR SoftwareSerial::restoreInterrupts()
+{
+#ifndef ESP32
+    xt_wsr_ps(m_savedPS);
+#else
+    taskEXIT_CRITICAL(&m_interruptsMux);
+#endif
+}
 
 constexpr uint8_t BYTE_ALL_BITS_SET = ~static_cast<uint8_t>(0);
 
@@ -287,10 +306,10 @@ void IRAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
     if (!sync)
     {
         // Reenable interrupts while delaying to avoid other tasks piling up
-        if (!m_intTxEnabled) { xt_wsr_ps(m_savedPS); }
+        if (!m_intTxEnabled) { restoreInterrupts(); }
         const auto expired = ESP.getCycleCount() - m_periodStart;
         const int32_t remaining = m_periodDuration - expired;
-        const int32_t ms = remaining / 1000L / static_cast<int32_t>(ESP.getCpuFreqMHz());
+        const int32_t ms = remaining > 0 ? remaining / 1000L / static_cast<int32_t>(ESP.getCpuFreqMHz()) : 0;
         if (ms > 0)
         {
             delay(ms);
@@ -302,7 +321,7 @@ void IRAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
     }
     while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) {}
     // Disable interrupts again if applicable
-    if (!sync && !m_intTxEnabled) { m_savedPS = xt_rsil(15); }
+    if (!sync && !m_intTxEnabled) { disableInterrupts(); }
     m_periodDuration = 0;
     m_periodStart = ESP.getCycleCount();
 }
@@ -349,7 +368,7 @@ size_t IRAM_ATTR SoftwareSerial::write(const uint8_t* buffer, size_t size, Softw
     uint32_t offCycle = 0;
     if (!m_intTxEnabled) {
         // Disable interrupts in order to get a clean transmit timing
-        m_savedPS = xt_rsil(15);
+        disableInterrupts();
     }
     const uint32_t dataMask = ((1UL << m_dataBits) - 1);
     bool withStopBit = true;
@@ -415,8 +434,8 @@ size_t IRAM_ATTR SoftwareSerial::write(const uint8_t* buffer, size_t size, Softw
     }
     writePeriod(dutyCycle, offCycle, true);
     if (!m_intTxEnabled) {
-        // restore the interrupt state
-        xt_wsr_ps(m_savedPS);
+        // restore the interrupt state if applicable
+        restoreInterrupts();
     }
     if (m_txEnableValid) {
         digitalWrite(m_txEnablePin, LOW);

@@ -229,6 +229,8 @@ private:
     /* check m_rxValid that calling is safe */
     void rxBits();
     void rxBits(const uint32_t isrCycle);
+    static void disableInterrupts();
+    static void restoreInterrupts();
 
     static void rxBitISR(SoftwareSerial* self);
     static void rxBitSyncISR(SoftwareSerial* self);
@@ -261,7 +263,11 @@ private:
     std::unique_ptr<circular_queue<uint8_t> > m_parityBuffer;
     uint32_t m_periodStart;
     uint32_t m_periodDuration;
-    uint32_t m_savedPS = 0;
+#ifndef ESP32
+    static uint32_t m_savedPS;
+#else
+    static portMUX_TYPE m_interruptsMux;
+#endif
     // the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
     // 1 = positive including 0, 0 = negative.
     std::unique_ptr<circular_queue<uint32_t, SoftwareSerial*> > m_isrBuffer;
