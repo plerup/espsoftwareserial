@@ -148,6 +148,8 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     m_bitCycles = (ESP.getCpuFreqMHz() * 1000000UL + baud / 2) / baud;
     m_intTxEnabled = true;
     if (isValidRxGPIOpin(m_rxPin)) {
+        m_rxReg = portInputRegister(digitalPinToPort(m_rxPin));
+        m_rxBitMask = digitalPinToBitMask(m_rxPin);
         m_buffer.reset(new circular_queue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
         if (m_parityMode)
         {
@@ -162,6 +164,8 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
         }
     }
     if (isValidTxGPIOpin(m_txPin)) {
+        m_txReg = portOutputRegister(digitalPinToPort(m_txPin));
+        m_txBitMask = digitalPinToBitMask(m_txPin);
         m_txValid = true;
         if (!m_oneWire) {
             pinMode(m_txPin, OUTPUT);
@@ -331,13 +335,13 @@ void IRAM_ATTR SoftwareSerial::writePeriod(
     preciseDelay(true);
     if (dutyCycle)
     {
-        digitalWrite(m_txPin, HIGH);
+        *m_txReg |= m_txBitMask;
         m_periodDuration += dutyCycle;
         if (offCycle || (withStopBit && !m_invert)) preciseDelay(!withStopBit || m_invert);
     }
     if (offCycle)
     {
-        digitalWrite(m_txPin, LOW);
+        *m_txReg &= ~m_txBitMask;
         m_periodDuration += offCycle;
         if (withStopBit && m_invert) preciseDelay(false);
     }
@@ -568,7 +572,7 @@ void SoftwareSerial::rxBits(const uint32_t isrCycle) {
 
 void IRAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial* self) {
     uint32_t curCycle = ESP.getCycleCount();
-    bool level = digitalRead(self->m_rxPin);
+    bool level = *self->m_rxReg & self->m_rxBitMask;
 
     // Store level and cycle in the buffer unless we have an overflow
     // cycle's LSB is repurposed for the level bit
@@ -590,7 +594,7 @@ void IRAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
 
         // Store level and cycle in the buffer unless we have an overflow
         // cycle's LSB is repurposed for the level bit
-        if (digitalRead(self->m_rxPin) != level)
+        if (static_cast<bool>(*self->m_rxReg & self->m_rxBitMask) != level)
         {
             if (!self->m_isrBuffer->push(((start + wait) | 1U) ^ level)) self->m_isrOverflow.store(true);
             level = !level;

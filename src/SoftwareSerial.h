@@ -102,8 +102,8 @@ public:
     /// @param invert true: uses invert line level logic
     /// @param bufCapacity the capacity for the received bytes buffer
     /// @param isrBufCapacity 0: derived from bufCapacity. The capacity of the internal asynchronous
-    ///	       bit receive buffer, a suggested size is bufCapacity times the sum of
-    ///	       start, data, parity and stop bit count.
+    ///        bit receive buffer, a suggested size is bufCapacity times the sum of
+    ///        start, data, parity and stop bit count.
     void begin(uint32_t baud, SoftwareSerialConfig config,
         int8_t rxPin, int8_t txPin, bool invert,
         int bufCapacity = 64, int isrBufCapacity = 0);
@@ -237,7 +237,11 @@ private:
 
     // Member variables
     int8_t m_rxPin = -1;
+    volatile uint32_t* m_rxReg;
+    uint32_t m_rxBitMask;
     int8_t m_txPin = -1;
+    volatile uint32_t* m_txReg;
+    uint32_t m_txBitMask;
     int8_t m_txEnablePin = -1;
     uint8_t m_dataBits;
     bool m_oneWire;
