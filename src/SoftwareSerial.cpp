@@ -308,33 +308,34 @@ int SoftwareSerial::available() {
     return avail;
 }
 
-void IRAM_ATTR SoftwareSerial::preciseDelay(bool sync) {
-    if (!sync)
+void IRAM_ATTR SoftwareSerial::lazyDelay() {
+    // Reenable interrupts while delaying to avoid other tasks piling up
+    if (!m_intTxEnabled) { restoreInterrupts(); }
+    const auto expired = ESP.getCycleCount() - m_periodStart;
+    const int32_t remaining = m_periodDuration - expired;
+    const int32_t ms = remaining > 0 ? remaining / 1000L / static_cast<int32_t>(ESP.getCpuFreqMHz()) : 0;
+    if (ms > 0)
     {
-        // Reenable interrupts while delaying to avoid other tasks piling up
-        if (!m_intTxEnabled) { restoreInterrupts(); }
-        const auto expired = ESP.getCycleCount() - m_periodStart;
-        const int32_t remaining = m_periodDuration - expired;
-        const int32_t ms = remaining > 0 ? remaining / 1000L / static_cast<int32_t>(ESP.getCpuFreqMHz()) : 0;
-        if (ms > 0)
-        {
-            delay(ms);
-        }
-        else
-        {
-            optimistic_yield(10000UL);
-        }
+        delay(ms);
     }
-    while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) {}
+    else
+    {
+        optimistic_yield(10000UL);
+    }
     // Disable interrupts again if applicable
-    if (!sync && !m_intTxEnabled) { disableInterrupts(); }
+    if (!m_intTxEnabled) { disableInterrupts(); }
+    preciseDelay();
+}
+
+void IRAM_ATTR SoftwareSerial::preciseDelay() {
+    while ((ESP.getCycleCount() - m_periodStart) < m_periodDuration) {}
     m_periodDuration = 0;
     m_periodStart = ESP.getCycleCount();
 }
 
 void IRAM_ATTR SoftwareSerial::writePeriod(
     uint32_t dutyCycle, uint32_t offCycle, bool withStopBit) {
-    preciseDelay(true);
+    preciseDelay();
     if (dutyCycle)
     {
 #if defined(ESP8266)
@@ -348,7 +349,13 @@ void IRAM_ATTR SoftwareSerial::writePeriod(
         *m_txReg |= m_txBitMask;
 #endif
         m_periodDuration += dutyCycle;
-        if (offCycle || (withStopBit && !m_invert)) preciseDelay(!withStopBit || m_invert);
+        if (offCycle || (withStopBit && !m_invert)) {
+                if (!withStopBit || m_invert) {
+			preciseDelay();
+                } else {
+			lazyDelay();
+                }
+        }
     }
     if (offCycle)
     {
@@ -363,7 +370,7 @@ void IRAM_ATTR SoftwareSerial::writePeriod(
         *m_txReg &= ~m_txBitMask;
 #endif
         m_periodDuration += offCycle;
-        if (withStopBit && m_invert) preciseDelay(false);
+        if (withStopBit && m_invert) lazyDelay();
     }
 }
 

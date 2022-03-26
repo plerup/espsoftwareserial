@@ -211,9 +211,11 @@ public:
     using Print::write;
 
 private:
-    // If sync is false, it's legal to exceed the deadline, for instance,
+    // It's legal to exceed the deadline, for instance,
     // by enabling interrupts.
-    void preciseDelay(bool sync);
+    void lazyDelay();
+    // Synchronous precise delay
+    void preciseDelay();
     // If withStopBit is set, either cycle contains a stop bit.
     // If dutyCycle == 0, the level is not forced to HIGH.
     // If offCycle == 0, the level remains unchanged from dutyCycle.
