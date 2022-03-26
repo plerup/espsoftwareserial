@@ -308,7 +308,7 @@ int SoftwareSerial::available() {
     return avail;
 }
 
-void IRAM_ATTR SoftwareSerial::lazyDelay() {
+void SoftwareSerial::lazyDelay() {
     // Reenable interrupts while delaying to avoid other tasks piling up
     if (!m_intTxEnabled) { restoreInterrupts(); }
     const auto expired = ESP.getCycleCount() - m_periodStart;
