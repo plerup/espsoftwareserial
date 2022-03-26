@@ -240,7 +240,9 @@ private:
     volatile uint32_t* m_rxReg;
     uint32_t m_rxBitMask;
     int8_t m_txPin = -1;
+#if !defined(ESP8266)
     volatile uint32_t* m_txReg;
+#endif
     uint32_t m_txBitMask;
     int8_t m_txEnablePin = -1;
     uint8_t m_dataBits;

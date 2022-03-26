@@ -164,7 +164,9 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
         }
     }
     if (isValidTxGPIOpin(m_txPin)) {
+#if !defined(ESP8266)
         m_txReg = portOutputRegister(digitalPinToPort(m_txPin));
+#endif
         m_txBitMask = digitalPinToBitMask(m_txPin);
         m_txValid = true;
         if (!m_oneWire) {
@@ -335,13 +337,31 @@ void IRAM_ATTR SoftwareSerial::writePeriod(
     preciseDelay(true);
     if (dutyCycle)
     {
+#if defined(ESP8266)
+        if (16 == m_txPin) {
+            GP16O = 1;
+        }
+        else {
+            GPOS = m_txBitMask;
+        }
+#else
         *m_txReg |= m_txBitMask;
+#endif
         m_periodDuration += dutyCycle;
         if (offCycle || (withStopBit && !m_invert)) preciseDelay(!withStopBit || m_invert);
     }
     if (offCycle)
     {
+#if defined(ESP8266)
+        if (16 == m_txPin) {
+            GP16O = 0;
+        }
+        else {
+            GPOC = m_txBitMask;
+        }
+#else
         *m_txReg &= ~m_txBitMask;
+#endif
         m_periodDuration += offCycle;
         if (withStopBit && m_invert) preciseDelay(false);
     }
