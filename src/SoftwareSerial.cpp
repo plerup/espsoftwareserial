@@ -90,10 +90,10 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
     // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/_images/esp32-c3-devkitm-1-v1-pinout.jpg
     return (pin >= 0 && pin <= 1) || (pin >= 3 && pin <= 7) || (pin >= 18 && pin <= 21);
 #else 
-    return true;
+    return pin >= 0;
 #endif
 #else
-    return true;
+    return pin >= 0;
 #endif
 }
 
