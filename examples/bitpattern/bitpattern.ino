@@ -2,11 +2,19 @@
 
 #ifndef D5
 #if defined(ESP8266)
+#define D8 (15)
 #define D5 (14)
+#define D7 (13)
 #define D6 (12)
+#define RX (3)
+#define TX (1)
 #elif defined(ESP32)
+#define D8 (5)
 #define D5 (18)
+#define D7 (23)
 #define D6 (19)
+#define RX (3)
+#define TX (1)
 #endif
 #endif
 
@@ -29,22 +37,22 @@ void setup() {
 #endif
 	logSer.begin(115200);
 	logSer.println(PSTR("\nOne Wire Half Duplex Bitpattern and Datarate Test"));
-	swSer.begin(115200, SWSERIAL_8N1, D6, -1);
+	swSer.begin(115200, SWSERIAL_8N1, -1, D5);
 	swSer.enableIntTx(true);
-	logSer.println(PSTR("Tx on hwSer"));
+	logSer.println(PSTR("Tx on swSer"));
 }
 
 uint8_t val = 0xff;
 
 void loop() {
-	hwSer.write((uint8_t)0x00);
-	hwSer.write(val);
-	hwSer.write(val);
+	swSer.write((uint8_t)0x00);
+	swSer.write(val);
+	swSer.write(val);
 	auto start = ESP.getCycleCount();
 	int rxCnt = 0;
 	while (ESP.getCycleCount() - start < ESP.getCpuFreqMHz() * 1000000 / 10) {
-		if (swSer.available()) {
-			auto rxVal = swSer.read();
+		if (hwSer.available()) {
+			auto rxVal = hwSer.read();
 			if ((!rxCnt && rxVal) || (rxCnt && rxVal != val)) {
 				logSer.printf(PSTR("Rx bit error: tx = 0x%02x, rx = 0x%02x\n"), val, rxVal);
 			}
