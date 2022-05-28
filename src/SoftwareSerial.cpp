@@ -52,12 +52,14 @@ constexpr uint8_t BYTE_ALL_BITS_SET = ~static_cast<uint8_t>(0);
 SoftwareSerial::SoftwareSerial() {
     m_isrOverflow = false;
     m_rxGPIOPullupEnabled = true;
+    m_txGPIOOpenDrain = false;
 }
 
 SoftwareSerial::SoftwareSerial(int8_t rxPin, int8_t txPin, bool invert)
 {
     m_isrOverflow = false;
     m_rxGPIOPullupEnabled = true;
+    m_txGPIOOpenDrain = false;
     m_rxPin = rxPin;
     m_txPin = txPin;
     m_invert = invert;
@@ -128,9 +130,15 @@ bool SoftwareSerial::hasRxGPIOPullUp(int8_t pin) {
 #endif
 }
 
-void SoftwareSerial::setRxGPIOPullUp() {
+void SoftwareSerial::setRxGPIOPinMode() {
     if (m_rxValid) {
         pinMode(m_rxPin, hasRxGPIOPullUp(m_rxPin) && m_rxGPIOPullupEnabled ? INPUT_PULLUP : INPUT);
+    }
+}
+
+void SoftwareSerial::setTxGPIOPinMode() {
+    if (m_txValid) {
+        pinMode(m_txPin, m_txGPIOOpenDrain ? OUTPUT_OPEN_DRAIN : OUTPUT);
     }
 }
 
@@ -160,7 +168,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
             isrBufCapacity : m_buffer->capacity() * (2 + m_dataBits + static_cast<bool>(m_parityMode))));
         if (m_buffer && (!m_parityMode || m_parityBuffer) && m_isrBuffer) {
             m_rxValid = true;
-            setRxGPIOPullUp();
+            setRxGPIOPinMode();
         }
     }
     if (isValidTxGPIOpin(m_txPin)) {
@@ -170,7 +178,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
         m_txBitMask = digitalPinToBitMask(m_txPin);
         m_txValid = true;
         if (!m_oneWire) {
-            pinMode(m_txPin, OUTPUT);
+            setTxGPIOPinMode();
             digitalWrite(m_txPin, !m_invert);
         }
     }
@@ -212,18 +220,23 @@ void SoftwareSerial::enableIntTx(bool on) {
 
 void SoftwareSerial::enableRxGPIOPullup(bool on) {
     m_rxGPIOPullupEnabled = on;
-    setRxGPIOPullUp();
+    setRxGPIOPinMode();
+}
+
+void SoftwareSerial::enableTxOpenDrain(bool on) {
+    m_txGPIOOpenDrain = on;
+    setTxGPIOPinMode();
 }
 
 void SoftwareSerial::enableTx(bool on) {
     if (m_txValid && m_oneWire) {
         if (on) {
             enableRx(false);
-            pinMode(m_txPin, OUTPUT);
+            setTxGPIOPinMode();
             digitalWrite(m_txPin, !m_invert);
         }
         else {
-            setRxGPIOPullUp();
+            setRxGPIOPinMode();
             enableRx(true);
         }
     }

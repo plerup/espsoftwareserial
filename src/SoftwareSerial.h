@@ -126,6 +126,8 @@ public:
     void enableIntTx(bool on);
     /// Enable (default) or disable internal rx GPIO pullup.
     void enableRxGPIOPullup(bool on);
+    /// Enable or disable (default) tx GPIO output mode.
+    void enableTxOpenDrain(bool on);
 
     bool overflow();
 
@@ -227,7 +229,9 @@ private:
     // result is only defined for a valid Rx GPIO pin
     bool hasRxGPIOPullUp(int8_t pin);
     // safely set the pin mode for the Rx GPIO pin
-    void setRxGPIOPullUp();
+    void setRxGPIOPinMode();
+    // safely set the pin mode for the Tx GPIO pin
+    void setTxGPIOPinMode();
     /* check m_rxValid that calling is safe */
     void rxBits();
     void rxBits(const uint32_t isrCycle);
@@ -258,6 +262,7 @@ private:
     uint8_t m_pduBits;
     bool m_intTxEnabled;
     bool m_rxGPIOPullupEnabled;
+    bool m_txGPIOOpenDrain;
     SoftwareSerialParity m_parityMode;
     uint8_t m_stopBits;
     bool m_lastReadParity;
