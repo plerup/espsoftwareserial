@@ -124,8 +124,8 @@ public:
     void setTransmitEnablePin(int8_t txEnablePin);
     /// Enable (default) or disable interrupts during tx.
     void enableIntTx(bool on);
-    /// Enable (default) or disable internal rx GPIO pullup.
-    void enableRxGPIOPullup(bool on);
+    /// Enable (default) or disable internal rx GPIO pull-up.
+    void enableRxGPIOPullUp(bool on);
     /// Enable or disable (default) tx GPIO output mode.
     void enableTxOpenDrain(bool on);
 
@@ -261,7 +261,7 @@ private:
     /// PDU bits include data, parity and stop bits; the start bit is not counted.
     uint8_t m_pduBits;
     bool m_intTxEnabled;
-    bool m_rxGPIOPullupEnabled;
+    bool m_rxGPIOPullUpEnabled;
     bool m_txGPIOOpenDrain;
     SoftwareSerialParity m_parityMode;
     uint8_t m_stopBits;
