@@ -174,7 +174,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
             digitalWrite(m_txPin, !m_invert);
         }
     }
-    if (!m_rxEnabled) { enableRx(true); }
+    enableRx(true);
 }
 
 void SoftwareSerial::end()
@@ -230,7 +230,7 @@ void SoftwareSerial::enableTx(bool on) {
 }
 
 void SoftwareSerial::enableRx(bool on) {
-    if (m_rxValid) {
+    if (m_rxValid && on != m_rxEnabled) {
         if (on) {
             m_rxLastBit = m_pduBits - 1;
             // Init to stop bit level and current cycle
