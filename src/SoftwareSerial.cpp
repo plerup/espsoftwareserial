@@ -293,7 +293,10 @@ size_t SoftwareSerial::readBytes(uint8_t* buffer, size_t size) {
         count += readCnt;
         if (count >= size) break;
         if (readCnt) start = millis();
-        else optimistic_yield(1000UL);
+        else
+		{
+			optimistic_yield(1000UL);
+		}
     } while (millis() - start < _timeout);
     return count;
 }
