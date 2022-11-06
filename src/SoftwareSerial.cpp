@@ -292,8 +292,12 @@ size_t SoftwareSerial::readBytes(uint8_t* buffer, size_t size) {
         auto readCnt = read(&buffer[count], size - count);
         count += readCnt;
         if (count >= size) break;
-        if (readCnt) start = millis();
-        else optimistic_yield(1000UL);
+        if (readCnt) {
+            start = millis();
+        }
+        else {
+            optimistic_yield(1000UL);
+        }
     } while (millis() - start < _timeout);
     return count;
 }
@@ -350,11 +354,12 @@ void IRAM_ATTR SoftwareSerial::writePeriod(
 #endif
         m_periodDuration += dutyCycle;
         if (offCycle || (withStopBit && !m_invert)) {
-                if (!withStopBit || m_invert) {
-			preciseDelay();
-                } else {
-			lazyDelay();
-                }
+            if (!withStopBit || m_invert) {
+                preciseDelay();
+            }
+            else {
+                lazyDelay();
+            }
         }
     }
     if (offCycle)
