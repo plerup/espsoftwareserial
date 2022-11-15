@@ -613,7 +613,7 @@ void IRAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial* self) {
 
 void IRAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
     uint32_t start = micros();
-    uint32_t wait = self->m_bitTicks - 172U;
+    uint32_t wait = self->m_bitTicks - 2U;
 
     bool level = self->m_invert;
     // Store level and tick in the buffer unless we have an overflow
