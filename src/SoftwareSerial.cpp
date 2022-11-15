@@ -145,7 +145,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     m_parityMode = static_cast<SoftwareSerialParity>(config & 070);
     m_stopBits = 1 + ((config & 0300) ? 1 : 0);
     m_pduBits = m_dataBits + static_cast<bool>(m_parityMode) + m_stopBits;
-    m_bitTicks = (1000000UL + baud / 2) / baud;
+    m_bitTicks = (microsToTicks(1000000UL) + baud / 2) / baud;
     m_intTxEnabled = true;
     if (isValidRxGPIOpin(m_rxPin)) {
         m_rxReg = portInputRegister(digitalPinToPort(m_rxPin));
@@ -191,7 +191,7 @@ void SoftwareSerial::end()
 }
 
 uint32_t SoftwareSerial::baudRate() {
-    return 1000000UL / m_bitTicks;
+    return 1000000UL / ticksToMicros(m_bitTicks);
 }
 
 void SoftwareSerial::setTransmitEnablePin(int8_t txEnablePin) {
@@ -234,8 +234,8 @@ void SoftwareSerial::enableRx(bool on) {
         if (on) {
             m_rxLastBit = m_pduBits - 1;
             // Init to stop bit level and current tick
-            m_isrLastTick = (micros() | 1) ^ m_invert;
-            if (m_bitTicks >= (1000000UL) / 74880UL)
+            m_isrLastTick = (microsToTicks(micros()) | 1) ^ m_invert;
+            if (m_bitTicks >= microsToTicks(1000000UL / 74880UL))
                 attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitISR), this, CHANGE);
             else
                 attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitSyncISR), this, m_invert ? RISING : FALLING);
@@ -315,9 +315,9 @@ int SoftwareSerial::available() {
 void SoftwareSerial::lazyDelay() {
     // Reenable interrupts while delaying to avoid other tasks piling up
     if (!m_intTxEnabled) { restoreInterrupts(); }
-    const auto expired = micros() - m_periodStart;
+    const auto expired = microsToTicks(micros()) - m_periodStart;
     const int32_t remaining = m_periodDuration - expired;
-    const int32_t ms = remaining > 0 ? remaining / 1000L / static_cast<int32_t>(1) : 0;
+    const int32_t ms = remaining > 0 ? static_cast<int32_t>(ticksToMicros(remaining) / 1000L) : 0;
     if (ms > 0)
     {
         delay(ms);
@@ -332,9 +332,12 @@ void SoftwareSerial::lazyDelay() {
 }
 
 void IRAM_ATTR SoftwareSerial::preciseDelay() {
-    while ((micros() - m_periodStart) < m_periodDuration) {}
+    uint32_t ticks;
+    do {
+        ticks = microsToTicks(micros());
+    } while ((ticks - m_periodStart) < m_periodDuration);
     m_periodDuration = 0;
-    m_periodStart = micros();
+    m_periodStart = ticks;
 }
 
 void IRAM_ATTR SoftwareSerial::writePeriod(
@@ -409,7 +412,7 @@ size_t IRAM_ATTR SoftwareSerial::write(const uint8_t* buffer, size_t size, Softw
     const uint32_t dataMask = ((1UL << m_dataBits) - 1);
     bool withStopBit = true;
     m_periodDuration = 0;
-    m_periodStart = micros();
+    m_periodStart = microsToTicks(micros());
     for (size_t cnt = 0; cnt < size; ++cnt) {
         uint8_t byte = pgm_read_byte(buffer + cnt) & dataMask;
         // push LSB start-data-parity-stop bit pattern into uint32_t
@@ -526,7 +529,7 @@ void SoftwareSerial::rxBits() {
     // extraneous stop level bit out of sequence breaks rx.
     if (m_rxLastBit < m_pduBits - 1) {
         const uint32_t detectionTicks = (m_pduBits - 1 - m_rxLastBit) * m_bitTicks;
-        if (!m_isrBuffer->available() && micros() - m_isrLastTick > detectionTicks) {
+        if (!m_isrBuffer->available() && microsToTicks(micros()) - m_isrLastTick > detectionTicks) {
             // Produce faux stop bit level, prevents start bit maldetection
             // tick's LSB is repurposed for the level bit
             rxBits(((m_isrLastTick + detectionTicks) | 1) ^ m_invert);
@@ -603,7 +606,7 @@ void SoftwareSerial::rxBits(const uint32_t isrTick) {
 }
 
 void IRAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial* self) {
-    uint32_t curTick = micros();
+    uint32_t curTick = microsToTicks(micros());
     bool level = *self->m_rxReg & self->m_rxBitMask;
 
     // Store level and tick in the buffer unless we have an overflow
@@ -612,8 +615,8 @@ void IRAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial* self) {
 }
 
 void IRAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
-    uint32_t start = micros();
-    uint32_t wait = self->m_bitTicks - 2U;
+    uint32_t start = microsToTicks(micros());
+    uint32_t wait = self->m_bitTicks - microsToTicks(2U);
 
     bool level = self->m_invert;
     // Store level and tick in the buffer unless we have an overflow
@@ -621,7 +624,7 @@ void IRAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
     if (!self->m_isrBuffer->push(((start + wait) | 1U) ^ !level)) self->m_isrOverflow.store(true);
 
     for (uint32_t i = 0; i < self->m_pduBits; ++i) {
-        while (micros() - start < wait) {};
+        while (microsToTicks(micros()) - start < wait) {};
         wait += self->m_bitTicks;
 
         // Store level and tick in the buffer unless we have an overflow

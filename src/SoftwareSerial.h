@@ -237,6 +237,13 @@ private:
     static void rxBitISR(SoftwareSerial* self);
     static void rxBitSyncISR(SoftwareSerial* self);
 
+    static inline uint32_t microsToTicks(uint32_t micros) {
+        return micros << 1;
+    }
+    static inline uint32_t ticksToMicros(uint32_t ticks) {
+        return ticks >> 1;
+    }
+
     // Member variables
     int8_t m_rxPin = -1;
     volatile uint32_t* m_rxReg;
