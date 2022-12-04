@@ -124,8 +124,10 @@ public:
     void setTransmitEnablePin(int8_t txEnablePin);
     /// Enable (default) or disable interrupts during tx.
     void enableIntTx(bool on);
-    /// Enable (default) or disable internal rx GPIO pullup.
-    void enableRxGPIOPullup(bool on);
+    /// Enable (default) or disable internal rx GPIO pull-up.
+    void enableRxGPIOPullUp(bool on);
+    /// Enable or disable (default) tx GPIO output mode.
+    void enableTxGPIOOpenDrain(bool on);
 
     bool overflow();
 
@@ -221,13 +223,15 @@ private:
     // If offCycle == 0, the level remains unchanged from dutyCycle.
     void writePeriod(
         uint32_t dutyCycle, uint32_t offCycle, bool withStopBit);
-    bool isValidGPIOpin(int8_t pin);
-    bool isValidRxGPIOpin(int8_t pin);
-    bool isValidTxGPIOpin(int8_t pin);
+    constexpr bool isValidGPIOpin(int8_t pin) const;
+    constexpr bool isValidRxGPIOpin(int8_t pin) const;
+    constexpr bool isValidTxGPIOpin(int8_t pin) const;
     // result is only defined for a valid Rx GPIO pin
-    bool hasRxGPIOPullUp(int8_t pin);
+    constexpr bool hasRxGPIOPullUp(int8_t pin) const;
     // safely set the pin mode for the Rx GPIO pin
-    void setRxGPIOPullUp();
+    void setRxGPIOPinMode();
+    // safely set the pin mode for the Tx GPIO pin
+    void setTxGPIOPinMode();
     /* check m_rxValid that calling is safe */
     void rxBits();
     void rxBits(const uint32_t isrTick);
@@ -264,7 +268,8 @@ private:
     /// PDU bits include data, parity and stop bits; the start bit is not counted.
     uint8_t m_pduBits;
     bool m_intTxEnabled;
-    bool m_rxGPIOPullupEnabled;
+    bool m_rxGPIOPullUpEnabled;
+    bool m_txGPIOOpenDrain;
     SoftwareSerialParity m_parityMode;
     uint8_t m_stopBits;
     bool m_lastReadParity;

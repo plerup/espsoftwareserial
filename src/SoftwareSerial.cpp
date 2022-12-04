@@ -51,13 +51,15 @@ constexpr uint8_t BYTE_ALL_BITS_SET = ~static_cast<uint8_t>(0);
 
 SoftwareSerial::SoftwareSerial() {
     m_isrOverflow = false;
-    m_rxGPIOPullupEnabled = true;
+    m_rxGPIOPullUpEnabled = true;
+    m_txGPIOOpenDrain = false;
 }
 
 SoftwareSerial::SoftwareSerial(int8_t rxPin, int8_t txPin, bool invert)
 {
     m_isrOverflow = false;
-    m_rxGPIOPullupEnabled = true;
+    m_rxGPIOPullUpEnabled = true;
+    m_txGPIOOpenDrain = false;
     m_rxPin = rxPin;
     m_txPin = txPin;
     m_invert = invert;
@@ -67,7 +69,10 @@ SoftwareSerial::~SoftwareSerial() {
     end();
 }
 
-bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
+#if __GNUC__ >= 10
+constexpr
+#endif
+bool SoftwareSerial::isValidGPIOpin(int8_t pin) const {
 #if defined(ESP8266)
     return (pin >= 0 && pin <= 16) && !isFlashInterfacePin(pin);
 #elif defined(ESP32)
@@ -97,7 +102,10 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 #endif
 }
 
-bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) {
+#if __GNUC__ >= 10
+constexpr
+#endif
+bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) const {
     return isValidGPIOpin(pin)
 #if defined(ESP8266)
         && (pin != 16)
@@ -105,7 +113,10 @@ bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) {
         ;
 }
 
-bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) {
+#if __GNUC__ >= 10
+constexpr
+#endif
+bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) const {
     return isValidGPIOpin(pin)
 #if defined(ESP32)
 #ifdef CONFIG_IDF_TARGET_ESP32
@@ -119,7 +130,10 @@ bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) {
         ;
 }
 
-bool SoftwareSerial::hasRxGPIOPullUp(int8_t pin) {
+#if __GNUC__ >= 10
+constexpr
+#endif
+bool SoftwareSerial::hasRxGPIOPullUp(int8_t pin) const {
 #if defined(ESP32)
     return !(pin >= 34 && pin <= 39);
 #else
@@ -128,9 +142,15 @@ bool SoftwareSerial::hasRxGPIOPullUp(int8_t pin) {
 #endif
 }
 
-void SoftwareSerial::setRxGPIOPullUp() {
+void SoftwareSerial::setRxGPIOPinMode() {
     if (m_rxValid) {
-        pinMode(m_rxPin, hasRxGPIOPullUp(m_rxPin) && m_rxGPIOPullupEnabled ? INPUT_PULLUP : INPUT);
+        pinMode(m_rxPin, hasRxGPIOPullUp(m_rxPin) && m_rxGPIOPullUpEnabled ? INPUT_PULLUP : INPUT);
+    }
+}
+
+void SoftwareSerial::setTxGPIOPinMode() {
+    if (m_txValid) {
+        pinMode(m_txPin, m_txGPIOOpenDrain ? OUTPUT_OPEN_DRAIN : OUTPUT);
     }
 }
 
@@ -160,7 +180,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
             isrBufCapacity : m_buffer->capacity() * (2 + m_dataBits + static_cast<bool>(m_parityMode))));
         if (m_buffer && (!m_parityMode || m_parityBuffer) && m_isrBuffer) {
             m_rxValid = true;
-            setRxGPIOPullUp();
+            setRxGPIOPinMode();
         }
     }
     if (isValidTxGPIOpin(m_txPin)) {
@@ -170,7 +190,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
         m_txBitMask = digitalPinToBitMask(m_txPin);
         m_txValid = true;
         if (!m_oneWire) {
-            pinMode(m_txPin, OUTPUT);
+            setTxGPIOPinMode();
             digitalWrite(m_txPin, !m_invert);
         }
     }
@@ -210,20 +230,25 @@ void SoftwareSerial::enableIntTx(bool on) {
     m_intTxEnabled = on;
 }
 
-void SoftwareSerial::enableRxGPIOPullup(bool on) {
-    m_rxGPIOPullupEnabled = on;
-    setRxGPIOPullUp();
+void SoftwareSerial::enableRxGPIOPullUp(bool on) {
+    m_rxGPIOPullUpEnabled = on;
+    setRxGPIOPinMode();
+}
+
+void SoftwareSerial::enableTxGPIOOpenDrain(bool on) {
+    m_txGPIOOpenDrain = on;
+    setTxGPIOPinMode();
 }
 
 void SoftwareSerial::enableTx(bool on) {
     if (m_txValid && m_oneWire) {
         if (on) {
             enableRx(false);
-            pinMode(m_txPin, OUTPUT);
+            setTxGPIOPinMode();
             digitalWrite(m_txPin, !m_invert);
         }
         else {
-            setRxGPIOPullUp();
+            setRxGPIOPinMode();
             enableRx(true);
         }
     }
