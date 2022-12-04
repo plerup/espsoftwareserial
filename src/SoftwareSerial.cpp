@@ -235,7 +235,7 @@ void SoftwareSerial::enableRxGPIOPullUp(bool on) {
     setRxGPIOPinMode();
 }
 
-void SoftwareSerial::enableTxOpenDrain(bool on) {
+void SoftwareSerial::enableTxGPIOOpenDrain(bool on) {
     m_txGPIOOpenDrain = on;
     setTxGPIOPinMode();
 }

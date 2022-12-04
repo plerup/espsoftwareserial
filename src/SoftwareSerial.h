@@ -127,7 +127,7 @@ public:
     /// Enable (default) or disable internal rx GPIO pull-up.
     void enableRxGPIOPullUp(bool on);
     /// Enable or disable (default) tx GPIO output mode.
-    void enableTxOpenDrain(bool on);
+    void enableTxGPIOOpenDrain(bool on);
 
     bool overflow();
 
