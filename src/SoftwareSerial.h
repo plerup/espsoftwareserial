@@ -230,12 +230,19 @@ private:
     void setRxGPIOPullUp();
     /* check m_rxValid that calling is safe */
     void rxBits();
-    void rxBits(const uint32_t isrCycle);
+    void rxBits(const uint32_t isrTick);
     static void disableInterrupts();
     static void restoreInterrupts();
 
     static void rxBitISR(SoftwareSerial* self);
     static void rxBitSyncISR(SoftwareSerial* self);
+
+    static inline uint32_t microsToTicks(uint32_t micros) {
+        return micros << 1;
+    }
+    static inline uint32_t ticksToMicros(uint32_t ticks) {
+        return ticks >> 1;
+    }
 
     // Member variables
     int8_t m_rxPin = -1;
@@ -262,7 +269,7 @@ private:
     uint8_t m_stopBits;
     bool m_lastReadParity;
     bool m_overflow = false;
-    uint32_t m_bitCycles;
+    uint32_t m_bitTicks;
     uint8_t m_parityInPos;
     uint8_t m_parityOutPos;
     int8_t m_rxLastBit; // 0 thru (m_pduBits - m_stopBits - 1): data/parity bits. -1: start bit. (m_pduBits - 1): stop bit.
@@ -279,9 +286,9 @@ private:
     // the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
     // 1 = positive including 0, 0 = negative.
     std::unique_ptr<circular_queue<uint32_t, SoftwareSerial*> > m_isrBuffer;
-    const Delegate<void(uint32_t&&), SoftwareSerial*> m_isrBufferForEachDel = { [](SoftwareSerial* self, uint32_t&& isrCycle) { self->rxBits(isrCycle); }, this };
+    const Delegate<void(uint32_t&&), SoftwareSerial*> m_isrBufferForEachDel = { [](SoftwareSerial* self, uint32_t&& isrTick) { self->rxBits(isrTick); }, this };
     std::atomic<bool> m_isrOverflow;
-    uint32_t m_isrLastCycle;
+    uint32_t m_isrLastTick;
     bool m_rxCurParity = false;
     Delegate<void(int available), void*> receiveHandler;
 };
