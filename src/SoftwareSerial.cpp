@@ -351,9 +351,9 @@ void SoftwareSerial::lazyDelay() {
     {
         optimistic_yield(10000UL);
     }
+    preciseDelay();
     // Disable interrupts again if applicable
     if (!m_intTxEnabled) { disableInterrupts(); }
-    preciseDelay();
 }
 
 void IRAM_ATTR SoftwareSerial::preciseDelay() {
