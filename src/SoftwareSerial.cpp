@@ -358,9 +358,11 @@ void SoftwareSerial::lazyDelay() {
 
 void IRAM_ATTR SoftwareSerial::preciseDelay() {
     uint32_t ticks;
+    uint32_t expired;
     do {
         ticks = microsToTicks(micros());
-    } while ((ticks - m_periodStart) < m_periodDuration);
+        expired =  ticks - m_periodStart;
+    } while (static_cast<int32_t>(m_periodDuration - expired) > 0);
     m_periodDuration = 0;
     m_periodStart = ticks;
 }
