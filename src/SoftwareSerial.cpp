@@ -634,19 +634,23 @@ void SoftwareSerial::rxBits(const uint32_t isrTick) {
 }
 
 void IRAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial* self) {
-    uint32_t curTick = microsToTicks(micros());
-    bool level = *self->m_rxReg & self->m_rxBitMask;
+    const bool level = *self->m_rxReg & self->m_rxBitMask;
+    const uint32_t curTick = microsToTicks(micros());
+    const bool empty = !self->m_isrBuffer->available();
 
     // Store level and tick in the buffer unless we have an overflow
     // tick's LSB is repurposed for the level bit
     if (!self->m_isrBuffer->push((curTick | 1U) ^ !level)) self->m_isrOverflow.store(true);
+    // Trigger rx callback only when receiver is starved
+    if (empty && self->m_rxHandler) self->m_rxHandler();
 }
 
 void IRAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
-    uint32_t start = microsToTicks(micros());
-    uint32_t wait = self->m_bitTicks - microsToTicks(2U);
-
     bool level = self->m_invert;
+    const uint32_t start = microsToTicks(micros());
+    uint32_t wait = self->m_bitTicks - microsToTicks(2U);
+    const bool empty = !self->m_isrBuffer->available();
+
     // Store level and tick in the buffer unless we have an overflow
     // tick's LSB is repurposed for the level bit
     if (!self->m_isrBuffer->push(((start + wait) | 1U) ^ !level)) self->m_isrOverflow.store(true);
@@ -663,17 +667,11 @@ void IRAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
             level = !level;
         }
     }
+    // Trigger rx callback only when receiver is starved
+    if (empty && self->m_rxHandler) self->m_rxHandler();
 }
 
-void SoftwareSerial::onReceive(Delegate<void(int available), void*> handler) {
-    receiveHandler = handler;
+void SoftwareSerial::onReceive(Delegate<void(), void*> handler) {
+    m_rxHandler = handler;
 }
 
-void SoftwareSerial::perform_work() {
-    if (!m_rxValid) { return; }
-    rxBits();
-    if (receiveHandler) {
-        int avail = m_buffer->available();
-        if (avail) { receiveHandler(avail); }
-    }
-}
