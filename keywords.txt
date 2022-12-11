@@ -30,7 +30,6 @@ end	KEYWORD2
 isListening	KEYWORD2
 stopListening	KEYWORD2
 onReceive	KEYWORD2
-perform_work	KEYWORD2
 
 #######################################
 # Constants (LITERAL1)

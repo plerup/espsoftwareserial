@@ -342,7 +342,7 @@ void SoftwareSerial::lazyDelay() {
     if (!m_intTxEnabled) { restoreInterrupts(); }
     const auto expired = microsToTicks(micros()) - m_periodStart;
     const int32_t remaining = m_periodDuration - expired;
-    const int32_t ms = remaining > 0 ? static_cast<int32_t>(ticksToMicros(remaining) / 1000L) : 0;
+    const uint32_t ms = remaining > 0 ? ticksToMicros(remaining) / 1000UL : 0;
     if (ms > 0)
     {
         delay(ms);
@@ -359,11 +359,9 @@ void SoftwareSerial::lazyDelay() {
 
 void IRAM_ATTR SoftwareSerial::preciseDelay() {
     uint32_t ticks;
-    uint32_t expired;
     do {
         ticks = microsToTicks(micros());
-        expired =  ticks - m_periodStart;
-    } while (static_cast<int32_t>(m_periodDuration - expired) > 0);
+    } while ((ticks - m_periodStart) < m_periodDuration);
     m_periodDuration = 0;
     m_periodStart = ticks;
 }
