@@ -69,10 +69,7 @@ SoftwareSerial::~SoftwareSerial() {
     end();
 }
 
-#if __GNUC__ >= 10
-constexpr
-#endif
-bool SoftwareSerial::isValidGPIOpin(int8_t pin) const {
+constexpr bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 #if defined(ESP8266)
     return (pin >= 0 && pin <= 16) && !isFlashInterfacePin(pin);
 #elif defined(ESP32)
@@ -80,7 +77,7 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) const {
     // Remmove the flash memory pins on related devices, since using these causes memory access issues.
 #ifdef CONFIG_IDF_TARGET_ESP32
     // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf,
-    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg    
+    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg
     return (pin == 1) || (pin >= 3 && pin <= 5) ||
         (pin >= 12 && pin <= 15) ||
         (!psramFound() && pin >= 16 && pin <= 17) ||
@@ -91,10 +88,10 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) const {
     // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/_images/esp32-s2_saola1-pinout.jpg
     return (pin >= 1 && pin <= 21) || (pin >= 33 && pin <= 44);
 #elif CONFIG_IDF_TARGET_ESP32C3
-    // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf, 
+    // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf,
     // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/_images/esp32-c3-devkitm-1-v1-pinout.jpg
     return (pin >= 0 && pin <= 1) || (pin >= 3 && pin <= 7) || (pin >= 18 && pin <= 21);
-#else 
+#else
     return pin >= 0;
 #endif
 #else
@@ -102,10 +99,7 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) const {
 #endif
 }
 
-#if __GNUC__ >= 10
-constexpr
-#endif
-bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) const {
+constexpr bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) {
     return isValidGPIOpin(pin)
 #if defined(ESP8266)
         && (pin != 16)
@@ -113,10 +107,7 @@ bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) const {
         ;
 }
 
-#if __GNUC__ >= 10
-constexpr
-#endif
-bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) const {
+constexpr bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) {
     return isValidGPIOpin(pin)
 #if defined(ESP32)
 #ifdef CONFIG_IDF_TARGET_ESP32
@@ -130,10 +121,7 @@ bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) const {
         ;
 }
 
-#if __GNUC__ >= 10
-constexpr
-#endif
-bool SoftwareSerial::hasRxGPIOPullUp(int8_t pin) const {
+constexpr bool SoftwareSerial::hasRxGPIOPullUp(int8_t pin) {
 #if defined(ESP32)
     return !(pin >= 34 && pin <= 39);
 #else

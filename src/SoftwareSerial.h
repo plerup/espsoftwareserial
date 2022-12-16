@@ -224,11 +224,11 @@ private:
     // If offCycle == 0, the level remains unchanged from dutyCycle.
     void writePeriod(
         uint32_t dutyCycle, uint32_t offCycle, bool withStopBit);
-    constexpr bool isValidGPIOpin(int8_t pin) const;
-    constexpr bool isValidRxGPIOpin(int8_t pin) const;
-    constexpr bool isValidTxGPIOpin(int8_t pin) const;
+    static constexpr bool isValidGPIOpin(int8_t pin);
+    static constexpr bool isValidRxGPIOpin(int8_t pin);
+    static constexpr bool isValidTxGPIOpin(int8_t pin);
     // result is only defined for a valid Rx GPIO pin
-    constexpr bool hasRxGPIOPullUp(int8_t pin) const;
+    static constexpr bool hasRxGPIOPullUp(int8_t pin);
     // safely set the pin mode for the Rx GPIO pin
     void setRxGPIOPinMode();
     // safely set the pin mode for the Tx GPIO pin
