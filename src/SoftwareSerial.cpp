@@ -69,10 +69,7 @@ SoftwareSerial::~SoftwareSerial() {
     end();
 }
 
-#if __GNUC__ >= 10
-constexpr
-#endif
-bool SoftwareSerial::isValidGPIOpin(int8_t pin) const {
+constexpr bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
 #if defined(ESP8266)
     return (pin >= 0 && pin <= 16) && !isFlashInterfacePin(pin);
 #elif defined(ESP32)
@@ -80,7 +77,7 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) const {
     // Remmove the flash memory pins on related devices, since using these causes memory access issues.
 #ifdef CONFIG_IDF_TARGET_ESP32
     // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf,
-    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg    
+    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg
     return (pin == 1) || (pin >= 3 && pin <= 5) ||
         (pin >= 12 && pin <= 15) ||
         (!psramFound() && pin >= 16 && pin <= 17) ||
@@ -91,10 +88,10 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) const {
     // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/_images/esp32-s2_saola1-pinout.jpg
     return (pin >= 1 && pin <= 21) || (pin >= 33 && pin <= 44);
 #elif CONFIG_IDF_TARGET_ESP32C3
-    // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf, 
+    // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf,
     // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/_images/esp32-c3-devkitm-1-v1-pinout.jpg
     return (pin >= 0 && pin <= 1) || (pin >= 3 && pin <= 7) || (pin >= 18 && pin <= 21);
-#else 
+#else
     return pin >= 0;
 #endif
 #else
@@ -102,10 +99,7 @@ bool SoftwareSerial::isValidGPIOpin(int8_t pin) const {
 #endif
 }
 
-#if __GNUC__ >= 10
-constexpr
-#endif
-bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) const {
+constexpr bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) {
     return isValidGPIOpin(pin)
 #if defined(ESP8266)
         && (pin != 16)
@@ -113,10 +107,7 @@ bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) const {
         ;
 }
 
-#if __GNUC__ >= 10
-constexpr
-#endif
-bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) const {
+constexpr bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) {
     return isValidGPIOpin(pin)
 #if defined(ESP32)
 #ifdef CONFIG_IDF_TARGET_ESP32
@@ -130,10 +121,7 @@ bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) const {
         ;
 }
 
-#if __GNUC__ >= 10
-constexpr
-#endif
-bool SoftwareSerial::hasRxGPIOPullUp(int8_t pin) const {
+constexpr bool SoftwareSerial::hasRxGPIOPullUp(int8_t pin) {
 #if defined(ESP32)
     return !(pin >= 34 && pin <= 39);
 #else
@@ -342,7 +330,7 @@ void SoftwareSerial::lazyDelay() {
     if (!m_intTxEnabled) { restoreInterrupts(); }
     const auto expired = microsToTicks(micros()) - m_periodStart;
     const int32_t remaining = m_periodDuration - expired;
-    const int32_t ms = remaining > 0 ? static_cast<int32_t>(ticksToMicros(remaining) / 1000L) : 0;
+    const uint32_t ms = remaining > 0 ? ticksToMicros(remaining) / 1000UL : 0;
     if (ms > 0)
     {
         delay(ms);
@@ -359,11 +347,9 @@ void SoftwareSerial::lazyDelay() {
 
 void IRAM_ATTR SoftwareSerial::preciseDelay() {
     uint32_t ticks;
-    uint32_t expired;
     do {
         ticks = microsToTicks(micros());
-        expired =  ticks - m_periodStart;
-    } while (static_cast<int32_t>(m_periodDuration - expired) > 0);
+    } while ((ticks - m_periodStart) < m_periodDuration);
     m_periodDuration = 0;
     m_periodStart = ticks;
 }
@@ -634,19 +620,23 @@ void SoftwareSerial::rxBits(const uint32_t isrTick) {
 }
 
 void IRAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial* self) {
-    uint32_t curTick = microsToTicks(micros());
-    bool level = *self->m_rxReg & self->m_rxBitMask;
+    const bool level = *self->m_rxReg & self->m_rxBitMask;
+    const uint32_t curTick = microsToTicks(micros());
+    const bool empty = !self->m_isrBuffer->available();
 
     // Store level and tick in the buffer unless we have an overflow
     // tick's LSB is repurposed for the level bit
     if (!self->m_isrBuffer->push((curTick | 1U) ^ !level)) self->m_isrOverflow.store(true);
+    // Trigger rx callback only when receiver is starved
+    if (empty && self->m_rxHandler) self->m_rxHandler();
 }
 
 void IRAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
-    uint32_t start = microsToTicks(micros());
-    uint32_t wait = self->m_bitTicks - microsToTicks(2U);
-
     bool level = self->m_invert;
+    const uint32_t start = microsToTicks(micros());
+    uint32_t wait = self->m_bitTicks - microsToTicks(2U);
+    const bool empty = !self->m_isrBuffer->available();
+
     // Store level and tick in the buffer unless we have an overflow
     // tick's LSB is repurposed for the level bit
     if (!self->m_isrBuffer->push(((start + wait) | 1U) ^ !level)) self->m_isrOverflow.store(true);
@@ -663,17 +653,11 @@ void IRAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
             level = !level;
         }
     }
+    // Trigger rx callback only when receiver is starved
+    if (empty && self->m_rxHandler) self->m_rxHandler();
 }
 
-void SoftwareSerial::onReceive(Delegate<void(int available), void*> handler) {
-    receiveHandler = handler;
+void SoftwareSerial::onReceive(Delegate<void(), void*> handler) {
+    m_rxHandler = handler;
 }
 
-void SoftwareSerial::perform_work() {
-    if (!m_rxValid) { return; }
-    rxBits();
-    if (receiveHandler) {
-        int avail = m_buffer->available();
-        if (avail) { receiveHandler(avail); }
-    }
-}

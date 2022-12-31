@@ -203,12 +203,13 @@ public:
     bool isListening() { return m_rxEnabled; }
     bool stopListening() { enableRx(false); return true; }
 
-    /// Set an event handler for received data.
-    void onReceive(Delegate<void(int available), void*> handler);
-
-    /// Run the internal processing and event engine. Can be iteratively called
-    /// from loop, or otherwise scheduled.
-    void perform_work();
+    /// onReceive sets a callback that will be called in interrupt context
+    /// when data is received.
+    /// More precisely, the callback is triggered when EspSoftwareSerial detects
+    /// a new reception, which may not yet have completed on invocation.
+    /// Reading - never from this interrupt context - should therefore be
+    /// delayed for the duration of one incoming word.
+    void onReceive(Delegate<void(), void*> handler);
 
     using Print::write;
 
@@ -223,11 +224,11 @@ private:
     // If offCycle == 0, the level remains unchanged from dutyCycle.
     void writePeriod(
         uint32_t dutyCycle, uint32_t offCycle, bool withStopBit);
-    constexpr bool isValidGPIOpin(int8_t pin) const;
-    constexpr bool isValidRxGPIOpin(int8_t pin) const;
-    constexpr bool isValidTxGPIOpin(int8_t pin) const;
+    static constexpr bool isValidGPIOpin(int8_t pin);
+    static constexpr bool isValidRxGPIOpin(int8_t pin);
+    static constexpr bool isValidTxGPIOpin(int8_t pin);
     // result is only defined for a valid Rx GPIO pin
-    constexpr bool hasRxGPIOPullUp(int8_t pin) const;
+    static constexpr bool hasRxGPIOPullUp(int8_t pin);
     // safely set the pin mode for the Rx GPIO pin
     void setRxGPIOPinMode();
     // safely set the pin mode for the Tx GPIO pin
@@ -295,7 +296,8 @@ private:
     std::atomic<bool> m_isrOverflow;
     uint32_t m_isrLastTick;
     bool m_rxCurParity = false;
-    Delegate<void(int available), void*> receiveHandler;
+    Delegate<void(), void*> m_rxHandler;
 };
 
 #endif // __SoftwareSerial_h
+
