@@ -657,7 +657,11 @@ void IRAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
     if (empty && self->m_rxHandler) self->m_rxHandler();
 }
 
-void SoftwareSerial::onReceive(Delegate<void(), void*> handler) {
+void SoftwareSerial::onReceive(const Delegate<void(), void*>& handler) {
     m_rxHandler = handler;
+}
+
+void SoftwareSerial::onReceive(Delegate<void(), void*>&& handler) {
+    m_rxHandler = std::move(handler);
 }
 

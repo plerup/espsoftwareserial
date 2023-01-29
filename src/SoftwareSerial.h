@@ -209,7 +209,8 @@ public:
     /// a new reception, which may not yet have completed on invocation.
     /// Reading - never from this interrupt context - should therefore be
     /// delayed for the duration of one incoming word.
-    void onReceive(Delegate<void(), void*> handler);
+    void onReceive(const Delegate<void(), void*>& handler);
+    void onReceive(Delegate<void(), void*>&& handler);
 
     using Print::write;
 
