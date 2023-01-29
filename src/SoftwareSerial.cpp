@@ -29,7 +29,7 @@ uint32_t SoftwareSerial::m_savedPS = 0;
 portMUX_TYPE SoftwareSerial::m_interruptsMux = portMUX_INITIALIZER_UNLOCKED;
 #endif
 
-inline void IRAM_ATTR SoftwareSerial::disableInterrupts()
+__attribute__((always_inline)) inline void IRAM_ATTR SoftwareSerial::disableInterrupts()
 {
 #ifndef ESP32
     m_savedPS = xt_rsil(15);
@@ -38,7 +38,7 @@ inline void IRAM_ATTR SoftwareSerial::disableInterrupts()
 #endif
 }
 
-inline void IRAM_ATTR SoftwareSerial::restoreInterrupts()
+__attribute__((always_inline)) inline void IRAM_ATTR SoftwareSerial::restoreInterrupts()
 {
 #ifndef ESP32
     xt_wsr_ps(m_savedPS);

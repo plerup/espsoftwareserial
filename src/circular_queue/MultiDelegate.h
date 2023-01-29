@@ -281,7 +281,7 @@ namespace delegate
                 return iterator();
             }
 
-            const Delegate* IRAM_ATTR add(const Delegate& del)
+            inline const Delegate* IRAM_ATTR add(const Delegate& del) __attribute__((always_inline))
             {
                 return add(Delegate(del));
             }

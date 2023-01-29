@@ -108,7 +108,7 @@ public:
     /*!
         @brief	Get a snapshot number of elements that can be retrieved by pop.
     */
-    size_t available() const
+    inline size_t IRAM_ATTR available() const __attribute__((always_inline))
     {
         int avail = static_cast<int>(m_inPos.load() - m_outPos.load());
         if (avail < 0) avail += m_bufSize;
@@ -118,7 +118,7 @@ public:
     /*!
         @brief	Get the remaining free elementes for pushing.
     */
-    size_t available_for_push() const
+    inline size_t IRAM_ATTR available_for_push() const __attribute__((always_inline))
     {
         int avail = static_cast<int>(m_outPos.load() - m_inPos.load()) - 1;
         if (avail < 0) avail += m_bufSize;

@@ -242,10 +242,10 @@ private:
     static void rxBitISR(SoftwareSerial* self);
     static void rxBitSyncISR(SoftwareSerial* self);
 
-    static inline uint32_t microsToTicks(uint32_t micros) {
+    static inline uint32_t IRAM_ATTR microsToTicks(uint32_t micros) __attribute__((always_inline)) {
         return micros << 1;
     }
-    static inline uint32_t ticksToMicros(uint32_t ticks) {
+    static inline uint32_t ticksToMicros(uint32_t ticks) __attribute__((always_inline)) {
         return ticks >> 1;
     }
 
