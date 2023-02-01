@@ -238,7 +238,7 @@ namespace delegate
                 return *this;
             }
 
-            inline DelegatePImpl& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline))
+            DelegatePImpl& IRAM_ATTR operator=(std::nullptr_t)
             {
                 if (FUNC == kind)
                 {
@@ -483,7 +483,7 @@ namespace delegate
                 return *this;
             }
 
-            inline DelegatePImpl& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline))
+            DelegatePImpl& IRAM_ATTR operator=(std::nullptr_t)
             {
                 if (FPA == kind)
                 {
@@ -682,7 +682,7 @@ namespace delegate
                 return *this;
             }
 
-            inline DelegatePImpl& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline))
+            DelegatePImpl& IRAM_ATTR operator=(std::nullptr_t)
             {
                 if (FUNC == kind)
                 {
@@ -1039,7 +1039,7 @@ namespace delegate
                 return *this;
             }
 
-            inline DelegateImpl& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline))
+            DelegateImpl& IRAM_ATTR operator=(std::nullptr_t)
             {
                 if (FUNC == kind)
                 {
@@ -1283,7 +1283,7 @@ namespace delegate
                 return *this;
             }
 
-            inline DelegateImpl& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline))
+            DelegateImpl& IRAM_ATTR operator=(std::nullptr_t)
             {
                 if (FPA == kind)
                 {
@@ -1481,7 +1481,7 @@ namespace delegate
                 return *this;
             }
 
-            inline DelegateImpl& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline))
+            DelegateImpl& IRAM_ATTR operator=(std::nullptr_t)
             {
                 if (FUNC == kind)
                 {
