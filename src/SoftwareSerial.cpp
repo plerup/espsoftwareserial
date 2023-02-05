@@ -658,11 +658,15 @@ void IRAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
 }
 
 void SoftwareSerial::onReceive(const Delegate<void(), void*>& handler) {
+    disableInterrupts();
     m_rxHandler = handler;
+    restoreInterrupts();
 }
 
 void SoftwareSerial::onReceive(Delegate<void(), void*>&& handler) {
+    disableInterrupts();
     m_rxHandler = std::move(handler);
+    restoreInterrupts();
 }
 
 // The template member functions below must be in IRAM, but due to a bug GCC doesn't currently

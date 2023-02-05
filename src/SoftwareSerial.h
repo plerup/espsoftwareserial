@@ -208,8 +208,14 @@ public:
     /// More precisely, the callback is triggered when EspSoftwareSerial detects
     /// a new reception, which may not yet have completed on invocation.
     /// Reading - never from this interrupt context - should therefore be
-    /// delayed for the duration of one incoming word.
+    /// delayed at least for the duration of one incoming word.
     void onReceive(const Delegate<void(), void*>& handler);
+    /// onReceive sets a callback that will be called in interrupt context
+    /// when data is received.
+    /// More precisely, the callback is triggered when EspSoftwareSerial detects
+    /// a new reception, which may not yet have completed on invocation.
+    /// Reading - never from this interrupt context - should therefore be
+    /// delayed at least for the duration of one incoming word.
     void onReceive(Delegate<void(), void*>&& handler);
 
     using Print::write;
