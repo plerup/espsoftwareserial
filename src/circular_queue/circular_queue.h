@@ -108,7 +108,7 @@ public:
     /*!
         @brief	Get a snapshot number of elements that can be retrieved by pop.
     */
-    inline size_t IRAM_ATTR available() const __attribute__((always_inline))
+    size_t IRAM_ATTR available() const
     {
         int avail = static_cast<int>(m_inPos.load() - m_outPos.load());
         if (avail < 0) avail += m_bufSize;
@@ -118,7 +118,7 @@ public:
     /*!
         @brief	Get the remaining free elementes for pushing.
     */
-    inline size_t IRAM_ATTR available_for_push() const __attribute__((always_inline))
+    size_t IRAM_ATTR available_for_push() const
     {
         int avail = static_cast<int>(m_outPos.load() - m_inPos.load()) - 1;
         if (avail < 0) avail += m_bufSize;
@@ -141,7 +141,7 @@ public:
         @brief	Peek at the next pending input value.
         @return A reference to the next element that can be pushed.
     */
-    inline T& IRAM_ATTR pushpeek() __attribute__((always_inline))
+    T& IRAM_ATTR pushpeek()
     {
         const auto inPos = m_inPos.load(std::memory_order_relaxed);
         std::atomic_thread_fence(std::memory_order_acquire);
@@ -153,7 +153,7 @@ public:
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
-    inline bool IRAM_ATTR push() __attribute__((always_inline))
+    bool IRAM_ATTR push()
     {
         const auto inPos = m_inPos.load(std::memory_order_acquire);
         const size_t next = (inPos + 1) % m_bufSize;
@@ -172,7 +172,7 @@ public:
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
-    inline bool IRAM_ATTR push(T&& val) __attribute__((always_inline))
+    bool IRAM_ATTR push(T&& val)
     {
         const auto inPos = m_inPos.load(std::memory_order_acquire);
         const size_t next = (inPos + 1) % m_bufSize;
@@ -195,7 +195,7 @@ public:
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
-    inline bool IRAM_ATTR push(const T& val) __attribute__((always_inline))
+    bool IRAM_ATTR push(const T& val)
     {
         T v(val);
         return push(std::move(v));
