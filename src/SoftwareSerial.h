@@ -300,5 +300,17 @@ private:
     Delegate<void(), void*> m_rxHandler;
 };
 
+// The template member functions below must be in IRAM, but due to a bug GCC doesn't currently
+// honor the attribute. Instead, it is possible to do explicit specialization and adorn
+// these with the IRAM attribute:
+// Delegate<>::operator bool, Delegate<>::operator (), circular_queue<>::available,
+// circular_queue<>::available_for_push, circular_queue<>::push_peek, circular_queue<>::push
+
+extern template delegate::detail::DelegateImpl<void*, void>::operator bool() const;
+extern template void delegate::detail::DelegateImpl<void*, void>::operator()() const;
+extern template size_t circular_queue<uint32_t, SoftwareSerial*>::available() const;
+extern template bool circular_queue<uint32_t, SoftwareSerial*>::push(uint32_t&&);
+extern template bool circular_queue<uint32_t, SoftwareSerial*>::push(const uint32_t&);
+
 #endif // __SoftwareSerial_h
 

@@ -665,3 +665,15 @@ void SoftwareSerial::onReceive(Delegate<void(), void*>&& handler) {
     m_rxHandler = std::move(handler);
 }
 
+// The template member functions below must be in IRAM, but due to a bug GCC doesn't currently
+// honor the attribute. Instead, it is possible to do explicit specialization and adorn
+// these with the IRAM attribute:
+// Delegate<>::operator bool, Delegate<>::operator (), circular_queue<>::available,
+// circular_queue<>::available_for_push, circular_queue<>::push_peek, circular_queue<>::push
+
+template IRAM_ATTR delegate::detail::DelegateImpl<void*, void>::operator bool() const;
+template void IRAM_ATTR delegate::detail::DelegateImpl<void*, void>::operator()() const;
+template size_t IRAM_ATTR circular_queue<uint32_t, SoftwareSerial*>::available() const;
+template bool IRAM_ATTR circular_queue<uint32_t, SoftwareSerial*>::push(uint32_t&&);
+template bool IRAM_ATTR circular_queue<uint32_t, SoftwareSerial*>::push(const uint32_t&);
+
