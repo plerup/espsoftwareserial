@@ -23,6 +23,67 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "SoftwareSerial.h"
 #include <Arduino.h>
 
+constexpr bool SoftwareSerialGpioCapabilities::isValidPin(int8_t pin) {
+#if defined(ESP8266)
+    return (pin >= 0 && pin <= 16) && !isFlashInterfacePin(pin);
+#elif defined(ESP32)
+    // Remove the strapping pins as defined in the datasheets, they affect bootup and other critical operations
+    // Remmove the flash memory pins on related devices, since using these causes memory access issues.
+#ifdef CONFIG_IDF_TARGET_ESP32
+    // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf,
+    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg
+    return (pin == 1) || (pin >= 3 && pin <= 5) ||
+        (pin >= 12 && pin <= 15) ||
+        (!psramFound() && pin >= 16 && pin <= 17) ||
+        (pin >= 18 && pin <= 19) ||
+        (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 39);
+#elif CONFIG_IDF_TARGET_ESP32S2
+    // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf,
+    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/_images/esp32-s2_saola1-pinout.jpg
+    return (pin >= 1 && pin <= 21) || (pin >= 33 && pin <= 44);
+#elif CONFIG_IDF_TARGET_ESP32C3
+    // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf,
+    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/_images/esp32-c3-devkitm-1-v1-pinout.jpg
+    return (pin >= 0 && pin <= 1) || (pin >= 3 && pin <= 7) || (pin >= 18 && pin <= 21);
+#else
+    return pin >= 0;
+#endif
+#else
+    return pin >= 0;
+#endif
+}
+
+constexpr bool SoftwareSerialGpioCapabilities::isValidRxPin(int8_t pin) {
+    return isValidPin(pin)
+#if defined(ESP8266)
+        && (pin != 16)
+#endif
+        ;
+}
+
+constexpr bool SoftwareSerialGpioCapabilities::isValidTxPin(int8_t pin) {
+    return isValidPin(pin)
+#if defined(ESP32)
+#ifdef CONFIG_IDF_TARGET_ESP32
+        && (pin < 34)
+#elif CONFIG_IDF_TARGET_ESP32S2
+        && (pin <= 45)
+#elif CONFIG_IDF_TARGET_ESP32C3
+        // no restrictions
+#endif
+#endif
+        ;
+}
+
+constexpr bool SoftwareSerialGpioCapabilities::hasPullUp(int8_t pin) {
+#if defined(ESP32)
+    return !(pin >= 34 && pin <= 39);
+#else
+    (void)pin;
+    return true;
+#endif
+}
+
 #ifndef ESP32
 uint32_t SoftwareSerial::m_savedPS = 0;
 #else
@@ -69,70 +130,9 @@ SoftwareSerial::~SoftwareSerial() {
     end();
 }
 
-constexpr bool SoftwareSerial::isValidGPIOpin(int8_t pin) {
-#if defined(ESP8266)
-    return (pin >= 0 && pin <= 16) && !isFlashInterfacePin(pin);
-#elif defined(ESP32)
-    // Remove the strapping pins as defined in the datasheets, they affect bootup and other critical operations
-    // Remmove the flash memory pins on related devices, since using these causes memory access issues.
-#ifdef CONFIG_IDF_TARGET_ESP32
-    // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf,
-    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg
-    return (pin == 1) || (pin >= 3 && pin <= 5) ||
-        (pin >= 12 && pin <= 15) ||
-        (!psramFound() && pin >= 16 && pin <= 17) ||
-        (pin >= 18 && pin <= 19) ||
-        (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 39);
-#elif CONFIG_IDF_TARGET_ESP32S2
-    // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf,
-    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/_images/esp32-s2_saola1-pinout.jpg
-    return (pin >= 1 && pin <= 21) || (pin >= 33 && pin <= 44);
-#elif CONFIG_IDF_TARGET_ESP32C3
-    // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf,
-    // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/_images/esp32-c3-devkitm-1-v1-pinout.jpg
-    return (pin >= 0 && pin <= 1) || (pin >= 3 && pin <= 7) || (pin >= 18 && pin <= 21);
-#else
-    return pin >= 0;
-#endif
-#else
-    return pin >= 0;
-#endif
-}
-
-constexpr bool SoftwareSerial::isValidRxGPIOpin(int8_t pin) {
-    return isValidGPIOpin(pin)
-#if defined(ESP8266)
-        && (pin != 16)
-#endif
-        ;
-}
-
-constexpr bool SoftwareSerial::isValidTxGPIOpin(int8_t pin) {
-    return isValidGPIOpin(pin)
-#if defined(ESP32)
-#ifdef CONFIG_IDF_TARGET_ESP32
-        && (pin < 34)
-#elif CONFIG_IDF_TARGET_ESP32S2
-        && (pin <= 45)
-#elif CONFIG_IDF_TARGET_ESP32C3
-        // no restrictions
-#endif
-#endif
-        ;
-}
-
-constexpr bool SoftwareSerial::hasRxGPIOPullUp(int8_t pin) {
-#if defined(ESP32)
-    return !(pin >= 34 && pin <= 39);
-#else
-    (void)pin;
-    return true;
-#endif
-}
-
 void SoftwareSerial::setRxGPIOPinMode() {
     if (m_rxValid) {
-        pinMode(m_rxPin, hasRxGPIOPullUp(m_rxPin) && m_rxGPIOPullUpEnabled ? INPUT_PULLUP : INPUT);
+        pinMode(m_rxPin, hasPullUp(m_rxPin) && m_rxGPIOPullUpEnabled ? INPUT_PULLUP : INPUT);
     }
 }
 
@@ -155,7 +155,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
     m_pduBits = m_dataBits + static_cast<bool>(m_parityMode) + m_stopBits;
     m_bitTicks = (microsToTicks(1000000UL) + baud / 2) / baud;
     m_intTxEnabled = true;
-    if (isValidRxGPIOpin(m_rxPin)) {
+    if (isValidRxPin(m_rxPin)) {
         m_rxReg = portInputRegister(digitalPinToPort(m_rxPin));
         m_rxBitMask = digitalPinToBitMask(m_rxPin);
         m_buffer.reset(new circular_queue<uint8_t>((bufCapacity > 0) ? bufCapacity : 64));
@@ -171,7 +171,7 @@ void SoftwareSerial::begin(uint32_t baud, SoftwareSerialConfig config,
             setRxGPIOPinMode();
         }
     }
-    if (isValidTxGPIOpin(m_txPin)) {
+    if (isValidTxPin(m_txPin)) {
 #if !defined(ESP8266)
         m_txReg = portOutputRegister(digitalPinToPort(m_txPin));
 #endif
@@ -203,7 +203,7 @@ uint32_t SoftwareSerial::baudRate() {
 }
 
 void SoftwareSerial::setTransmitEnablePin(int8_t txEnablePin) {
-    if (isValidTxGPIOpin(txEnablePin)) {
+    if (isValidTxPin(txEnablePin)) {
         m_txEnableValid = true;
         m_txEnablePin = txEnablePin;
         pinMode(m_txEnablePin, OUTPUT);

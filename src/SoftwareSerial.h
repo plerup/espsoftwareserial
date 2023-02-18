@@ -27,6 +27,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "circular_queue/circular_queue.h"
 #include <Stream.h>
 
+class SoftwareSerialGpioCapabilities {
+public:
+    static constexpr bool isValidPin(int8_t pin);
+    static constexpr bool isValidRxPin(int8_t pin);
+    static constexpr bool isValidTxPin(int8_t pin);
+    // result is only defined for a valid Rx pin
+    static constexpr bool hasPullUp(int8_t pin);
+};
+
 enum SoftwareSerialParity : uint8_t {
     SWSERIAL_PARITY_NONE = 000,
     SWSERIAL_PARITY_EVEN = 020,
@@ -84,7 +93,7 @@ enum SoftwareSerialConfig {
 /// Instead, the begin() function handles pin assignments and logic inversion.
 /// It also has optional input buffer capacity arguments for byte buffer and ISR bit buffer.
 /// Bitrates up to at least 115200 can be used.
-class SoftwareSerial : public Stream {
+class SoftwareSerial : private SoftwareSerialGpioCapabilities, public Stream {
 public:
     SoftwareSerial();
     /// Ctor to set defaults for pins.
@@ -231,11 +240,6 @@ private:
     // If offCycle == 0, the level remains unchanged from dutyCycle.
     void writePeriod(
         uint32_t dutyCycle, uint32_t offCycle, bool withStopBit);
-    static constexpr bool isValidGPIOpin(int8_t pin);
-    static constexpr bool isValidRxGPIOpin(int8_t pin);
-    static constexpr bool isValidTxGPIOpin(int8_t pin);
-    // result is only defined for a valid Rx GPIO pin
-    static constexpr bool hasRxGPIOPullUp(int8_t pin);
     // safely set the pin mode for the Rx GPIO pin
     void setRxGPIOPinMode();
     // safely set the pin mode for the Tx GPIO pin
