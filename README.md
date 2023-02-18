@@ -111,8 +111,8 @@ The exact list for each device can be found in the
 in sections 2.2 (Pin Descriptions) and 2.4 (Strapping pins). There is a discussion
 dedicated to the use of GPIO12 in this
 [note about GPIO12](https://github.com/espressif/esp-idf/tree/release/v3.2/examples/storage/sd_card#note-about-gpio12).
-Refer to the `isValidGPIOpin()`, `isValidRxGPIOpin()` and `isValidTxGPIOpin()`
-functions for the GPIO restrictions enforced by this library by default.
+Refer to the `isValidPin()`, `isValidRxPin()` and `isValidTxPin()`
+functions in the `SoftwareSerialGpioCapabilities` class for the GPIO restrictions enforced by this library by default.
 
 The easiest and safest method is to test the object returned at runtime, to see if 
 it is valid. For example:
