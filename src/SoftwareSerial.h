@@ -227,6 +227,9 @@ public:
     /// delayed at least for the duration of one incoming word.
     void onReceive(Delegate<void(), void*>&& handler);
 
+    [[deprecated("function removed; semantics of onReceive() changed; check the header file.")]]
+    void perform_work();
+
     using Print::write;
 
 private:
