@@ -634,7 +634,7 @@ void IRAM_ATTR SoftwareSerial::rxBitISR(SoftwareSerial* self) {
 void IRAM_ATTR SoftwareSerial::rxBitSyncISR(SoftwareSerial* self) {
     bool level = self->m_invert;
     const uint32_t start = microsToTicks(micros());
-    uint32_t wait = self->m_bitTicks - microsToTicks(2U);
+    uint32_t wait = self->m_bitTicks;
     const bool empty = !self->m_isrBuffer->available();
 
     // Store level and tick in the buffer unless we have an overflow
