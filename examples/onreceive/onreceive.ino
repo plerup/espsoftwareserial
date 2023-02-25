@@ -1,5 +1,5 @@
 // On ESP8266:
-// Runs up to 115200bps with only negligible errors.
+// Runs up to 128000bps at 80MHz, 250000bps at 160MHz, with nearly zero errors.
 // This example is currently not ported to ESP32, which is based on FreeRTOS.
 
 #include <SoftwareSerial.h>
@@ -13,7 +13,7 @@
 #define TX (1)
 #endif
 
-#define BAUD_RATE 115200
+#define BAUD_RATE 128000
 
 SoftwareSerial testSerial;
 
@@ -29,6 +29,8 @@ void setup() {
 	Serial.setDebugOutput(false);
 	Serial.swap();
 	testSerial.begin(BAUD_RATE, SWSERIAL_8N1, RX, TX);
+	// Only half duplex this way, but reliable TX timings for high bps
+	testSerial.enableIntTx(false);
 	testSerial.onReceive(receiveHandler);
 
 	testSerial.println(PSTR("\nSoftware serial onReceive() event test started"));
@@ -41,9 +43,11 @@ void setup() {
 
 void loop() {
 	if (rxPending && !testSerial.available()) {
+		// event fired on start bit, wait until first stop bit
 		delayMicroseconds(1 + (1 + 8 + 1) * 1000000 / BAUD_RATE);
 	}
-	rxPending = testSerial.available() > 0;
+	auto avail = testSerial.available();
+	rxPending = avail > 0;
 	if (!rxPending) {
 		// On development board, idle power draw at USB:
 		// with yield() 77mA, 385mW (160MHz: 82mA, 410mW)
@@ -52,9 +56,15 @@ void loop() {
 		esp_suspend();
 	}
 	else {
+		// try to force to half-duplex
+		decltype(avail) new_avail;
+		while (avail != (new_avail = testSerial.available())) {
+			avail = new_avail;
+		}
 		do {
 			testSerial.write(testSerial.read());
-			rxPending = testSerial.available() > 0;
+			avail = testSerial.available();
+			rxPending = avail > 0;
 		} while (rxPending);
 		testSerial.println();
 	}
