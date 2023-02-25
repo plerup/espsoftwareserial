@@ -1,5 +1,5 @@
 // On ESP8266:
-// At 80MHz runs up 57600ps, and at 160MHz CPU frequency up to 115200bps with only negligible errors.
+// At 80MHz runs up 57600bps, and at 160MHz CPU frequency up to 115200bps with only negligible errors.
 // Connect pin 13 to 15.
 // For verification and as a example for how to use SW serial on the USB to PC connection,
 // which allows the use of HW Serial on GPIO13 and GPIO15 instead, #define SWAPSERIAL below.

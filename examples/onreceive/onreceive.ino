@@ -1,5 +1,5 @@
 // On ESP8266:
-// At 80MHz runs up 57600ps, and at 160MHz CPU frequency up to 115200bps with only negligible errors.
+// Runs up to 115200bps with only negligible errors.
 // This example is currently not ported to ESP32, which is based on FreeRTOS.
 
 #include <SoftwareSerial.h>
@@ -46,8 +46,8 @@ void loop() {
 	rxPending = testSerial.available() > 0;
 	if (!rxPending) {
 		// On development board, idle power draw at USB:
-		// with yield() 77mA, 385mW
-		// with esp_suspend() 20mA, 100mW
+		// with yield() 77mA, 385mW (160MHz: 82mA, 410mW)
+		// with esp_suspend() 20mA, 100mW (at 160MHz, too)
 		//yield();
 		esp_suspend();
 	}
