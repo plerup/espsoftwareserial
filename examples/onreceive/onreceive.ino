@@ -1,5 +1,5 @@
 // On ESP8266:
-// Runs up to 128000bps at 80MHz, 250000bps at 160MHz, with nearly zero errors.
+// Runs up to 115200bps at 80MHz, 250000bps at 160MHz, with nearly zero errors.
 // This example is currently not ported to ESP32, which is based on FreeRTOS.
 
 #include <SoftwareSerial.h>
@@ -13,14 +13,16 @@
 #define TX (1)
 #endif
 
-#define BAUD_RATE 128000
+#define BAUD_RATE 115200
+#define MAX_FRAMEBITS (1 + 8 + 1 + 2)
 
 SoftwareSerial testSerial;
 
-bool rxPending = false;
+// Becomes set from ISR / IRQ callback function.
+std::atomic<bool> rxPending(false);
 
 void IRAM_ATTR receiveHandler() {
-	rxPending = true;
+	rxPending.store(true);
 	esp_schedule();
 }
 
@@ -42,30 +44,33 @@ void setup() {
 }
 
 void loop() {
-	if (rxPending && !testSerial.available()) {
-		// event fired on start bit, wait until first stop bit
-		delayMicroseconds(1 + (1 + 8 + 1) * 1000000 / BAUD_RATE);
-	}
+	bool isRxPending = rxPending.load();
 	auto avail = testSerial.available();
-	rxPending = avail > 0;
-	if (!rxPending) {
+	if (isRxPending) {
+		rxPending.store(false);
+	}
+	if (isRxPending && !avail) {
+		// event fired on start bit, wait until first stop bit of longest frame
+		delayMicroseconds(1 + MAX_FRAMEBITS * 1000000 / BAUD_RATE);
+		avail = testSerial.available();
+	}
+	if (!avail) {
 		// On development board, idle power draw at USB:
 		// with yield() 77mA, 385mW (160MHz: 82mA, 410mW)
 		// with esp_suspend() 20mA, 100mW (at 160MHz, too)
 		//yield();
 		esp_suspend();
+		return;
 	}
-	else {
-		// try to force to half-duplex
-		decltype(avail) new_avail;
-		while (avail != (new_avail = testSerial.available())) {
-			avail = new_avail;
-		}
-		do {
-			testSerial.write(testSerial.read());
-			avail = testSerial.available();
-			rxPending = avail > 0;
-		} while (rxPending);
-		testSerial.println();
+	// try to force to half-duplex
+	decltype(avail) prev_avail;
+	do {
+		delayMicroseconds(1 + MAX_FRAMEBITS * 1000000 / BAUD_RATE);
+		prev_avail = avail;
+	} while (prev_avail != (avail = testSerial.available()));
+	while (avail > 0) {
+		testSerial.write(testSerial.read());
+		avail = testSerial.available();
 	}
+	testSerial.println();
 }
