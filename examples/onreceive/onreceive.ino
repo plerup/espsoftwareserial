@@ -44,11 +44,15 @@ void setup() {
 }
 
 void loop() {
+#ifdef ESP8266
 	bool isRxPending = rxPending.load();
-	auto avail = testSerial.available();
 	if (isRxPending) {
 		rxPending.store(false);
 	}
+#else
+	bool isRxPending = m_isrOverflow.exchange(false);
+#endif
+	auto avail = testSerial.available();
 	if (isRxPending && !avail) {
 		// event fired on start bit, wait until first stop bit of longest frame
 		delayMicroseconds(1 + MAX_FRAMEBITS * 1000000 / BAUD_RATE);
