@@ -12,7 +12,8 @@ Except at high bitrates, depending on other ongoing activity,
 interrupts in particular, this software serial adapter
 supports full duplex receive and send. At high bitrates (115200bps)
 send bit timing can be improved at the expense of blocking concurrent
-full duplex receives, with the `SoftwareSerial::enableIntTx(false)` function call.
+full duplex receives, with the
+`EspSoftwareSerial::UART::enableIntTx(false)` function call.
 
 The same functionality is given as the corresponding AVR library but
 several instances can be active at the same time. Speed up to 115200 baud
@@ -33,7 +34,7 @@ This library supports ESP8266, ESP32, ESP32-S2 and ESP32-C3 devices.
 
 The memory footprint can be optimized to just fit the amount of expected
 incoming asynchronous data.
-For this, the `SoftwareSerial` constructor provides two arguments. First, the
+For this, the `EspSoftwareSerial::UART` constructor provides two arguments. First, the
 octet buffer capacity for assembled received octets can be set. Read calls are
 satisfied from this buffer, freeing it in return.
 Second, the signal edge detection buffer of 32bit fields can be resized.
@@ -75,8 +76,8 @@ chances are that you can reduce the `isrBufCapacity` footprint without losing da
 and each time you call read to fetch from the octet buffer, you reduce the
 need for space there.
 
-## SoftwareSerialConfig and parity
-The configuration of the data stream is done via a `SoftwareSerialConfig`
+## EspSoftwareSerial::Config and parity
+The configuration of the data stream is done via a `EspSoftwareSerial::Config`
 argument to `begin()`. Word lengths can be set to between 5 and 8 bits, parity
 can be N(one), O(dd) or E(ven) and 1 or 2 stop bits can be used. The default is
 `SWSERIAL_8N1` using 8 bits, no parity and 1 stop bit but any combination can
@@ -92,7 +93,7 @@ individually set in each call to `write()`.
 
 This allows a simple implementation of protocols where the parity bit is used to
 distinguish between data and addresses/commands ("9-bit" protocols). First set
-up SoftwareSerial with parity mode SPACE, e.g. `SWSERIAL_8S1`. This will add a
+up EspSoftwareSerial::UART with parity mode SPACE, e.g. `SWSERIAL_8S1`. This will add a
 parity bit to every byte sent, setting it to logical zero (SPACE parity).
 
 To detect incoming bytes with the parity bit set (MARK parity), use the
@@ -100,7 +101,7 @@ To detect incoming bytes with the parity bit set (MARK parity), use the
 `MARK` as the second argument when writing, e.g. `write(ch, SWSERIAL_PARITY_MARK)`.
 
 ## Checking for correct pin selection / configuration 
-In general, most pins on the ESP8266 and ESP32 devices can be used by SoftwareSerial, 
+In general, most pins on the ESP8266 and ESP32 devices can be used by EspSoftwareSerial, 
 however each device has a number of pins that have special functions or require careful
 handling to prevent undesirable situations, for example they are connected to the 
 on-board SPI flash memory or they are used to determine boot and programming modes 
@@ -112,7 +113,7 @@ in sections 2.2 (Pin Descriptions) and 2.4 (Strapping pins). There is a discussi
 dedicated to the use of GPIO12 in this
 [note about GPIO12](https://github.com/espressif/esp-idf/tree/release/v3.2/examples/storage/sd_card#note-about-gpio12).
 Refer to the `isValidPin()`, `isValidRxPin()` and `isValidTxPin()`
-functions in the `SoftwareSerialGpioCapabilities` class for the GPIO restrictions
+functions in the `EspSoftwareSerial::GpioCapabilities` class for the GPIO restrictions
 enforced by this library by default.
 
 The easiest and safest method is to test the object returned at runtime, to see if 
@@ -124,7 +125,7 @@ it is valid. For example:
 #define MYPORT_TX 12
 #define MYPORT_RX 13
 
-SoftwareSerial myPort;
+EspSoftwareSerial::UART myPort;
 
 [...]
 
@@ -132,7 +133,7 @@ Serial.begin(115200); // Standard hardware serial port
 
 myPort.begin(38400, SWSERIAL_8N1, MYPORT_RX, MYPORT_TX, false);
 if (!myPort) { // If the object did not initialize, then its configuration is invalid
-  Serial.println("Invalid SoftwareSerial pin configuration, check config"); 
+  Serial.println("Invalid EspSoftwareSerial pin configuration, check config"); 
   while (1) { // Don't continue with invalid configuration
     delay (1000);
   }
@@ -155,7 +156,7 @@ The responsible maintainer of the esp8266 repository has kindly shared the
 following command line instructions to use, if one wishes to manually
 update EspSoftwareSerial to a newer release than pulled in via the ESP8266 Arduino BSP:
 
-To update esp8266/arduino SoftwareSerial submodule to lastest master:
+To update esp8266/arduino EspSoftwareSerial submodule to lastest master:
 
 Clean it (optional):
 ```shell

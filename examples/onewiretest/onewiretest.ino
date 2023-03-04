@@ -10,17 +10,17 @@
 #endif
 #endif
 
-SoftwareSerial::UART swSer1;
-SoftwareSerial::UART swSer2;
+EspSoftwareSerial::UART swSer1;
+EspSoftwareSerial::UART swSer2;
 
 void setup() {
 	delay(2000);
 	Serial.begin(115200);
 	Serial.println(PSTR("\nOne Wire Half Duplex Serial Tester"));
-	swSer1.begin(115200, SoftwareSerial::SERIAL_8N1, D6, D6, false, 256);
+	swSer1.begin(115200, EspSoftwareSerial::SERIAL_8N1, D6, D6, false, 256);
 	// high speed half duplex, turn off interrupts during tx
 	swSer1.enableIntTx(false);
-	swSer2.begin(115200, SoftwareSerial::SERIAL_8N1, D5, D5, false, 256);
+	swSer2.begin(115200, EspSoftwareSerial::SERIAL_8N1, D5, D5, false, 256);
 	// high speed half duplex, turn off interrupts during tx
 	swSer2.enableIntTx(false);
 }
@@ -36,7 +36,7 @@ void loop() {
 
 }
 
-void checkSwSerial(SoftwareSerial::UART* ss) {
+void checkSwSerial(EspSoftwareSerial::UART* ss) {
 	byte ch;
 	while (!Serial.available());
 	ss->enableTx(true);
@@ -45,7 +45,7 @@ void checkSwSerial(SoftwareSerial::UART* ss) {
 		ss->write(ch);
 	}
 	ss->enableTx(false);
-	// wait 1 second for the reply from SoftwareSerial if any
+	// wait 1 second for the reply from EspSoftwareSerial if any
 	delay(1000);
 	if (ss->available()) {
 		Serial.print(PSTR("\nResult:"));

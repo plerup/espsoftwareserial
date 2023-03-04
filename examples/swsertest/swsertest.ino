@@ -37,9 +37,9 @@
 
 #ifndef SWAPSERIAL
 auto& usbSerial = Serial;
-SoftwareSerial::UART testSerial;
+EspSoftwareSerial::UART testSerial;
 #else
-SoftwareSerial::UART usbSerial;
+EspSoftwareSerial::UART usbSerial;
 auto& testSerial = Serial;
 #endif
 
@@ -48,15 +48,15 @@ void setup() {
     usbSerial.begin(115200);
     // Important: the buffer size optimizations here, in particular the isrBufSize (11) that is only sufficiently
     // large to hold a single word (up to start - 8 data - parity - stop), are on the basis that any char written
-    // to the loopback SoftwareSerial adapter gets read before another write is performed.
+    // to the loopback EspSoftwareSerial adapter gets read before another write is performed.
     // Block writes with a size greater than 1 would usually fail. Do not copy this into your own project without
     // reading the documentation.
-    testSerial.begin(BAUD_RATE, SoftwareSerial::SERIAL_8N1, D7, D8, false, 95, 11);
+    testSerial.begin(BAUD_RATE, EspSoftwareSerial::SERIAL_8N1, D7, D8, false, 95, 11);
 #else
     testSerial.begin(115200);
     testSerial.setDebugOutput(false);
     testSerial.swap();
-    usbSerial.begin(BAUD_RATE, SoftwareSerial::SERIAL_8N1, RX, TX, false, 95);
+    usbSerial.begin(BAUD_RATE, EspSoftwareSerial::SERIAL_8N1, RX, TX, false, 95);
 #endif
 
     usbSerial.println(PSTR("\nSoftware serial test started"));

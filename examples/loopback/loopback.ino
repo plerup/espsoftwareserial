@@ -1,18 +1,18 @@
 #include <SoftwareSerial.h>
 
 // On ESP8266:
-// Local SoftwareSerial loopback, connect D5 (rx) and D6 (tx).
+// Local EspSoftwareSerial loopback, connect D5 (rx) and D6 (tx).
 // For local hardware loopback, connect D5 to D8 (tx), D6 to D7 (rx).
 // For hardware send/sink, connect D7 (rx) and D8 (tx).
 // Hint: The logger is run at 9600bps such that enableIntTx(true) can remain unchanged. Blocking
-// interrupts severely impacts the ability of the SoftwareSerial devices to operate concurrently
+// interrupts severely impacts the ability of the EspSoftwareSerial devices to operate concurrently
 // and/or in duplex mode.
 // Operating in software serial full duplex mode, runs at 19200bps and few errors (~2.5%).
 // Operating in software serial half duplex mode (both loopback and repeater),
 // runs at 57600bps with nearly no errors.
 // Operating loopback in full duplex, and repeater in half duplex, runs at 38400bps with nearly no errors.
 // On ESP32:
-// For SoftwareSerial or hardware send/sink, connect D5 (rx) and D6 (tx).
+// For EspSoftwareSerial or hardware send/sink, connect D5 (rx) and D6 (tx).
 // Hardware Serial2 defaults to D4 (rx), D3 (tx).
 // For local hardware loopback, connect D5 (rx) to D3 (tx), D6 (tx) to D4 (rx).
 
@@ -47,10 +47,10 @@ constexpr int IUTBITRATE = 19200;
 #endif
 
 #if defined(ESP8266)
-constexpr SoftwareSerial::Config swSerialConfig = SoftwareSerial::SERIAL_8E1;
+constexpr EspSoftwareSerial::Config swSerialConfig = EspSoftwareSerial::SERIAL_8E1;
 constexpr SerialConfig hwSerialConfig = ::SERIAL_8E1;
 #elif defined(ESP32)
-constexpr SoftwareSerial::Config swSerialConfig = SoftwareSerial::SERIAL_8E1;
+constexpr EspSoftwareSerial::Config swSerialConfig = EspSoftwareSerial::SERIAL_8E1;
 constexpr uint32_t hwSerialConfig = ::SERIAL_8E1;
 #else
 constexpr unsigned swSerialConfig = 3;
@@ -72,27 +72,27 @@ constexpr int ReportInterval = IUTBITRATE / 8;
 #if defined(ESP8266)
 #if defined(HWLOOPBACK) || defined(HWSOURCESWSINK)
 HardwareSerial& hwSerial(Serial);
-SoftwareSerial::UART serialIUT;
-SoftwareSerial::UART logger;
+EspSoftwareSerial::UART serialIUT;
+EspSoftwareSerial::UART logger;
 #elif defined(HWSOURCESINK)
 HardwareSerial& serialIUT(Serial);
-SoftwareSerial::UART logger;
+EspSoftwareSerial::UART logger;
 #else
-SoftwareSerial::UART serialIUT;
+EspSoftwareSerial::UART serialIUT;
 HardwareSerial& logger(Serial);
 #endif
 #elif defined(ESP32)
 #if defined(HWLOOPBACK) || defined (HWSOURCESWSINK)
 HardwareSerial& hwSerial(Serial2);
-SoftwareSerial::UART serialIUT;
+EspSoftwareSerial::UART serialIUT;
 #elif defined(HWSOURCESINK)
 HardwareSerial& serialIUT(Serial2);
 #else
-SoftwareSerial::UART serialIUT;
+EspSoftwareSerial::UART serialIUT;
 #endif
 HardwareSerial& logger(Serial);
 #else
-SoftwareSerial::UART serialIUT(14, 12);
+EspSoftwareSerial::UART serialIUT(14, 12);
 HardwareSerial& logger(Serial);
 #endif
 
@@ -102,7 +102,7 @@ void setup() {
     Serial.begin(IUTBITRATE, hwSerialConfig, ::SERIAL_FULL, 1, invert);
     Serial.swap();
     Serial.setRxBufferSize(2 * BLOCKSIZE);
-    logger.begin(9600, SoftwareSerial::SERIAL_8N1, -1, TX);
+    logger.begin(9600, EspSoftwareSerial::SERIAL_8N1, -1, TX);
 #else
     logger.begin(9600);
 #endif
@@ -134,7 +134,7 @@ void setup() {
     logger.begin(9600);
 #endif
 
-    logger.println(PSTR("Loopback example for EspSoftwareSerial"));
+    logger.println(PSTR("Loopback example for EspEspSoftwareSerial"));
 
     start = micros();
     txCount = 0;

@@ -1,7 +1,5 @@
 /*
-SoftwareSerial.h
-
-SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266/ESP32.
+SoftwareSerial.h - Implementation of the Arduino software serial for ESP8266/ESP32.
 Copyright (c) 2015-2016 Peter Lerup. All rights reserved.
 Copyright (c) 2018-2019 Dirk O. Kaar. All rights reserved.
 
@@ -27,7 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "circular_queue/circular_queue.h"
 #include <Stream.h>
 
-namespace SoftwareSerial {
+namespace EspSoftwareSerial {
 
 class GpioCapabilities {
 public:
@@ -315,7 +313,9 @@ private:
     Delegate<void(), void*> m_rxHandler;
 };
 
-}; // namespace SoftwareSerial
+}; // namespace EspSoftwareSerial
+
+using SoftwareSerial = EspSoftwareSerial::UART;
 
 // The template member functions below must be in IRAM, but due to a bug GCC doesn't currently
 // honor the attribute. Instead, it is possible to do explicit specialization and adorn
@@ -325,9 +325,9 @@ private:
 
 extern template delegate::detail::DelegateImpl<void*, void>::operator bool() const;
 extern template void delegate::detail::DelegateImpl<void*, void>::operator()() const;
-extern template size_t circular_queue<uint32_t, SoftwareSerial::UART*>::available() const;
-extern template bool circular_queue<uint32_t, SoftwareSerial::UART*>::push(uint32_t&&);
-extern template bool circular_queue<uint32_t, SoftwareSerial::UART*>::push(const uint32_t&);
+extern template size_t circular_queue<uint32_t, EspSoftwareSerial::UART*>::available() const;
+extern template bool circular_queue<uint32_t, EspSoftwareSerial::UART*>::push(uint32_t&&);
+extern template bool circular_queue<uint32_t, EspSoftwareSerial::UART*>::push(const uint32_t&);
 
 #endif // __SoftwareSerial_h
 

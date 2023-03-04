@@ -16,7 +16,7 @@
 #define BAUD_RATE 115200
 #define MAX_FRAMEBITS (1 + 8 + 1 + 2)
 
-SoftwareSerial::UART testSerial;
+EspSoftwareSerial::UART testSerial;
 
 // Becomes set from ISR / IRQ callback function.
 std::atomic<bool> rxPending(false);
@@ -30,7 +30,7 @@ void setup() {
 	Serial.begin(115200);
 	Serial.setDebugOutput(false);
 	Serial.swap();
-	testSerial.begin(BAUD_RATE, SoftwareSerial::SERIAL_8N1, RX, TX);
+	testSerial.begin(BAUD_RATE, EspSoftwareSerial::SERIAL_8N1, RX, TX);
 	// Only half duplex this way, but reliable TX timings for high bps
 	testSerial.enableIntTx(false);
 	testSerial.onReceive(receiveHandler);
