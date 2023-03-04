@@ -47,11 +47,11 @@ constexpr int IUTBITRATE = 19200;
 #endif
 
 #if defined(ESP8266)
-constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8E1;
-constexpr SerialConfig hwSerialConfig = SERIAL_8E1;
+constexpr SoftwareSerial::Config swSerialConfig = SoftwareSerial::SERIAL_8E1;
+constexpr SerialConfig hwSerialConfig = ::SERIAL_8E1;
 #elif defined(ESP32)
-constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8E1;
-constexpr uint32_t hwSerialConfig = SERIAL_8E1;
+constexpr SoftwareSerial::Config swSerialConfig = SoftwareSerial::SERIAL_8E1;
+constexpr uint32_t hwSerialConfig = ::SERIAL_8E1;
 #else
 constexpr unsigned swSerialConfig = 3;
 #endif
@@ -72,37 +72,37 @@ constexpr int ReportInterval = IUTBITRATE / 8;
 #if defined(ESP8266)
 #if defined(HWLOOPBACK) || defined(HWSOURCESWSINK)
 HardwareSerial& hwSerial(Serial);
-SoftwareSerial serialIUT;
-SoftwareSerial logger;
+SoftwareSerial::UART serialIUT;
+SoftwareSerial::UART logger;
 #elif defined(HWSOURCESINK)
 HardwareSerial& serialIUT(Serial);
-SoftwareSerial logger;
+SoftwareSerial::UART logger;
 #else
-SoftwareSerial serialIUT;
+SoftwareSerial::UART serialIUT;
 HardwareSerial& logger(Serial);
 #endif
 #elif defined(ESP32)
 #if defined(HWLOOPBACK) || defined (HWSOURCESWSINK)
 HardwareSerial& hwSerial(Serial2);
-SoftwareSerial serialIUT;
+SoftwareSerial::UART serialIUT;
 #elif defined(HWSOURCESINK)
 HardwareSerial& serialIUT(Serial2);
 #else
-SoftwareSerial serialIUT;
+SoftwareSerial::UART serialIUT;
 #endif
 HardwareSerial& logger(Serial);
 #else
-SoftwareSerial serialIUT(14, 12);
+SoftwareSerial::UART serialIUT(14, 12);
 HardwareSerial& logger(Serial);
 #endif
 
 void setup() {
 #if defined(ESP8266)
 #if defined(HWLOOPBACK) || defined(HWSOURCESINK) || defined(HWSOURCESWSINK)
-    Serial.begin(IUTBITRATE, hwSerialConfig, SERIAL_FULL, 1, invert);
+    Serial.begin(IUTBITRATE, hwSerialConfig, ::SERIAL_FULL, 1, invert);
     Serial.swap();
     Serial.setRxBufferSize(2 * BLOCKSIZE);
-    logger.begin(9600, SWSERIAL_8N1, -1, TX);
+    logger.begin(9600, SoftwareSerial::SERIAL_8N1, -1, TX);
 #else
     logger.begin(9600);
 #endif

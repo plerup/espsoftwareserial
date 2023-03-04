@@ -37,9 +37,9 @@
 
 #ifndef SWAPSERIAL
 auto& usbSerial = Serial;
-SoftwareSerial testSerial;
+SoftwareSerial::UART testSerial;
 #else
-SoftwareSerial usbSerial;
+SoftwareSerial::UART usbSerial;
 auto& testSerial = Serial;
 #endif
 
@@ -51,12 +51,12 @@ void setup() {
     // to the loopback SoftwareSerial adapter gets read before another write is performed.
     // Block writes with a size greater than 1 would usually fail. Do not copy this into your own project without
     // reading the documentation.
-    testSerial.begin(BAUD_RATE, SWSERIAL_8N1, D7, D8, false, 95, 11);
+    testSerial.begin(BAUD_RATE, SoftwareSerial::SERIAL_8N1, D7, D8, false, 95, 11);
 #else
     testSerial.begin(115200);
     testSerial.setDebugOutput(false);
     testSerial.swap();
-    usbSerial.begin(BAUD_RATE, SWSERIAL_8N1, RX, TX, false, 95);
+    usbSerial.begin(BAUD_RATE, SoftwareSerial::SERIAL_8N1, RX, TX, false, 95);
 #endif
 
     usbSerial.println(PSTR("\nSoftware serial test started"));

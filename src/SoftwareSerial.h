@@ -27,64 +27,66 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "circular_queue/circular_queue.h"
 #include <Stream.h>
 
-class SoftwareSerialGpioCapabilities {
+namespace SoftwareSerial {
+
+class GpioCapabilities {
 public:
     static constexpr bool isValidPin(int8_t pin);
-    static constexpr bool isValidRxPin(int8_t pin);
-    static constexpr bool isValidTxPin(int8_t pin);
+    static constexpr bool isValidInputPin(int8_t pin);
+    static constexpr bool isValidOutputPin(int8_t pin);
     // result is only defined for a valid Rx pin
     static constexpr bool hasPullUp(int8_t pin);
 };
 
-enum SoftwareSerialParity : uint8_t {
-    SWSERIAL_PARITY_NONE = 000,
-    SWSERIAL_PARITY_EVEN = 020,
-    SWSERIAL_PARITY_ODD = 030,
-    SWSERIAL_PARITY_MARK = 040,
-    SWSERIAL_PARITY_SPACE = 070,
+enum Parity : uint8_t {
+    PARITY_NONE = 000,
+    PARITY_EVEN = 020,
+    PARITY_ODD = 030,
+    PARITY_MARK = 040,
+    PARITY_SPACE = 070,
 };
 
-enum SoftwareSerialConfig {
-    SWSERIAL_5N1 = SWSERIAL_PARITY_NONE,
-    SWSERIAL_6N1,
-    SWSERIAL_7N1,
-    SWSERIAL_8N1,
-    SWSERIAL_5E1 = SWSERIAL_PARITY_EVEN,
-    SWSERIAL_6E1,
-    SWSERIAL_7E1,
-    SWSERIAL_8E1,
-    SWSERIAL_5O1 = SWSERIAL_PARITY_ODD,
-    SWSERIAL_6O1,
-    SWSERIAL_7O1,
-    SWSERIAL_8O1,
-    SWSERIAL_5M1 = SWSERIAL_PARITY_MARK,
-    SWSERIAL_6M1,
-    SWSERIAL_7M1,
-    SWSERIAL_8M1,
-    SWSERIAL_5S1 = SWSERIAL_PARITY_SPACE,
-    SWSERIAL_6S1,
-    SWSERIAL_7S1,
-    SWSERIAL_8S1,
-    SWSERIAL_5N2 = 0200 | SWSERIAL_PARITY_NONE,
-    SWSERIAL_6N2,
-    SWSERIAL_7N2,
-    SWSERIAL_8N2,
-    SWSERIAL_5E2 = 0200 | SWSERIAL_PARITY_EVEN,
-    SWSERIAL_6E2,
-    SWSERIAL_7E2,
-    SWSERIAL_8E2,
-    SWSERIAL_5O2 = 0200 | SWSERIAL_PARITY_ODD,
-    SWSERIAL_6O2,
-    SWSERIAL_7O2,
-    SWSERIAL_8O2,
-    SWSERIAL_5M2 = 0200 | SWSERIAL_PARITY_MARK,
-    SWSERIAL_6M2,
-    SWSERIAL_7M2,
-    SWSERIAL_8M2,
-    SWSERIAL_5S2 = 0200 | SWSERIAL_PARITY_SPACE,
-    SWSERIAL_6S2,
-    SWSERIAL_7S2,
-    SWSERIAL_8S2,
+enum Config {
+    SERIAL_5N1 = PARITY_NONE,
+    SERIAL_6N1,
+    SERIAL_7N1,
+    SERIAL_8N1,
+    SERIAL_5E1 = PARITY_EVEN,
+    SERIAL_6E1,
+    SERIAL_7E1,
+    SERIAL_8E1,
+    SERIAL_5O1 = PARITY_ODD,
+    SERIAL_6O1,
+    SERIAL_7O1,
+    SERIAL_8O1,
+    SERIAL_5M1 = PARITY_MARK,
+    SERIAL_6M1,
+    SERIAL_7M1,
+    SERIAL_8M1,
+    SERIAL_5S1 = PARITY_SPACE,
+    SERIAL_6S1,
+    SERIAL_7S1,
+    SERIAL_8S1,
+    SERIAL_5N2 = 0200 | PARITY_NONE,
+    SERIAL_6N2,
+    SERIAL_7N2,
+    SERIAL_8N2,
+    SERIAL_5E2 = 0200 | PARITY_EVEN,
+    SERIAL_6E2,
+    SERIAL_7E2,
+    SERIAL_8E2,
+    SERIAL_5O2 = 0200 | PARITY_ODD,
+    SERIAL_6O2,
+    SERIAL_7O2,
+    SERIAL_8O2,
+    SERIAL_5M2 = 0200 | PARITY_MARK,
+    SERIAL_6M2,
+    SERIAL_7M2,
+    SERIAL_8M2,
+    SERIAL_5S2 = 0200 | PARITY_SPACE,
+    SERIAL_6S2,
+    SERIAL_7S2,
+    SERIAL_8S2,
 };
 
 /// This class is compatible with the corresponding AVR one, however,
@@ -93,17 +95,17 @@ enum SoftwareSerialConfig {
 /// Instead, the begin() function handles pin assignments and logic inversion.
 /// It also has optional input buffer capacity arguments for byte buffer and ISR bit buffer.
 /// Bitrates up to at least 115200 can be used.
-class SoftwareSerial : private SoftwareSerialGpioCapabilities, public Stream {
+class UART : private GpioCapabilities, public Stream {
 public:
-    SoftwareSerial();
+    UART();
     /// Ctor to set defaults for pins.
     /// @param rxPin the GPIO pin used for RX
     /// @param txPin -1 for onewire protocol, GPIO pin used for twowire TX
-    SoftwareSerial(int8_t rxPin, int8_t txPin = -1, bool invert = false);
-    SoftwareSerial(const SoftwareSerial&) = delete;
-    SoftwareSerial& operator= (const SoftwareSerial&) = delete;
-    virtual ~SoftwareSerial();
-    /// Configure the SoftwareSerial object for use.
+    UART(int8_t rxPin, int8_t txPin = -1, bool invert = false);
+    UART(const UART&) = delete;
+    UART& operator= (const UART&) = delete;
+    virtual ~UART();
+    /// Configure the UART object for use.
     /// @param baud the TX/RX bitrate
     /// @param config sets databits, parity, and stop bit count
     /// @param rxPin -1 or default: either no RX pin, or keeps the rxPin set in the ctor
@@ -113,18 +115,18 @@ public:
     /// @param isrBufCapacity 0: derived from bufCapacity. The capacity of the internal asynchronous
     ///        bit receive buffer, a suggested size is bufCapacity times the sum of
     ///        start, data, parity and stop bit count.
-    void begin(uint32_t baud, SoftwareSerialConfig config,
+    void begin(uint32_t baud, Config config,
         int8_t rxPin, int8_t txPin, bool invert,
         int bufCapacity = 64, int isrBufCapacity = 0);
-    void begin(uint32_t baud, SoftwareSerialConfig config,
+    void begin(uint32_t baud, Config config,
         int8_t rxPin, int8_t txPin) {
         begin(baud, config, rxPin, txPin, m_invert);
     }
-    void begin(uint32_t baud, SoftwareSerialConfig config,
+    void begin(uint32_t baud, Config config,
         int8_t rxPin) {
         begin(baud, config, rxPin, m_txPin, m_invert);
     }
-    void begin(uint32_t baud, SoftwareSerialConfig config = SWSERIAL_8N1) {
+    void begin(uint32_t baud, Config config = SERIAL_8N1) {
         begin(baud, config, m_rxPin, m_txPin, m_invert);
     }
 
@@ -188,13 +190,13 @@ public:
     }
     void flush() override;
     size_t write(uint8_t byte) override;
-    size_t write(uint8_t byte, SoftwareSerialParity parity);
+    size_t write(uint8_t byte, Parity parity);
     size_t write(const uint8_t* buffer, size_t size) override;
     size_t write(const char* buffer, size_t size) {
         return write(reinterpret_cast<const uint8_t*>(buffer), size);
     }
-    size_t write(const uint8_t* buffer, size_t size, SoftwareSerialParity parity);
-    size_t write(const char* buffer, size_t size, SoftwareSerialParity parity) {
+    size_t write(const uint8_t* buffer, size_t size, Parity parity);
+    size_t write(const char* buffer, size_t size, Parity parity) {
         return write(reinterpret_cast<const uint8_t*>(buffer), size, parity);
     }
     operator bool() const {
@@ -214,14 +216,14 @@ public:
 
     /// onReceive sets a callback that will be called in interrupt context
     /// when data is received.
-    /// More precisely, the callback is triggered when EspSoftwareSerial detects
+    /// More precisely, the callback is triggered when UART detects
     /// a new reception, which may not yet have completed on invocation.
     /// Reading - never from this interrupt context - should therefore be
     /// delayed at least for the duration of one incoming word.
     void onReceive(const Delegate<void(), void*>& handler);
     /// onReceive sets a callback that will be called in interrupt context
     /// when data is received.
-    /// More precisely, the callback is triggered when EspSoftwareSerial detects
+    /// More precisely, the callback is triggered when UART detects
     /// a new reception, which may not yet have completed on invocation.
     /// Reading - never from this interrupt context - should therefore be
     /// delayed at least for the duration of one incoming word.
@@ -253,8 +255,8 @@ private:
     static void disableInterrupts();
     static void restoreInterrupts();
 
-    static void rxBitISR(SoftwareSerial* self);
-    static void rxBitSyncISR(SoftwareSerial* self);
+    static void rxBitISR(UART* self);
+    static void rxBitSyncISR(UART* self);
 
     static inline uint32_t IRAM_ATTR microsToTicks(uint32_t micros) __attribute__((always_inline)) {
         return micros << 1;
@@ -285,7 +287,7 @@ private:
     bool m_intTxEnabled;
     bool m_rxGPIOPullUpEnabled;
     bool m_txGPIOOpenDrain;
-    SoftwareSerialParity m_parityMode;
+    Parity m_parityMode;
     uint8_t m_stopBits;
     bool m_lastReadParity;
     bool m_overflow = false;
@@ -305,13 +307,15 @@ private:
 #endif
     // the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
     // 1 = positive including 0, 0 = negative.
-    std::unique_ptr<circular_queue<uint32_t, SoftwareSerial*> > m_isrBuffer;
-    const Delegate<void(uint32_t&&), SoftwareSerial*> m_isrBufferForEachDel = { [](SoftwareSerial* self, uint32_t&& isrTick) { self->rxBits(isrTick); }, this };
+    std::unique_ptr<circular_queue<uint32_t, UART*> > m_isrBuffer;
+    const Delegate<void(uint32_t&&), UART*> m_isrBufferForEachDel = { [](UART* self, uint32_t&& isrTick) { self->rxBits(isrTick); }, this };
     std::atomic<bool> m_isrOverflow;
     uint32_t m_isrLastTick;
     bool m_rxCurParity = false;
     Delegate<void(), void*> m_rxHandler;
 };
+
+}; // namespace SoftwareSerial
 
 // The template member functions below must be in IRAM, but due to a bug GCC doesn't currently
 // honor the attribute. Instead, it is possible to do explicit specialization and adorn
@@ -321,9 +325,9 @@ private:
 
 extern template delegate::detail::DelegateImpl<void*, void>::operator bool() const;
 extern template void delegate::detail::DelegateImpl<void*, void>::operator()() const;
-extern template size_t circular_queue<uint32_t, SoftwareSerial*>::available() const;
-extern template bool circular_queue<uint32_t, SoftwareSerial*>::push(uint32_t&&);
-extern template bool circular_queue<uint32_t, SoftwareSerial*>::push(const uint32_t&);
+extern template size_t circular_queue<uint32_t, SoftwareSerial::UART*>::available() const;
+extern template bool circular_queue<uint32_t, SoftwareSerial::UART*>::push(uint32_t&&);
+extern template bool circular_queue<uint32_t, SoftwareSerial::UART*>::push(const uint32_t&);
 
 #endif // __SoftwareSerial_h
 

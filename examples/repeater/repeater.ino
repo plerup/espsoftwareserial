@@ -37,11 +37,11 @@ constexpr int IUTBITRATE = 19200;
 #endif
 
 #if defined(ESP8266)
-constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8E1;
-constexpr SerialConfig hwSerialConfig = SERIAL_8E1;
+constexpr SoftwareSerial::Config swSerialConfig = SoftwareSerial::SERIAL_8E1;
+constexpr SerialConfig hwSerialConfig = ::SERIAL_8E1;
 #elif defined(ESP32)
-constexpr SoftwareSerialConfig swSerialConfig = SWSERIAL_8E1;
-constexpr uint32_t hwSerialConfig = SERIAL_8E1;
+constexpr SoftwareSerial::Config swSerialConfig = SoftwareSerial::SERIAL_8E1;
+constexpr uint32_t hwSerialConfig = ::SERIAL_8E1;
 #else
 constexpr unsigned swSerialConfig = 3;
 #endif
@@ -60,30 +60,30 @@ constexpr int ReportInterval = IUTBITRATE / 8;
 #if defined(ESP8266)
 #if defined(HWLOOPBACK)
 HardwareSerial& repeater(Serial);
-SoftwareSerial logger;
+SoftwareSerial::UART logger;
 #else
-SoftwareSerial repeater;
+SoftwareSerial::UART repeater;
 HardwareSerial& logger(Serial);
 #endif
 #elif defined(ESP32)
 #if defined(HWLOOPBACK)
 HardwareSerial& repeater(Serial2);
 #else
-SoftwareSerial repeater;
+SoftwareSerial::UART repeater;
 #endif
 HardwareSerial& logger(Serial);
 #else
-SoftwareSerial repeater(14, 12);
+SoftwareSerial::UART repeater(14, 12);
 HardwareSerial& logger(Serial);
 #endif
 
 void setup() {
 #if defined(ESP8266)
 #if defined(HWLOOPBACK)
-    repeater.begin(IUTBITRATE, hwSerialConfig, SERIAL_FULL, 1, invert);
+    repeater.begin(IUTBITRATE, hwSerialConfig, ::SERIAL_FULL, 1, invert);
     repeater.swap();
     repeater.setRxBufferSize(2 * BLOCKSIZE);
-    logger.begin(9600, SWSERIAL_8N1, -1, TX);
+    logger.begin(9600, SoftwareSerial::SERIAL_8N1, -1, TX);
 #else
     repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, invert, 4 * BLOCKSIZE);
 #ifdef HALFDUPLEX
