@@ -111,46 +111,46 @@ enum Parity : uint8_t {
 };
 
 enum Config {
-    SERIAL_5N1 = PARITY_NONE,
-    SERIAL_6N1,
-    SERIAL_7N1,
-    SERIAL_8N1,
-    SERIAL_5E1 = PARITY_EVEN,
-    SERIAL_6E1,
-    SERIAL_7E1,
-    SERIAL_8E1,
-    SERIAL_5O1 = PARITY_ODD,
-    SERIAL_6O1,
-    SERIAL_7O1,
-    SERIAL_8O1,
-    SERIAL_5M1 = PARITY_MARK,
-    SERIAL_6M1,
-    SERIAL_7M1,
-    SERIAL_8M1,
-    SERIAL_5S1 = PARITY_SPACE,
-    SERIAL_6S1,
-    SERIAL_7S1,
-    SERIAL_8S1,
-    SERIAL_5N2 = 0200 | PARITY_NONE,
-    SERIAL_6N2,
-    SERIAL_7N2,
-    SERIAL_8N2,
-    SERIAL_5E2 = 0200 | PARITY_EVEN,
-    SERIAL_6E2,
-    SERIAL_7E2,
-    SERIAL_8E2,
-    SERIAL_5O2 = 0200 | PARITY_ODD,
-    SERIAL_6O2,
-    SERIAL_7O2,
-    SERIAL_8O2,
-    SERIAL_5M2 = 0200 | PARITY_MARK,
-    SERIAL_6M2,
-    SERIAL_7M2,
-    SERIAL_8M2,
-    SERIAL_5S2 = 0200 | PARITY_SPACE,
-    SERIAL_6S2,
-    SERIAL_7S2,
-    SERIAL_8S2,
+    SWSERIAL_5N1 = PARITY_NONE,
+    SWSERIAL_6N1,
+    SWSERIAL_7N1,
+    SWSERIAL_8N1,
+    SWSERIAL_5E1 = PARITY_EVEN,
+    SWSERIAL_6E1,
+    SWSERIAL_7E1,
+    SWSERIAL_8E1,
+    SWSERIAL_5O1 = PARITY_ODD,
+    SWSERIAL_6O1,
+    SWSERIAL_7O1,
+    SWSERIAL_8O1,
+    SWSERIAL_5M1 = PARITY_MARK,
+    SWSERIAL_6M1,
+    SWSERIAL_7M1,
+    SWSERIAL_8M1,
+    SWSERIAL_5S1 = PARITY_SPACE,
+    SWSERIAL_6S1,
+    SWSERIAL_7S1,
+    SWSERIAL_8S1,
+    SWSERIAL_5N2 = 0200 | PARITY_NONE,
+    SWSERIAL_6N2,
+    SWSERIAL_7N2,
+    SWSERIAL_8N2,
+    SWSERIAL_5E2 = 0200 | PARITY_EVEN,
+    SWSERIAL_6E2,
+    SWSERIAL_7E2,
+    SWSERIAL_8E2,
+    SWSERIAL_5O2 = 0200 | PARITY_ODD,
+    SWSERIAL_6O2,
+    SWSERIAL_7O2,
+    SWSERIAL_8O2,
+    SWSERIAL_5M2 = 0200 | PARITY_MARK,
+    SWSERIAL_6M2,
+    SWSERIAL_7M2,
+    SWSERIAL_8M2,
+    SWSERIAL_5S2 = 0200 | PARITY_SPACE,
+    SWSERIAL_6S2,
+    SWSERIAL_7S2,
+    SWSERIAL_8S2,
 };
 
 /// This class is compatible with the corresponding AVR one, however,
@@ -416,7 +416,7 @@ public:
         int8_t rxPin) {
         begin(baud, config, rxPin, m_txPin, m_invert);
     }
-    void begin(uint32_t baud, Config config = SERIAL_8N1) {
+    void begin(uint32_t baud, Config config = SWSERIAL_8N1) {
         begin(baud, config, m_rxPin, m_txPin, m_invert);
     }
     void setTransmitEnablePin(int8_t txEnablePin) {
@@ -430,6 +430,7 @@ using UART = BasicUART< GpioCapabilities >;
 }; // namespace EspSoftwareSerial
 
 using SoftwareSerial = EspSoftwareSerial::UART;
+using namespace EspSoftwareSerial;
 
 // The template member functions below must be in IRAM, but due to a bug GCC doesn't currently
 // honor the attribute. Instead, it is possible to do explicit specialization and adorn

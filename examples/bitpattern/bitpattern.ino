@@ -39,7 +39,7 @@ void setup() {
 #endif
 	logSer.begin(115200);
 	logSer.println(PSTR("\nOne Wire Half Duplex Bitpattern and Datarate Test"));
-	swSer.begin(TESTBPS, EspSoftwareSerial::SERIAL_8N1, D6, D5);
+	swSer.begin(TESTBPS, EspSoftwareSerial::SWSERIAL_8N1, D6, D5);
 	swSer.enableIntTx(true);
 	logSer.println(PSTR("Tx on swSer"));
 }

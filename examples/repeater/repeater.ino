@@ -37,10 +37,10 @@ constexpr int IUTBITRATE = 19200;
 #endif
 
 #if defined(ESP8266)
-constexpr EspSoftwareSerial::Config swSerialConfig = EspSoftwareSerial::SERIAL_8E1;
+constexpr EspSoftwareSerial::Config swSerialConfig = EspSoftwareSerial::SWSERIAL_8E1;
 constexpr SerialConfig hwSerialConfig = ::SERIAL_8E1;
 #elif defined(ESP32)
-constexpr EspSoftwareSerial::Config swSerialConfig = EspSoftwareSerial::SERIAL_8E1;
+constexpr EspSoftwareSerial::Config swSerialConfig = EspSoftwareSerial::SWSERIAL_8E1;
 constexpr uint32_t hwSerialConfig = ::SERIAL_8E1;
 #else
 constexpr unsigned swSerialConfig = 3;
@@ -83,7 +83,7 @@ void setup() {
     repeater.begin(IUTBITRATE, hwSerialConfig, ::SERIAL_FULL, 1, invert);
     repeater.swap();
     repeater.setRxBufferSize(2 * BLOCKSIZE);
-    logger.begin(9600, EspSoftwareSerial::SERIAL_8N1, -1, TX);
+    logger.begin(9600, EspSoftwareSerial::SWSERIAL_8N1, -1, TX);
 #else
     repeater.begin(IUTBITRATE, swSerialConfig, D7, D8, invert, 4 * BLOCKSIZE);
 #ifdef HALFDUPLEX

@@ -30,7 +30,7 @@ void setup() {
 	Serial.begin(115200);
 	Serial.setDebugOutput(false);
 	Serial.swap();
-	testSerial.begin(BAUD_RATE, EspSoftwareSerial::SERIAL_8N1, RX, TX);
+	testSerial.begin(BAUD_RATE, EspSoftwareSerial::SWSERIAL_8N1, RX, TX);
 	// Only half duplex this way, but reliable TX timings for high bps
 	testSerial.enableIntTx(false);
 	testSerial.onReceive(receiveHandler);
