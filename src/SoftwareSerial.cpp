@@ -87,7 +87,7 @@ void UARTBase::setTxGPIOPinMode() {
 
 void UARTBase::begin(uint32_t baud, Config config,
     int8_t rxPin, int8_t txPin,
-    bool invert, int bufCapacity, int isrBufCapacity) {
+    bool invert) {
     if (-1 != rxPin) m_rxPin = rxPin;
     if (-1 != txPin) m_txPin = txPin;
     m_oneWire = (m_rxPin == m_txPin);

@@ -180,8 +180,7 @@ public:
     ///        bit receive buffer, a suggested size is bufCapacity times the sum of
     ///        start, data, parity and stop bit count.
     void begin(uint32_t baud, Config config,
-        int8_t rxPin, int8_t txPin, bool invert,
-        int bufCapacity = 64, int isrBufCapacity = 0);
+        int8_t rxPin, int8_t txPin, bool invert);
 
     uint32_t baudRate();
     /// Transmit control pin.
@@ -400,7 +399,7 @@ public:
     void begin(uint32_t baud, Config config,
         int8_t rxPin, int8_t txPin, bool invert,
         int bufCapacity = 64, int isrBufCapacity = 0) {
-        UARTBase::begin(baud, config, rxPin, txPin, invert, bufCapacity, isrBufCapacity);
+        UARTBase::begin(baud, config, rxPin, txPin, invert);
         if (GpioCapabilities::isValidInputPin(rxPin)) {
             beginRx(GpioCapabilities:: hasPullUp(rxPin), bufCapacity, isrBufCapacity);
         }
