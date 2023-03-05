@@ -27,13 +27,79 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 namespace EspSoftwareSerial {
 
-class GpioCapabilities {
+// Interface definition for template argument of BasicUART
+class IGpioCapabilities {
 public:
     static constexpr bool isValidPin(int8_t pin);
     static constexpr bool isValidInputPin(int8_t pin);
     static constexpr bool isValidOutputPin(int8_t pin);
     // result is only defined for a valid Rx pin
     static constexpr bool hasPullUp(int8_t pin);
+};
+
+class GpioCapabilities : private IGpioCapabilities {
+public:
+    static constexpr bool isValidPin(int8_t pin) {
+    #if defined(ESP8266)
+        return (pin >= 0 && pin <= 16) && !isFlashInterfacePin(pin);
+    #elif defined(ESP32)
+        // Remove the strapping pins as defined in the datasheets, they affect bootup and other critical operations
+        // Remmove the flash memory pins on related devices, since using these causes memory access issues.
+    #ifdef CONFIG_IDF_TARGET_ESP32
+        // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf,
+        // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg
+        return (pin == 1) || (pin >= 3 && pin <= 5) ||
+            (pin >= 12 && pin <= 15) ||
+            (!psramFound() && pin >= 16 && pin <= 17) ||
+            (pin >= 18 && pin <= 19) ||
+            (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 39);
+    #elif CONFIG_IDF_TARGET_ESP32S2
+        // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf,
+        // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/_images/esp32-s2_saola1-pinout.jpg
+        return (pin >= 1 && pin <= 21) || (pin >= 33 && pin <= 44);
+    #elif CONFIG_IDF_TARGET_ESP32C3
+        // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf,
+        // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/_images/esp32-c3-devkitm-1-v1-pinout.jpg
+        return (pin >= 0 && pin <= 1) || (pin >= 3 && pin <= 7) || (pin >= 18 && pin <= 21);
+    #else
+        return pin >= 0;
+    #endif
+    #else
+        return pin >= 0;
+    #endif
+    }
+
+    static constexpr bool isValidInputPin(int8_t pin) {
+        return isValidPin(pin)
+    #if defined(ESP8266)
+            && (pin != 16)
+    #endif
+            ;
+    }
+
+    static constexpr bool isValidOutputPin(int8_t pin) {
+        return isValidPin(pin)
+    #if defined(ESP32)
+    #ifdef CONFIG_IDF_TARGET_ESP32
+            && (pin < 34)
+    #elif CONFIG_IDF_TARGET_ESP32S2
+            && (pin <= 45)
+    #elif CONFIG_IDF_TARGET_ESP32C3
+            // no restrictions
+    #endif
+    #endif
+            ;
+    }
+
+    // result is only defined for a valid Rx pin
+    static constexpr bool hasPullUp(int8_t pin) {
+    #if defined(ESP32)
+        return !(pin >= 34 && pin <= 39);
+    #else
+        (void)pin;
+        return true;
+    #endif
+    }
 };
 
 enum Parity : uint8_t {
@@ -93,17 +159,17 @@ enum Config {
 /// Instead, the begin() function handles pin assignments and logic inversion.
 /// It also has optional input buffer capacity arguments for byte buffer and ISR bit buffer.
 /// Bitrates up to at least 115200 can be used.
-class UART : private GpioCapabilities, public Stream {
+class UARTBase : public Stream {
 public:
-    UART();
+    UARTBase();
     /// Ctor to set defaults for pins.
     /// @param rxPin the GPIO pin used for RX
     /// @param txPin -1 for onewire protocol, GPIO pin used for twowire TX
-    UART(int8_t rxPin, int8_t txPin = -1, bool invert = false);
-    UART(const UART&) = delete;
-    UART& operator= (const UART&) = delete;
-    virtual ~UART();
-    /// Configure the UART object for use.
+    UARTBase(int8_t rxPin, int8_t txPin = -1, bool invert = false);
+    UARTBase(const UARTBase&) = delete;
+    UARTBase& operator= (const UARTBase&) = delete;
+    virtual ~UARTBase();
+    /// Configure the UARTBase object for use.
     /// @param baud the TX/RX bitrate
     /// @param config sets databits, parity, and stop bit count
     /// @param rxPin -1 or default: either no RX pin, or keeps the rxPin set in the ctor
@@ -116,17 +182,6 @@ public:
     void begin(uint32_t baud, Config config,
         int8_t rxPin, int8_t txPin, bool invert,
         int bufCapacity = 64, int isrBufCapacity = 0);
-    void begin(uint32_t baud, Config config,
-        int8_t rxPin, int8_t txPin) {
-        begin(baud, config, rxPin, txPin, m_invert);
-    }
-    void begin(uint32_t baud, Config config,
-        int8_t rxPin) {
-        begin(baud, config, rxPin, m_txPin, m_invert);
-    }
-    void begin(uint32_t baud, Config config = SERIAL_8N1) {
-        begin(baud, config, m_rxPin, m_txPin, m_invert);
-    }
 
     uint32_t baudRate();
     /// Transmit control pin.
@@ -214,14 +269,14 @@ public:
 
     /// onReceive sets a callback that will be called in interrupt context
     /// when data is received.
-    /// More precisely, the callback is triggered when UART detects
+    /// More precisely, the callback is triggered when UARTBase detects
     /// a new reception, which may not yet have completed on invocation.
     /// Reading - never from this interrupt context - should therefore be
     /// delayed at least for the duration of one incoming word.
     void onReceive(const Delegate<void(), void*>& handler);
     /// onReceive sets a callback that will be called in interrupt context
     /// when data is received.
-    /// More precisely, the callback is triggered when UART detects
+    /// More precisely, the callback is triggered when UARTBase detects
     /// a new reception, which may not yet have completed on invocation.
     /// Reading - never from this interrupt context - should therefore be
     /// delayed at least for the duration of one incoming word.
@@ -231,6 +286,14 @@ public:
     void perform_work();
 
     using Print::write;
+
+protected:
+    void beginRx(bool hasPullUp, int bufCapacity, int isrBufCapacity);
+    void beginTx();
+    // Member variables
+    int8_t m_rxPin = -1;
+    int8_t m_txPin = -1;
+    bool m_invert;
 
 private:
     // It's legal to exceed the deadline, for instance,
@@ -253,8 +316,8 @@ private:
     static void disableInterrupts();
     static void restoreInterrupts();
 
-    static void rxBitISR(UART* self);
-    static void rxBitSyncISR(UART* self);
+    static void rxBitISR(UARTBase* self);
+    static void rxBitSyncISR(UARTBase* self);
 
     static inline uint32_t IRAM_ATTR microsToTicks(uint32_t micros) __attribute__((always_inline)) {
         return micros << 1;
@@ -264,10 +327,8 @@ private:
     }
 
     // Member variables
-    int8_t m_rxPin = -1;
     volatile uint32_t* m_rxReg;
     uint32_t m_rxBitMask;
-    int8_t m_txPin = -1;
 #if !defined(ESP8266)
     volatile uint32_t* m_txReg;
 #endif
@@ -279,10 +340,10 @@ private:
     bool m_rxEnabled = false;
     bool m_txValid = false;
     bool m_txEnableValid = false;
-    bool m_invert;
     /// PDU bits include data, parity and stop bits; the start bit is not counted.
     uint8_t m_pduBits;
     bool m_intTxEnabled;
+    bool m_rxGPIOHasPullUp;
     bool m_rxGPIOPullUpEnabled;
     bool m_txGPIOOpenDrain;
     Parity m_parityMode;
@@ -305,13 +366,67 @@ private:
 #endif
     // the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
     // 1 = positive including 0, 0 = negative.
-    std::unique_ptr<circular_queue<uint32_t, UART*> > m_isrBuffer;
-    const Delegate<void(uint32_t&&), UART*> m_isrBufferForEachDel = { [](UART* self, uint32_t&& isrTick) { self->rxBits(isrTick); }, this };
+    std::unique_ptr<circular_queue<uint32_t, UARTBase*> > m_isrBuffer;
+    const Delegate<void(uint32_t&&), UARTBase*> m_isrBufferForEachDel = { [](UARTBase* self, uint32_t&& isrTick) { self->rxBits(isrTick); }, this };
     std::atomic<bool> m_isrOverflow;
     uint32_t m_isrLastTick;
     bool m_rxCurParity = false;
     Delegate<void(), void*> m_rxHandler;
 };
+
+template< class GpioCapabilities > class BasicUART : public UARTBase {
+    static_assert(std::is_base_of<IGpioCapabilities, GpioCapabilities>::value,
+        "template argument is not derived from IGpioCapabilities");
+public:
+    BasicUART() : UARTBase() {
+    }
+    /// Ctor to set defaults for pins.
+    /// @param rxPin the GPIO pin used for RX
+    /// @param txPin -1 for onewire protocol, GPIO pin used for twowire TX
+    BasicUART(int8_t rxPin, int8_t txPin = -1, bool invert = false) :
+        UARTBase(rxPin, txPin, invert) {
+    }
+
+    /// Configure the BasicUART object for use.
+    /// @param baud the TX/RX bitrate
+    /// @param config sets databits, parity, and stop bit count
+    /// @param rxPin -1 or default: either no RX pin, or keeps the rxPin set in the ctor
+    /// @param txPin -1 or default: either no TX pin (onewire), or keeps the txPin set in the ctor
+    /// @param invert true: uses invert line level logic
+    /// @param bufCapacity the capacity for the received bytes buffer
+    /// @param isrBufCapacity 0: derived from bufCapacity. The capacity of the internal asynchronous
+    ///        bit receive buffer, a suggested size is bufCapacity times the sum of
+    ///        start, data, parity and stop bit count.
+    void begin(uint32_t baud, Config config,
+        int8_t rxPin, int8_t txPin, bool invert,
+        int bufCapacity = 64, int isrBufCapacity = 0) {
+        UARTBase::begin(baud, config, rxPin, txPin, invert, bufCapacity, isrBufCapacity);
+        if (GpioCapabilities::isValidInputPin(rxPin)) {
+            beginRx(GpioCapabilities:: hasPullUp(rxPin), bufCapacity, isrBufCapacity);
+        }
+        if (GpioCapabilities::isValidOutputPin(txPin)) {
+            beginTx();
+        }
+        enableRx(true);
+    }
+    void begin(uint32_t baud, Config config,
+        int8_t rxPin, int8_t txPin) {
+        begin(baud, config, rxPin, txPin, m_invert);
+    }
+    void begin(uint32_t baud, Config config,
+        int8_t rxPin) {
+        begin(baud, config, rxPin, m_txPin, m_invert);
+    }
+    void begin(uint32_t baud, Config config = SERIAL_8N1) {
+        begin(baud, config, m_rxPin, m_txPin, m_invert);
+    }
+    void setTransmitEnablePin(int8_t txEnablePin) {
+        UARTBase::setTransmitEnablePin(
+            GpioCapabilities::isValidOutputPin(txEnablePin) ? txEnablePin : -1);
+    }
+};
+
+using UART = BasicUART< GpioCapabilities >;
 
 }; // namespace EspSoftwareSerial
 
@@ -325,9 +440,9 @@ using SoftwareSerial = EspSoftwareSerial::UART;
 
 extern template delegate::detail::DelegateImpl<void*, void>::operator bool() const;
 extern template void delegate::detail::DelegateImpl<void*, void>::operator()() const;
-extern template size_t circular_queue<uint32_t, EspSoftwareSerial::UART*>::available() const;
-extern template bool circular_queue<uint32_t, EspSoftwareSerial::UART*>::push(uint32_t&&);
-extern template bool circular_queue<uint32_t, EspSoftwareSerial::UART*>::push(const uint32_t&);
+extern template size_t circular_queue<uint32_t, EspSoftwareSerial::UARTBase*>::available() const;
+extern template bool circular_queue<uint32_t, EspSoftwareSerial::UARTBase*>::push(uint32_t&&);
+extern template bool circular_queue<uint32_t, EspSoftwareSerial::UARTBase*>::push(const uint32_t&);
 
 #endif // __SoftwareSerial_h
 
