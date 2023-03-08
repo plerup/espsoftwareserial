@@ -327,16 +327,17 @@ namespace delegate
             {
                 if (FP == kind)
                 {
-                    return fn(std::forward<P...>(args...));
+                    if (fn) return fn(std::forward<P...>(args...));
                 }
                 else if (FPA == kind)
                 {
-                    return fnA(obj, std::forward<P...>(args...));
+                    if (fnA) return fnA(obj, std::forward<P...>(args...));
                 }
                 else
                 {
-                    return functional(std::forward<P...>(args...));
+                    if (functional) return functional(std::forward<P...>(args...));
                 }
+                return R();
             }
 
         protected:
@@ -541,12 +542,13 @@ namespace delegate
             {
                 if (FP == kind)
                 {
-                    return fn(std::forward<P...>(args...));
+                    if (fn) return fn(std::forward<P...>(args...));
                 }
                 else
                 {
-                    return fnA(obj, std::forward<P...>(args...));
+                    if (fnA) return fnA(obj, std::forward<P...>(args...));
                 }
+                return R();
             }
 
         protected:
@@ -748,12 +750,13 @@ namespace delegate
             {
                 if (FP == kind)
                 {
-                    return fn(std::forward<P...>(args...));
+                    if (fn) return fn(std::forward<P...>(args...));
                 }
                 else
                 {
-                    return functional(std::forward<P...>(args...));
+                    if (functional) return functional(std::forward<P...>(args...));
                 }
+                return R();
             }
 
         protected:
@@ -845,7 +848,8 @@ namespace delegate
 
             inline R IRAM_ATTR operator()(P... args) const __attribute__((always_inline))
             {
-                return fn(std::forward<P...>(args...));
+                if (fn) return fn(std::forward<P...>(args...));
+                return R();
             }
 
         protected:
@@ -1127,16 +1131,17 @@ namespace delegate
             {
                 if (FP == kind)
                 {
-                    return fn();
+                    if (fn) return fn();
                 }
                 else if (FPA == kind)
                 {
-                    return fnA(obj);
+                    if (fnA) return fnA(obj);
                 }
                 else
                 {
-                    return functional();
+                    if (functional) return functional();
                 }
+                return R();
             }
 
         protected:
@@ -1340,12 +1345,13 @@ namespace delegate
             {
                 if (FP == kind)
                 {
-                    return fn();
+                    if (fn) return fn();
                 }
                 else
                 {
-                    return fnA(obj);
+                    if (fnA) return fnA(obj);
                 }
+                return R();
             }
 
         protected:
@@ -1547,12 +1553,13 @@ namespace delegate
             {
                 if (FP == kind)
                 {
-                    return fn();
+                    if (fn) return fn();
                 }
                 else
                 {
-                    return functional();
+                    if (functional) return functional();
                 }
+                return R();
             }
 
         protected:
@@ -1644,7 +1651,8 @@ namespace delegate
 
             inline R IRAM_ATTR operator()() const __attribute__((always_inline))
             {
-                return fn();
+                if (fn) return fn();
+                return R();
             }
 
         protected:
