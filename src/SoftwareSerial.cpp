@@ -573,7 +573,7 @@ void IRAM_ATTR UARTBase::rxBitISR(UARTBase* self) {
     // tick's LSB is repurposed for the level bit
     if (!self->m_isrBuffer->push((curTick | 1U) ^ !level)) self->m_isrOverflow.store(true);
     // Trigger rx callback only when receiver is starved
-    if (empty && self->m_rxHandler) self->m_rxHandler();
+    if (empty) self->m_rxHandler();
 }
 
 void IRAM_ATTR UARTBase::rxBitSyncISR(UARTBase* self) {
@@ -599,7 +599,7 @@ void IRAM_ATTR UARTBase::rxBitSyncISR(UARTBase* self) {
         }
     }
     // Trigger rx callback only when receiver is starved
-    if (empty && self->m_rxHandler) self->m_rxHandler();
+    if (empty) self->m_rxHandler();
 }
 
 void UARTBase::onReceive(const Delegate<void(), void*>& handler) {
@@ -617,10 +617,9 @@ void UARTBase::onReceive(Delegate<void(), void*>&& handler) {
 // The template member functions below must be in IRAM, but due to a bug GCC doesn't currently
 // honor the attribute. Instead, it is possible to do explicit specialization and adorn
 // these with the IRAM attribute:
-// Delegate<>::operator bool, Delegate<>::operator (), circular_queue<>::available,
+// Delegate<>::operator (), circular_queue<>::available,
 // circular_queue<>::available_for_push, circular_queue<>::push_peek, circular_queue<>::push
 
-template IRAM_ATTR delegate::detail::DelegateImpl<void*, void>::operator bool() const;
 template void IRAM_ATTR delegate::detail::DelegateImpl<void*, void>::operator()() const;
 template size_t IRAM_ATTR circular_queue<uint32_t, UARTBase*>::available() const;
 template bool IRAM_ATTR circular_queue<uint32_t, UARTBase*>::push(uint32_t&&);

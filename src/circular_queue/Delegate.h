@@ -323,6 +323,14 @@ namespace delegate
                 }
             }
 
+	    /// Calling is safe without checking for nullptr.
+	    /// If non-void, returns the default value.
+	    /// In ISR context, where faults and exceptions must not
+	    /// occurs, this saves the extra check for nullptr,
+	    /// and allows the compiler to optimize out checks
+	    /// in std::function which may not be ISR-safe or
+	    /// cause linker errors, like l32r relocation errors
+	    /// on the Xtensa ISA.
             R IRAM_ATTR operator()(P... args) const
             {
                 if (FP == kind)
@@ -538,6 +546,14 @@ namespace delegate
                 }
             }
 
+	    /// Calling is safe without checking for nullptr.
+	    /// If non-void, returns the default value.
+	    /// In ISR context, where faults and exceptions must not
+	    /// occurs, this saves the extra check for nullptr,
+	    /// and allows the compiler to optimize out checks
+	    /// in std::function which may not be ISR-safe or
+	    /// cause linker errors, like l32r relocation errors
+	    /// on the Xtensa ISA.
             R IRAM_ATTR operator()(P... args) const
             {
                 if (FP == kind)
@@ -746,6 +762,14 @@ namespace delegate
                 }
             }
 
+	    /// Calling is safe without checking for nullptr.
+	    /// If non-void, returns the default value.
+	    /// In ISR context, where faults and exceptions must not
+	    /// occurs, this saves the extra check for nullptr,
+	    /// and allows the compiler to optimize out checks
+	    /// in std::function which may not be ISR-safe or
+	    /// cause linker errors, like l32r relocation errors
+	    /// on the Xtensa ISA.
             R IRAM_ATTR operator()(P... args) const
             {
                 if (FP == kind)
@@ -846,6 +870,14 @@ namespace delegate
                 return reinterpret_cast<void*>(fn);
             }
 
+	    /// Calling is safe without checking for nullptr.
+	    /// If non-void, returns the default value.
+	    /// In ISR context, where faults and exceptions must not
+	    /// occurs, this saves the extra check for nullptr,
+	    /// and allows the compiler to optimize out checks
+	    /// in std::function which may not be ISR-safe or
+	    /// cause linker errors, like l32r relocation errors
+	    /// on the Xtensa ISA.
             inline R IRAM_ATTR operator()(P... args) const __attribute__((always_inline))
             {
                 if (fn) return fn(std::forward<P...>(args...));
@@ -1127,6 +1159,14 @@ namespace delegate
                 }
             }
 
+	    /// Calling is safe without checking for nullptr.
+	    /// If non-void, returns the default value.
+	    /// In ISR context, where faults and exceptions must not
+	    /// occurs, this saves the extra check for nullptr,
+	    /// and allows the compiler to optimize out checks
+	    /// in std::function which may not be ISR-safe or
+	    /// cause linker errors, like l32r relocation errors
+	    /// on the Xtensa ISA.
             R IRAM_ATTR operator()() const
             {
                 if (FP == kind)
@@ -1341,6 +1381,14 @@ namespace delegate
                 }
             }
 
+	    /// Calling is safe without checking for nullptr.
+	    /// If non-void, returns the default value.
+	    /// In ISR context, where faults and exceptions must not
+	    /// occurs, this saves the extra check for nullptr,
+	    /// and allows the compiler to optimize out checks
+	    /// in std::function which may not be ISR-safe or
+	    /// cause linker errors, like l32r relocation errors
+	    /// on the Xtensa ISA.
             R IRAM_ATTR operator()() const
             {
                 if (FP == kind)
@@ -1549,6 +1597,14 @@ namespace delegate
                 }
             }
 
+	    /// Calling is safe without checking for nullptr.
+	    /// If non-void, returns the default value.
+	    /// In ISR context, where faults and exceptions must not
+	    /// occurs, this saves the extra check for nullptr,
+	    /// and allows the compiler to optimize out checks
+	    /// in std::function which may not be ISR-safe or
+	    /// cause linker errors, like l32r relocation errors
+	    /// on the Xtensa ISA.
             R IRAM_ATTR operator()() const
             {
                 if (FP == kind)
@@ -1649,6 +1705,14 @@ namespace delegate
                 return nullptr;
             }
 
+	    /// Calling is safe without checking for nullptr.
+	    /// If non-void, returns the default value.
+	    /// In ISR context, where faults and exceptions must not
+	    /// occurs, this saves the extra check for nullptr,
+	    /// and allows the compiler to optimize out checks
+	    /// in std::function which may not be ISR-safe or
+	    /// cause linker errors, like l32r relocation errors
+	    /// on the Xtensa ISA.
             inline R IRAM_ATTR operator()() const __attribute__((always_inline))
             {
                 if (fn) return fn();
