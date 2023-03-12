@@ -47,7 +47,7 @@ namespace std
         T load(std::memory_order = std::memory_order_seq_cst) const volatile noexcept { return value; }
     };
     inline void atomic_thread_fence(std::memory_order order) noexcept {}
-    template< typename T >	T&& move(T& t) noexcept { return static_cast<T&&>(t); }
+    template< typename T > T&& move(T& t) noexcept { return static_cast<T&&>(t); }
 #endif
 
     template< typename T, size_t long N > struct array
