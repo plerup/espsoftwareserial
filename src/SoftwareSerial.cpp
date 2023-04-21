@@ -52,18 +52,10 @@ __attribute__((always_inline)) inline void IRAM_ATTR UARTBase::restoreInterrupts
 constexpr uint8_t BYTE_ALL_BITS_SET = ~static_cast<uint8_t>(0);
 
 UARTBase::UARTBase() {
-    m_isrOverflow = false;
-    m_rxGPIOHasPullUp = false;
-    m_rxGPIOPullUpEnabled = true;
-    m_txGPIOOpenDrain = false;
 }
 
 UARTBase::UARTBase(int8_t rxPin, int8_t txPin, bool invert)
 {
-    m_isrOverflow = false;
-    m_rxGPIOHasPullUp = false;
-    m_rxGPIOPullUpEnabled = true;
-    m_txGPIOOpenDrain = false;
     m_rxPin = rxPin;
     m_txPin = txPin;
     m_invert = invert;

@@ -342,9 +342,9 @@ private:
     /// PDU bits include data, parity and stop bits; the start bit is not counted.
     uint8_t m_pduBits;
     bool m_intTxEnabled;
-    bool m_rxGPIOHasPullUp;
-    bool m_rxGPIOPullUpEnabled;
-    bool m_txGPIOOpenDrain;
+    bool m_rxGPIOHasPullUp = false;
+    bool m_rxGPIOPullUpEnabled = true;
+    bool m_txGPIOOpenDrain = false;
     Parity m_parityMode;
     uint8_t m_stopBits;
     bool m_lastReadParity;
@@ -367,7 +367,7 @@ private:
     // 1 = positive including 0, 0 = negative.
     std::unique_ptr<circular_queue<uint32_t, UARTBase*> > m_isrBuffer;
     const Delegate<void(uint32_t&&), UARTBase*> m_isrBufferForEachDel = { [](UARTBase* self, uint32_t&& isrTick) { self->rxBits(isrTick); }, this };
-    std::atomic<bool> m_isrOverflow;
+    std::atomic<bool> m_isrOverflow = false;
     uint32_t m_isrLastTick;
     bool m_rxCurParity = false;
     Delegate<void(), void*> m_rxHandler;
