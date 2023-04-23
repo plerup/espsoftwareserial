@@ -251,7 +251,7 @@ public:
 #endif
 
 protected:
-    const T defaultValue = {};
+    const T defaultValue {};
     size_t m_bufSize;
 #if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
     std::unique_ptr<T[]> m_buffer;
