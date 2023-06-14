@@ -24,6 +24,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifdef ESP8266
 #include "interrupts.h"
+#elif defined(__ZEPHYR__)
+#include <zephyr/spinlock.h>
+class lock_guard {
+public:
+    lock_guard(struct k_spinlock& _lock) : lock(_lock) {
+        key = k_spin_lock(&lock);
+    }
+
+    ~lock_guard() {
+        k_spin_unlock(&lock, key);
+    }
+
+protected:
+    struct k_spinlock& lock;
+    k_spinlock_key_t key;
+};
 #else
 #include <mutex>
 #endif
@@ -65,6 +81,8 @@ public:
     {
 #ifdef ESP8266
         esp8266::InterruptLock lock;
+#elif defined(__ZEPHYR__)
+        lock_guard lock(m_pushLock);
 #else
         std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
@@ -83,6 +101,8 @@ public:
     {
 #ifdef ESP8266
         esp8266::InterruptLock lock;
+#elif defined(__ZEPHYR__)
+        lock_guard lock(m_pushLock);
 #else
         std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
@@ -99,6 +119,8 @@ public:
     {
 #ifdef ESP8266
         esp8266::InterruptLock lock;
+#elif defined(__ZEPHYR__)
+        lock_guard lock(m_pushLock);
 #else
         std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
@@ -116,6 +138,8 @@ public:
     {
 #ifdef ESP8266
         esp8266::InterruptLock lock;
+#elif defined(__ZEPHYR__)
+        lock_guard lock(m_pushLock);
 #else
         std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
@@ -138,7 +162,10 @@ public:
     */
     bool for_each_requeue(const Delegate<bool(T&), ForEachArg>& fun);
 
-#ifndef ESP8266
+#ifdef __ZEPHYR__
+protected:
+    struct k_spinlock m_pushLock {};
+#elif !defined(ESP8266)
 protected:
     std::mutex m_pushMtx;
 #endif
@@ -149,6 +176,8 @@ T& circular_queue_mp<T, ForEachArg>::pop_requeue()
 {
 #ifdef ESP8266
     esp8266::InterruptLock lock;
+#elif defined(__ZEPHYR__)
+    lock_guard lock(m_pushLock);
 #else
     std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
@@ -159,8 +188,8 @@ T& circular_queue_mp<T, ForEachArg>::pop_requeue()
     T& val = circular_queue<T, ForEachArg>::m_buffer[inPos] = std::move(circular_queue<T, ForEachArg>::m_buffer[outPos]);
     const auto bufSize = circular_queue<T, ForEachArg>::m_bufSize;
     std::atomic_thread_fence(std::memory_order_release);
-	circular_queue<T, ForEachArg>::m_outPos.store((outPos + 1) % bufSize, std::memory_order_relaxed);
-	circular_queue<T, ForEachArg>::m_inPos.store((inPos + 1) % bufSize, std::memory_order_release);
+        circular_queue<T, ForEachArg>::m_outPos.store((outPos + 1) % bufSize, std::memory_order_relaxed);
+        circular_queue<T, ForEachArg>::m_inPos.store((inPos + 1) % bufSize, std::memory_order_release);
     return val;
 }
 
@@ -177,22 +206,24 @@ bool circular_queue_mp<T, ForEachArg>::for_each_requeue(const Delegate<bool(T&),
         {
 #ifdef ESP8266
             esp8266::InterruptLock lock;
+#elif defined(__ZEPHYR__)
+            lock_guard lock(m_pushLock);
 #else
             std::lock_guard<std::mutex> lock(m_pushMtx);
 #endif
             std::atomic_thread_fence(std::memory_order_release);
             auto inPos = circular_queue<T, ForEachArg>::m_inPos.load(std::memory_order_relaxed);
             std::atomic_thread_fence(std::memory_order_acquire);
-			circular_queue<T, ForEachArg>::m_buffer[inPos] = std::move(val);
+                        circular_queue<T, ForEachArg>::m_buffer[inPos] = std::move(val);
             std::atomic_thread_fence(std::memory_order_release);
-			circular_queue<T, ForEachArg>::m_inPos.store((inPos + 1) % circular_queue<T, ForEachArg>::m_bufSize, std::memory_order_release);
+                        circular_queue<T, ForEachArg>::m_inPos.store((inPos + 1) % circular_queue<T, ForEachArg>::m_bufSize, std::memory_order_release);
         }
         else
         {
             std::atomic_thread_fence(std::memory_order_release);
         }
         outPos = (outPos + 1) % circular_queue<T, ForEachArg>::m_bufSize;
-		circular_queue<T, ForEachArg>::m_outPos.store(outPos, std::memory_order_release);
+                circular_queue<T, ForEachArg>::m_outPos.store(outPos, std::memory_order_release);
     } while (outPos != inPos0);
     return true;
 }
