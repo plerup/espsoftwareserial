@@ -251,7 +251,6 @@ public:
 #endif
 
 protected:
-    const T defaultValue {};
     size_t m_bufSize;
 #if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
     std::unique_ptr<T[]> m_buffer;
@@ -309,7 +308,7 @@ template< typename T, typename ForEachArg >
 T circular_queue<T, ForEachArg>::pop()
 {
     const auto outPos = m_outPos.load(std::memory_order_acquire);
-    if (m_inPos.load(std::memory_order_relaxed) == outPos) return defaultValue;
+    if (m_inPos.load(std::memory_order_relaxed) == outPos) return {};
 
     std::atomic_thread_fence(std::memory_order_acquire);
 

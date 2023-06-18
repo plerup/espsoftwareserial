@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __SoftwareSerial_h
 #define __SoftwareSerial_h
 
-#include "circular_queue/circular_queue.h"
+#include "circular_queue/circular_queue_mp.h"
 #include <Stream.h>
 
 namespace EspSoftwareSerial {
@@ -365,7 +365,7 @@ private:
 #endif
     // the ISR stores the relative bit times in the buffer. The inversion corrected level is used as sign bit (2's complement):
     // 1 = positive including 0, 0 = negative.
-    std::unique_ptr<circular_queue<uint32_t, UARTBase*> > m_isrBuffer;
+    std::unique_ptr<circular_queue_mp<uint32_t, UARTBase*> > m_isrBuffer;
     const Delegate<void(uint32_t&&), UARTBase*> m_isrBufferForEachDel { [](UARTBase* self, uint32_t&& isrTick) { self->rxBits(isrTick); }, this };
     std::atomic<bool> m_isrOverflow { false };
     uint32_t m_isrLastTick;
@@ -442,6 +442,9 @@ extern template void delegate::detail::DelegateImpl<void*, void>::operator()() c
 extern template size_t circular_queue<uint32_t, EspSoftwareSerial::UARTBase*>::available() const;
 extern template bool circular_queue<uint32_t, EspSoftwareSerial::UARTBase*>::push(uint32_t&&);
 extern template bool circular_queue<uint32_t, EspSoftwareSerial::UARTBase*>::push(const uint32_t&);
+extern template size_t circular_queue_mp<uint32_t, EspSoftwareSerial::UARTBase*>::available() const;
+extern template bool circular_queue_mp<uint32_t, EspSoftwareSerial::UARTBase*>::push(uint32_t&&);
+extern template bool circular_queue_mp<uint32_t, EspSoftwareSerial::UARTBase*>::push(const uint32_t&);
 
 #endif // __SoftwareSerial_h
 

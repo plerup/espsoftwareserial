@@ -28,6 +28,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define IRAM_ATTR
 #endif
 
+#if defined(__GNUC__)
+#define ALWAYS_INLINE __attribute__((always_inline))
+#else
+#define ALWAYS_INLINE
+#endif
+
 #if !defined(ARDUINO) || defined(ESP8266) || defined(ESP32)
 #include <functional>
 #include <cstddef>
@@ -39,7 +45,7 @@ namespace
 {
 
     template<typename R, typename... P>
-    __attribute__((always_inline)) inline R IRAM_ATTR vPtrToFunPtrExec(void* fn, P... args)
+    ALWAYS_INLINE inline R IRAM_ATTR vPtrToFunPtrExec(void* fn, P... args)
     {
         using target_type = R(P...);
         return reinterpret_cast<target_type*>(fn)(std::forward<P...>(args...));
@@ -269,7 +275,7 @@ namespace delegate
                 }
             }
 
-            static inline R IRAM_ATTR vPtrToFunAPtrExec(void* self, P... args) __attribute__((always_inline))
+            static inline R IRAM_ATTR vPtrToFunAPtrExec(void* self, P... args) ALWAYS_INLINE
             {
                 return static_cast<DelegatePImpl*>(self)->fnA(
                     static_cast<DelegatePImpl*>(self)->obj,
@@ -515,7 +521,7 @@ namespace delegate
                 }
             }
 
-            static inline R IRAM_ATTR vPtrToFunAPtrExec(void* self, P... args) __attribute__((always_inline))
+            static inline R IRAM_ATTR vPtrToFunAPtrExec(void* self, P... args) ALWAYS_INLINE
             {
                 return static_cast<DelegatePImpl*>(self)->fnA(
                     static_cast<DelegatePImpl*>(self)->obj,
@@ -849,13 +855,13 @@ namespace delegate
                 return *this;
             }
 
-            inline DelegatePImpl& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline))
+            inline DelegatePImpl& IRAM_ATTR operator=(std::nullptr_t) ALWAYS_INLINE
             {
                 fn = nullptr;
                 return *this;
             }
 
-            inline IRAM_ATTR operator bool() const __attribute__((always_inline))
+            inline IRAM_ATTR operator bool() const ALWAYS_INLINE
             {
                 return fn;
             }
@@ -878,7 +884,7 @@ namespace delegate
 	    /// in std::function which may not be ISR-safe or
 	    /// cause linker errors, like l32r relocation errors
 	    /// on the Xtensa ISA.
-            inline R IRAM_ATTR operator()(P... args) const __attribute__((always_inline))
+            inline R IRAM_ATTR operator()(P... args) const ALWAYS_INLINE
             {
                 if (fn) return fn(std::forward<P...>(args...));
                 return R();
@@ -1106,7 +1112,7 @@ namespace delegate
                 }
             }
 
-            static inline R IRAM_ATTR vPtrToFunAPtrExec(void* self) __attribute__((always_inline))
+            static inline R IRAM_ATTR vPtrToFunAPtrExec(void* self) ALWAYS_INLINE
             {
                 return static_cast<DelegateImpl*>(self)->fnA(
                     static_cast<DelegateImpl*>(self)->obj);
@@ -1351,7 +1357,7 @@ namespace delegate
                 }
             }
 
-            static inline R IRAM_ATTR vPtrToFunAPtrExec(void* self) __attribute__((always_inline))
+            static inline R IRAM_ATTR vPtrToFunAPtrExec(void* self) ALWAYS_INLINE
             {
                 return static_cast<DelegateImpl*>(self)->fnA(
                     static_cast<DelegateImpl*>(self)->obj);
@@ -1684,13 +1690,13 @@ namespace delegate
                 return *this;
             }
 
-            inline DelegateImpl& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline))
+            inline DelegateImpl& IRAM_ATTR operator=(std::nullptr_t) ALWAYS_INLINE
             {
                 fn = nullptr;
                 return *this;
             }
 
-            inline IRAM_ATTR operator bool() const __attribute__((always_inline))
+            inline IRAM_ATTR operator bool() const ALWAYS_INLINE
             {
                 return fn;
             }
@@ -1713,7 +1719,7 @@ namespace delegate
 	    /// in std::function which may not be ISR-safe or
 	    /// cause linker errors, like l32r relocation errors
 	    /// on the Xtensa ISA.
-            inline R IRAM_ATTR operator()() const __attribute__((always_inline))
+            inline R IRAM_ATTR operator()() const ALWAYS_INLINE
             {
                 if (fn) return fn();
                 return R();
@@ -1779,7 +1785,7 @@ namespace delegate
                 return *this;
             }
 
-            inline Delegate& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline)) {
+            inline Delegate& IRAM_ATTR operator=(std::nullptr_t) ALWAYS_INLINE {
                 detail::DelegatePImpl<A, R, P...>::operator=(nullptr);
                 return *this;
             }
@@ -1858,7 +1864,7 @@ namespace delegate
                 return *this;
             }
 
-            inline Delegate& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline)) {
+            inline Delegate& IRAM_ATTR operator=(std::nullptr_t) ALWAYS_INLINE {
                 detail::DelegatePImpl<A*, R, P...>::operator=(nullptr);
                 return *this;
             }
@@ -1914,7 +1920,7 @@ namespace delegate
                 return *this;
             }
 
-            inline Delegate& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline)) {
+            inline Delegate& IRAM_ATTR operator=(std::nullptr_t) ALWAYS_INLINE {
                 detail::DelegatePImpl<void, R, P...>::operator=(nullptr);
                 return *this;
             }
@@ -1975,7 +1981,7 @@ namespace delegate
                 return *this;
             }
 
-            inline Delegate& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline)) {
+            inline Delegate& IRAM_ATTR operator=(std::nullptr_t) ALWAYS_INLINE {
                 detail::DelegateImpl<A, R>::operator=(nullptr);
                 return *this;
             }
@@ -2054,7 +2060,7 @@ namespace delegate
                 return *this;
             }
 
-            inline Delegate& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline)) {
+            inline Delegate& IRAM_ATTR operator=(std::nullptr_t) ALWAYS_INLINE {
                 detail::DelegateImpl<A*, R>::operator=(nullptr);
                 return *this;
             }
@@ -2110,7 +2116,7 @@ namespace delegate
                 return *this;
             }
 
-            inline Delegate& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline)) {
+            inline Delegate& IRAM_ATTR operator=(std::nullptr_t) ALWAYS_INLINE {
                 detail::DelegateImpl<void, R>::operator=(nullptr);
                 return *this;
             }
@@ -2155,7 +2161,7 @@ public:
         return *this;
     }
 
-    inline Delegate& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline)) {
+    inline Delegate& IRAM_ATTR operator=(std::nullptr_t) ALWAYS_INLINE {
         delegate::detail::Delegate<A, R, P...>::operator=(nullptr);
         return *this;
     }
@@ -2193,7 +2199,7 @@ public:
         return *this;
     }
 
-    inline Delegate& IRAM_ATTR operator=(std::nullptr_t) __attribute__((always_inline)) {
+    inline Delegate& IRAM_ATTR operator=(std::nullptr_t) ALWAYS_INLINE {
         delegate::detail::Delegate<void, R, P...>::operator=(nullptr);
         return *this;
     }
