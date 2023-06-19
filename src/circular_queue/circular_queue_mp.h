@@ -129,7 +129,8 @@ bool circular_queue_mp<T, ForEachArg>::capacity(const size_t cap)
 {
     if (cap + 1 == circular_queue<T, ForEachArg>::m_bufSize) return true;
     else if (!circular_queue<T, ForEachArg>::capacity(cap)) return false;
-    m_inPos_mp.store(circular_queue<T, ForEachArg>::m_inPos.load(), std::memory_order_relaxed);
+    m_inPos_mp.store(circular_queue<T, ForEachArg>::m_inPos.load(std::memory_order_relaxed),
+        std::memory_order_relaxed);
     m_concurrent_mp.store(0, std::memory_order_relaxed);
     return true;
 }
@@ -156,14 +157,16 @@ bool IRAM_ATTR circular_queue_mp<T, ForEachArg>::push(T&& val)
     do
     {
 #endif
-        inPos_mp = m_inPos_mp.load(std::memory_order_acquire);
+        inPos_mp = m_inPos_mp.load(std::memory_order_relaxed);
         next = (inPos_mp + 1) % circular_queue<T, ForEachArg>::m_bufSize;
         if (next == circular_queue<T, ForEachArg>::m_outPos.load(std::memory_order_relaxed)) {
 #if !defined(ESP32) && defined(ARDUINO)
             return false;
         }
-        m_inPos_mp.store(next);
-        m_concurrent_mp.store(m_concurrent_mp.load() + 1);
+        m_inPos_mp.store(next, std::memory_order_relaxed);
+        m_concurrent_mp.store(m_concurrent_mp.load(std::memory_order_relaxed) + 1,
+            std::memory_order_relaxed);
+        std::atomic_thread_fence(std::memory_order_release);
     }
 #else
             int concurrent_mp;
@@ -183,8 +186,6 @@ bool IRAM_ATTR circular_queue_mp<T, ForEachArg>::push(T&& val)
     while (!m_inPos_mp.compare_exchange_weak(inPos_mp, next));
 #endif
 
-    std::atomic_thread_fence(std::memory_order_acquire);
-
     circular_queue<T, ForEachArg>::m_buffer[inPos_mp] = std::move(val);
 
     std::atomic_thread_fence(std::memory_order_release);
@@ -192,12 +193,14 @@ bool IRAM_ATTR circular_queue_mp<T, ForEachArg>::push(T&& val)
 #if !defined(ESP32) && defined(ARDUINO)
     {
         InterruptLock lock;
-        if (1 == m_concurrent_mp.load())
+        if (1 == m_concurrent_mp.load(std::memory_order_relaxed))
         {
-            inPos_mp = m_inPos_mp.load(std::memory_order_acquire);
-            circular_queue<T, ForEachArg>::m_inPos.store(inPos_mp, std::memory_order_release);
+            inPos_mp = m_inPos_mp.load(std::memory_order_relaxed);
+            circular_queue<T, ForEachArg>::m_inPos.store(inPos_mp, std::memory_order_relaxed);
         }
-        m_concurrent_mp.store(m_concurrent_mp.load() - 1);
+        m_concurrent_mp.store(m_concurrent_mp.load(std::memory_order_relaxed) - 1,
+            std::memory_order_relaxed);
+        std::atomic_thread_fence(std::memory_order_release);
     }
 #else
     int concurrent_mp;
@@ -232,7 +235,7 @@ size_t circular_queue_mp<T, ForEachArg>::push_n(const T* buffer, size_t size)
     do
     {
 #endif
-        inPos_mp = m_inPos_mp.load(std::memory_order_acquire);
+        inPos_mp = m_inPos_mp.load(std::memory_order_relaxed);
         blockSize = (outPos > inPos_mp) ? outPos - 1 - inPos_mp : (outPos == 0) ? circular_queue<T, ForEachArg>::m_bufSize - 1 - inPos_mp : circular_queue<T, ForEachArg>::m_bufSize - inPos_mp;
         blockSize = min(size, blockSize);
         if (!blockSize)
@@ -241,8 +244,10 @@ size_t circular_queue_mp<T, ForEachArg>::push_n(const T* buffer, size_t size)
             return 0;
         }
         next = (inPos_mp + blockSize) % circular_queue<T, ForEachArg>::m_bufSize;
-        m_inPos_mp.store(next);
-        m_concurrent_mp.store(m_concurrent_mp.load() + 1);
+        m_inPos_mp.store(next, std::memory_order_relaxed);
+        m_concurrent_mp.store(m_concurrent_mp.load(std::memory_order_relaxed) + 1,
+            std::memory_order_relaxed);
+        std::atomic_thread_fence(std::memory_order_release);
     }
 #else
             int concurrent_mp = m_concurrent_mp.load();
@@ -262,8 +267,6 @@ size_t circular_queue_mp<T, ForEachArg>::push_n(const T* buffer, size_t size)
     while (!m_inPos_mp.compare_exchange_weak(inPos_mp, next));
 #endif
 
-    std::atomic_thread_fence(std::memory_order_acquire);
-
     auto dest = circular_queue<T, ForEachArg>::m_buffer.get() + inPos_mp;
     std::copy_n(std::make_move_iterator(buffer), blockSize, dest);
     size = min(size - blockSize, outPos > 1 ? static_cast<size_t>(outPos - next - 1) : 0);
@@ -276,12 +279,14 @@ size_t circular_queue_mp<T, ForEachArg>::push_n(const T* buffer, size_t size)
 #if !defined(ESP32) && defined(ARDUINO)
     {
         InterruptLock lock;
-        if (1 == m_concurrent_mp.load())
+        if (1 == m_concurrent_mp.load(std::memory_order_relaxed))
         {
-            inPos_mp = m_inPos_mp.load(std::memory_order_acquire);
-            circular_queue<T, ForEachArg>::m_inPos.store(inPos_mp, std::memory_order_release);
+            inPos_mp = m_inPos_mp.load(std::memory_order_relaxed);
+            circular_queue<T, ForEachArg>::m_inPos.store(inPos_mp, std::memory_order_relaxed);
         }
-        m_concurrent_mp.store(m_concurrent_mp.load() - 1);
+        m_concurrent_mp.store(m_concurrent_mp.load(std::memory_order_relaxed) - 1,
+            std::memory_order_relaxed);
+        std::atomic_thread_fence(std::memory_order_release);
     }
 #else
     int concurrent_mp;
