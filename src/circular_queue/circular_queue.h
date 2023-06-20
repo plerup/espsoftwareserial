@@ -38,6 +38,12 @@ using std::min;
 #define IRAM_ATTR
 #endif
 
+#if defined(__GNUC__)
+#define ALWAYS_INLINE __attribute__((always_inline))
+#else
+#define ALWAYS_INLINE
+#endif
+
 /*!
     @brief	Instance class for a single-producer, single-consumer circular queue / ring buffer (FIFO).
             This implementation is lock-free between producer and consumer for the available(), peek(),
@@ -188,7 +194,7 @@ public:
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
-    bool IRAM_ATTR push(const T& val)
+    inline bool IRAM_ATTR push(const T& val) ALWAYS_INLINE
     {
         T v(val);
         return push(std::move(v));
