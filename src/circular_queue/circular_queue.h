@@ -39,9 +39,10 @@ using std::min;
 #endif
 
 #if defined(__GNUC__)
-#define ALWAYS_INLINE __attribute__((always_inline))
+#undef ALWAYS_INLINE_ATTR
+#define ALWAYS_INLINE_ATTR __attribute__((always_inline))
 #else
-#define ALWAYS_INLINE
+#define ALWAYS_INLINE_ATTR
 #endif
 
 /*!
@@ -194,7 +195,7 @@ public:
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
-    inline bool IRAM_ATTR push(const T& val) ALWAYS_INLINE
+    inline bool IRAM_ATTR push(const T& val) ALWAYS_INLINE_ATTR
     {
         T v(val);
         return push(std::move(v));

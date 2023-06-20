@@ -70,11 +70,11 @@ public:
     T& pushpeek() = delete;
     bool push() = delete;
 
-    inline size_t IRAM_ATTR available() const ALWAYS_INLINE
+    inline size_t IRAM_ATTR available() const ALWAYS_INLINE_ATTR
     {
         return circular_queue<T, ForEachArg>::available();
     }
-    inline size_t IRAM_ATTR available_for_push() const ALWAYS_INLINE
+    inline size_t IRAM_ATTR available_for_push() const ALWAYS_INLINE_ATTR
     {
         return circular_queue<T, ForEachArg>::available_for_push();
     }
@@ -102,7 +102,7 @@ public:
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
-    inline bool IRAM_ATTR push(const T& val) ALWAYS_INLINE
+    inline bool IRAM_ATTR push(const T& val) ALWAYS_INLINE_ATTR
     {
         T v(val);
         return push(std::move(v));

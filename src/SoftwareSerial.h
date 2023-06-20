@@ -318,10 +318,10 @@ private:
     static void rxBitISR(UARTBase* self);
     static void rxBitSyncISR(UARTBase* self);
 
-    static inline uint32_t IRAM_ATTR microsToTicks(uint32_t micros) __attribute__((always_inline)) {
+    static inline uint32_t IRAM_ATTR microsToTicks(uint32_t micros) ALWAYS_INLINE_ATTR {
         return micros << 1;
     }
-    static inline uint32_t ticksToMicros(uint32_t ticks) __attribute__((always_inline)) {
+    static inline uint32_t ticksToMicros(uint32_t ticks) ALWAYS_INLINE_ATTR {
         return ticks >> 1;
     }
 

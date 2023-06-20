@@ -31,7 +31,7 @@ uint32_t UARTBase::m_savedPS = 0;
 portMUX_TYPE UARTBase::m_interruptsMux = portMUX_INITIALIZER_UNLOCKED;
 #endif
 
-__attribute__((always_inline)) inline void IRAM_ATTR UARTBase::disableInterrupts()
+ALWAYS_INLINE_ATTR inline void IRAM_ATTR UARTBase::disableInterrupts()
 {
 #ifndef ESP32
     m_savedPS = xt_rsil(15);
@@ -40,7 +40,7 @@ __attribute__((always_inline)) inline void IRAM_ATTR UARTBase::disableInterrupts
 #endif
 }
 
-__attribute__((always_inline)) inline void IRAM_ATTR UARTBase::restoreInterrupts()
+ALWAYS_INLINE_ATTR inline void IRAM_ATTR UARTBase::restoreInterrupts()
 {
 #ifndef ESP32
     xt_wsr_ps(m_savedPS);
