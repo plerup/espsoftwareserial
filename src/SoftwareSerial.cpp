@@ -304,7 +304,7 @@ void IRAM_ATTR UARTBase::writePeriod(
             GPOS = m_txBitMask;
         }
 #else
-        *m_txReg |= m_txBitMask;
+        *m_txReg = *m_txReg | m_txBitMask;
 #endif
         m_periodDuration += dutyCycle;
         if (offCycle || (withStopBit && !m_invert)) {
@@ -326,7 +326,7 @@ void IRAM_ATTR UARTBase::writePeriod(
             GPOC = m_txBitMask;
         }
 #else
-        *m_txReg &= ~m_txBitMask;
+        *m_txReg = *m_txReg & ~m_txBitMask;
 #endif
         m_periodDuration += offCycle;
         if (withStopBit && m_invert) lazyDelay();
