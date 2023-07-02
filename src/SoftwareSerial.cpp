@@ -102,7 +102,7 @@ void UARTBase::beginRx(bool hasPullUp, int bufCapacity, int isrBufCapacity) {
         m_parityBuffer.reset(new circular_queue<uint8_t>((m_buffer->capacity() + 7) / 8));
         m_parityInPos = m_parityOutPos = 1;
     }
-    m_isrBuffer.reset(new circular_queue_mp<uint32_t, UARTBase*>((isrBufCapacity > 0) ?
+    m_isrBuffer.reset(new circular_queue<uint32_t, UARTBase*>((isrBufCapacity > 0) ?
         isrBufCapacity : m_buffer->capacity() * (2 + m_dataBits + static_cast<bool>(m_parityMode))));
     if (m_buffer && (!m_parityMode || m_parityBuffer) && m_isrBuffer) {
         m_rxValid = true;
@@ -616,8 +616,4 @@ template void IRAM_ATTR delegate::detail::DelegateImpl<void*, void>::operator()(
 template size_t IRAM_ATTR circular_queue<uint32_t, UARTBase*>::available() const;
 template bool IRAM_ATTR circular_queue<uint32_t, UARTBase*>::push(uint32_t&&);
 template bool IRAM_ATTR circular_queue<uint32_t, UARTBase*>::push(const uint32_t&);
-template size_t IRAM_ATTR circular_queue_mp<uint32_t, UARTBase*>::available() const;
-template bool IRAM_ATTR circular_queue_mp<uint32_t, UARTBase*>::push(uint32_t&&);
-template bool IRAM_ATTR circular_queue_mp<uint32_t, UARTBase*>::push(const uint32_t&);
-
 
