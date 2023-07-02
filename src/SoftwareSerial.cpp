@@ -606,6 +606,7 @@ void UARTBase::onReceive(Delegate<void(), void*>&& handler) {
     restoreInterrupts();
 }
 
+#if __GNUC__ < 12
 // The template member functions below must be in IRAM, but due to a bug GCC doesn't currently
 // honor the attribute. Instead, it is possible to do explicit specialization and adorn
 // these with the IRAM attribute:
@@ -616,4 +617,5 @@ template void IRAM_ATTR delegate::detail::DelegateImpl<void*, void>::operator()(
 template size_t IRAM_ATTR circular_queue<uint32_t, UARTBase*>::available() const;
 template bool IRAM_ATTR circular_queue<uint32_t, UARTBase*>::push(uint32_t&&);
 template bool IRAM_ATTR circular_queue<uint32_t, UARTBase*>::push(const uint32_t&);
+#endif // __GNUC__ < 12
 

@@ -432,6 +432,7 @@ using UART = BasicUART< GpioCapabilities >;
 using SoftwareSerial = EspSoftwareSerial::UART;
 using namespace EspSoftwareSerial;
 
+#if __GNUC__ < 12
 // The template member functions below must be in IRAM, but due to a bug GCC doesn't currently
 // honor the attribute. Instead, it is possible to do explicit specialization and adorn
 // these with the IRAM attribute:
@@ -442,6 +443,7 @@ extern template void delegate::detail::DelegateImpl<void*, void>::operator()() c
 extern template size_t circular_queue<uint32_t, EspSoftwareSerial::UARTBase*>::available() const;
 extern template bool circular_queue<uint32_t, EspSoftwareSerial::UARTBase*>::push(uint32_t&&);
 extern template bool circular_queue<uint32_t, EspSoftwareSerial::UARTBase*>::push(const uint32_t&);
+#endif // __GNUC__ < 12
 
 #endif // __SoftwareSerial_h
 
