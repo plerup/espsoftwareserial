@@ -45,6 +45,24 @@ namespace std
         atomic(T desired) { value = desired; }
         void store(T desired, std::memory_order = std::memory_order_seq_cst) volatile noexcept { value = desired; }
         T load(std::memory_order = std::memory_order_seq_cst) const volatile noexcept { return value; }
+        T exchange(T desired, std::memory_order = std::memory_order_seq_cst) const volatile noexcept {
+            noInterrupts();
+            T orig = value;
+            value = desired;
+            interrupts();
+            return orig;
+        }
+        bool compare_exchange_strong(T& expected, T desired, std::memory_order order = std::memory_order_seq_cst) volatile noexcept {
+            noInterrupts();
+            const bool equal = value == expected;
+            if (equal) value = desired;
+            else expected = value;
+            interrupts();
+            return equal;
+        }
+        bool compare_exchange_weak(T& expected, T desired, std::memory_order order = std::memory_order_seq_cst) volatile noexcept {
+            return compare_exchange_strong(expected, desired, order);
+        };
     };
     inline void atomic_thread_fence(std::memory_order order) noexcept {}
     template< typename T > T&& move(T& t) noexcept { return static_cast<T&&>(t); }
