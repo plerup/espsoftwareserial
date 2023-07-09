@@ -1,0 +1,78 @@
+#pragma once
+
+#include <atomic>
+#include <memory>
+
+namespace ghostl
+{
+	template <typename T>
+	struct generator
+	{
+		struct promise_type
+		{
+			T value;
+			std::exception_ptr exception;
+
+			generator get_return_object()
+			{
+				return generator(std::coroutine_handle<promise_type>::from_promise(*this));
+			}
+			std::suspend_always initial_suspend() { return {}; }
+			std::suspend_always final_suspend() noexcept { return {}; }
+			void unhandled_exception() { exception = std::current_exception(); }
+
+			template <std::convertible_to<T> From> // C++20 concept
+			std::suspend_always yield_value(From&& from)
+			{
+				value = std::forward<From>(from); // caching the result in promise
+				return {};
+			}
+			void return_void() { }
+		};
+
+		std::coroutine_handle<promise_type> coroutine;
+
+		generator() noexcept : coroutine(nullptr) {}
+		explicit generator(std::coroutine_handle<promise_type> h) : coroutine(h) { }
+		generator(const generator&) = delete;
+		generator(generator&& other) noexcept : coroutine(std::exchange(other.coroutine, nullptr)), full(other.full) {};
+		~generator() { if (coroutine) coroutine.destroy(); }
+		generator& operator=(const generator&) = delete;
+		generator& operator=(generator&& other) noexcept
+		{
+			if (std::addressof(other) != this)
+			{
+				if (coroutine) coroutine.destroy();
+				coroutine = std::exchange(other.coroutine, nullptr);
+				full = other.full;
+			}
+			return *this;
+		}
+		explicit operator bool()
+		{
+			fill();
+			return !coroutine.done();
+		}
+		T operator()()
+		{
+			fill();
+			full = false;
+			return std::move(coroutine.promise().value);
+		}
+
+	private:
+		bool full = false;
+
+		void fill()
+		{
+			if (!full)
+			{
+				coroutine();
+				// propagate coroutine exception in called context
+				if (coroutine.promise().exception)
+					std::rethrow_exception(coroutine.promise().exception);
+				full = true;
+			}
+		}
+	};
+} // namespace ghostl
