@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <memory>
+#include <concepts>
 
 namespace ghostl
 {
@@ -10,7 +11,7 @@ namespace ghostl
 	{
 		struct promise_type
 		{
-			T value;
+			T value {};
 			std::exception_ptr exception;
 
 			generator get_return_object()

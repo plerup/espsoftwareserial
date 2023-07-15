@@ -1,51 +1,93 @@
 #pragma once
 
-#include <atomic>
-#include <memory>
 #include "task.h"
 #include "task_completion_source.h"
 
+#include <vector>
+
 namespace ghostl
 {
-	template<typename T>
+	template<typename T = void>
 	struct when_all
 	{
-		std::vector<ghostl::task<void>> continuations;
-		std::atomic<size_t> completedCnt;
-		ghostl::task_completion_source<std::string> tcs;
+		std::vector<ghostl::task<>> continuations;
+		std::vector<T> results;
+		std::atomic<size_t> remainingCnt{ 0 };
+		ghostl::task_completion_source<std::vector<T>> tcs;
 
-		static auto run_task(
-			T& t,
-			std::atomic<size_t>& completedCnt,
-			ghostl::task_completion_source<std::string> tcs) -> ghostl::task<void>
+		auto run_task(ghostl::task<T> t, size_t pos) -> ghostl::task<>
 		{
-			co_await t;
-			if (--completedCnt == 0)
+			results[pos] = std::move(co_await t);
+			if (--remainingCnt == 0)
 			{
-				Serial.println("when_all: completed");
-				tcs.set_value("hello");
+				tcs.set_value(std::move(results));
 				if (auto handle = tcs.handle(); handle && !handle.done()) {
-					Serial.println("handle.resume");
 					handle.resume();
-					Serial.println("handle.resumed");
 				}
 			}
+			co_return;
 		}
 
 		when_all() = delete;
-		explicit when_all(std::vector<T>& tasks) : completedCnt(tasks.size())
+		template<typename C> explicit when_all(C&& tasks)
 		{
-			for (size_t i = 0; i < tasks.size(); ++i)
+			for (auto& task : tasks)
 			{
-				continuations.emplace_back(run_task(tasks[i], completedCnt, tcs));
-				continuations[i].resume();
+				continuations.emplace_back(run_task(std::exchange(task, {}), remainingCnt++));
+			}
+			results.resize(remainingCnt);
+			for (auto& task : continuations)
+			{
+				task.resume();
 			}
 		}
-		when_all(const when_all& other) = default;
-		when_all(when_all&& other) = default;
-		when_all& operator=(when_all& other) = default;
-		when_all& operator=(when_all&& other) = default;
-		auto token() {
+		when_all(const when_all& other) = delete;
+		when_all(when_all&& other) = delete;
+		when_all& operator=(when_all& other) = delete;
+		when_all& operator=(when_all&& other) = delete;
+		auto operator ()() {
+			return tcs.token();
+		}
+	};
+
+	template<>
+	struct when_all<>
+	{
+		std::vector<ghostl::task<>> continuations;
+		std::atomic<size_t> remainingCnt{ 0 };
+		ghostl::task_completion_source<> tcs;
+
+		auto run_task(ghostl::task<> t) -> ghostl::task<>
+		{
+			co_await t;
+			if (--remainingCnt == 0)
+			{
+				tcs.set_value();
+				if (auto handle = tcs.handle(); handle && !handle.done()) {
+					handle.resume();
+				}
+			}
+			co_return;
+		}
+
+		when_all() = delete;
+		template<typename C> explicit when_all(C&& tasks)
+		{
+			for (auto& task : tasks)
+			{
+				continuations.emplace_back(run_task(std::exchange(task, {})));
+				++remainingCnt;
+			}
+			for (auto& task : continuations)
+			{
+				task.resume();
+			}
+		}
+		when_all(const when_all& other) = delete;
+		when_all(when_all&& other) = delete;
+		when_all& operator=(when_all& other) = delete;
+		when_all& operator=(when_all&& other) = delete;
+		auto operator ()() {
 			return tcs.token();
 		}
 	};
