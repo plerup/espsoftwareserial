@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
 #include <atomic>
 #else
-#include "circular_queue/ghostl.h"
+#include "ghostl.h"
 #endif
 
 #if defined(ESP8266)
