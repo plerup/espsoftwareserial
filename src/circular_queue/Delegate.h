@@ -1,3 +1,4 @@
+#pragma once
 /*
 Delegate.h - An efficient interchangeable C function ptr and C++ std::function delegate
 Copyright (c) 2019 Dirk O. Kaar. All rights reserved.

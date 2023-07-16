@@ -1,3 +1,4 @@
+#pragma once
 /*
 circular_queue_mp.h - Implementation of a lock-free circular queue for EspSoftwareSerial.
 Copyright (c) 2019 Dirk O. Kaar. All rights reserved.

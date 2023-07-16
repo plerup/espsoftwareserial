@@ -1,3 +1,4 @@
+#pragma once
 /*
 MultiDelegate.h - A queue or event multiplexer based on the efficient Delegate
 class

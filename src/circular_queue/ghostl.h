@@ -1,3 +1,4 @@
+#pragma once
 /*
 ghostl.h - Implementation of a bare-bones, mostly no-op, C++ STL shell
            that allows building some Arduino ESP8266/ESP32
