@@ -18,12 +18,35 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+#include "task_completion_source.h"
+#include "circular_queue_mp.h"
+
 #include <atomic>
 #include <memory>
 
 namespace ghostl
 {
     struct cancellation_token_source;
+
+    struct cancellation_state
+    {
+        void cancel()
+        {
+            cancelled.store(true);
+            queue.for_each([](task_completion_source<bool>&& tcs) { tcs.set_value(true); });
+        }
+        [[nodiscard]] auto is_cancellation_requested() const
+        {
+            return cancelled.load();
+        }
+        [[nodiscard]] auto is_cancellation_requested(task_completion_source<bool>&& tcs)
+        {
+            queue.push(std::move(tcs));
+            return tcs.token();
+        }
+        std::atomic<bool> cancelled{ false };
+        circular_queue_mp<task_completion_source<bool>> queue;
+    };
 
     struct cancellation_token
     {
@@ -35,14 +58,14 @@ namespace ghostl
         cancellation_token(cancellation_token&& other) noexcept = default;
         auto operator=(const cancellation_token&)->cancellation_token & = default;
         auto operator=(cancellation_token&& other) noexcept -> cancellation_token & = default;
-        [[nodiscard]] bool is_cancellation_requested() const
+        [[nodiscard]] auto is_cancellation_requested() const
         {
-            return state && state->load();
+            return state && state->is_cancellation_requested();
         }
     private:
         friend cancellation_token_source;
-        std::shared_ptr<std::atomic<bool>> state;
-        cancellation_token(decltype(state) _state) : state(_state) {}
+        std::shared_ptr<cancellation_state> state;
+        cancellation_token(decltype(state) _state) : state(std::move(_state)) {}
     };
 
     struct cancellation_token_source
@@ -54,14 +77,14 @@ namespace ghostl
         auto operator=(cancellation_token_source&& other) noexcept -> cancellation_token_source & = default;
         void cancel()
         {
-            state->store(true);
+            state->cancel();
         }
-        [[nodiscard]] bool is_cancellation_requested() const
+        [[nodiscard]] auto is_cancellation_requested() const
         {
-            return state->load();
+            return state->is_cancellation_requested();
         }
         [[nodiscard]] auto token() const { return cancellation_token(state); }
     private:
-        decltype(cancellation_token::state) state{ std::make_shared<std::atomic<bool>>(false) };
+        decltype(cancellation_token::state) state{ std::make_shared<cancellation_state>() };
 	};
 } // namespace ghostl
