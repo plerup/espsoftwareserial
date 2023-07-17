@@ -30,6 +30,10 @@ namespace ghostl
 
     struct cancellation_state
     {
+        ~cancellation_state()
+        {
+            queue.for_each([](task_completion_source<bool>&& tcs) { tcs.set_value(false); });
+        }
         void cancel()
         {
             cancelled.store(true);
@@ -39,8 +43,9 @@ namespace ghostl
         {
             return cancelled.load();
         }
-        [[nodiscard]] auto is_cancellation_requested(task_completion_source<bool>&& tcs)
+        [[nodiscard]] auto token()
         {
+            task_completion_source<bool> tcs;
             queue.push(std::move(tcs));
             return tcs.token();
         }
@@ -62,6 +67,15 @@ namespace ghostl
         {
             return state && state->is_cancellation_requested();
         }
+        [[nodiscard]] ghostl::task<bool> cancellation_request() const
+        {
+            if (!state) co_return false;
+            if (state->is_cancellation_requested()) co_return true;
+            auto token = state->token();
+            // if concurrently cancelled, re-cancel to force processing of the new token. 
+            if (state->is_cancellation_requested()) state->cancel();
+            co_return co_await token;
+        }
     private:
         friend cancellation_token_source;
         std::shared_ptr<cancellation_state> state;
@@ -71,11 +85,11 @@ namespace ghostl
     struct cancellation_token_source
 	{
         explicit cancellation_token_source() {}
-        cancellation_token_source(const cancellation_token_source&) = delete;
+        cancellation_token_source(const cancellation_token_source&) = default;
         cancellation_token_source(cancellation_token_source&& other) noexcept = default;
-        auto operator=(const cancellation_token_source&)->cancellation_token_source & = delete;
+        auto operator=(const cancellation_token_source&)->cancellation_token_source & = default;
         auto operator=(cancellation_token_source&& other) noexcept -> cancellation_token_source & = default;
-        void cancel()
+        void cancel() const
         {
             state->cancel();
         }
