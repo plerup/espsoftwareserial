@@ -44,9 +44,6 @@ namespace ghostl
 			if (auto isCompleted = completed->exchange(true); !isCompleted)
 			{
 				tcs.set_value(std::move(result));
-				if (auto handle = tcs.handle(); handle && !handle.done()) {
-					handle.resume();
-				}
 			}
 			co_return;
 		}
@@ -92,9 +89,6 @@ namespace ghostl
 			if (auto isCompleted = completed->exchange(true); !isCompleted)
 			{
 				tcs.set_value();
-				if (auto handle = tcs.handle(); handle && !handle.done()) {
-					handle.resume();
-				}
 			}
 			co_return;
 		}

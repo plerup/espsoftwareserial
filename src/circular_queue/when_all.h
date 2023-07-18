@@ -39,9 +39,6 @@ namespace ghostl
 			if (--remainingCnt == 0)
 			{
 				tcs.set_value(std::move(results));
-				if (auto handle = tcs.handle(); handle && !handle.done()) {
-					handle.resume();
-				}
 			}
 			co_return;
 		}
@@ -81,9 +78,6 @@ namespace ghostl
 			if (--remainingCnt == 0)
 			{
 				tcs.set_value();
-				if (auto handle = tcs.handle(); handle && !handle.done()) {
-					handle.resume();
-				}
 			}
 			co_return;
 		}

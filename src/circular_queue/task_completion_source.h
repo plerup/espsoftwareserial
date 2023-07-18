@@ -73,6 +73,7 @@ public:
         state->value = std::make_shared<T>(v);
         std::atomic_thread_fence(std::memory_order_release);
         for (bool expect{false}; !state->ready.compare_exchange_weak(expect, true); expect = false) {}
+        if (auto handle = state->coroutine.load(); handle && !handle.done()) { handle.resume(); }
     }
     void set_value(T&& v) const
     {
@@ -81,8 +82,8 @@ public:
         state->value = std::make_shared<T>(std::move(v));
         std::atomic_thread_fence(std::memory_order_release);
         for (bool expect{false}; !state->ready.compare_exchange_weak(expect, true); expect = false) {}
+        if (auto handle = state->coroutine.load(); handle && !handle.done()) { handle.resume(); }
     }
-    auto               handle() const { return state->coroutine.load(); }
     [[nodiscard]] auto token() { return awaiter(state); }
 };
 
@@ -133,8 +134,8 @@ public:
             return;
         std::atomic_thread_fence(std::memory_order_release);
         for (bool expect{false}; !state->ready.compare_exchange_weak(expect, true); expect = false) {}
+        if (auto handle = state->coroutine.load(); handle && !handle.done()) { handle.resume(); }
     }
-    auto               handle() const { return state->coroutine.load(); }
     [[nodiscard]] auto token() { return awaiter(state); }
 };
 
