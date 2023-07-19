@@ -65,7 +65,7 @@ namespace ghostl
 		task() noexcept : coroutine(nullptr) {}
 		explicit task(std::coroutine_handle<promise_type> h) : coroutine(h) {}
 		task(const task&) = delete;
-		task(task&& other) noexcept : coroutine(std::exchange(other.coroutine, nullptr)) {};
+		task(task&& other) noexcept : coroutine(std::exchange(other.coroutine, nullptr)) {}
 		~task() { if (coroutine) coroutine.destroy(); }
 		task& operator=(const task&) = delete;
 		task& operator=(task&& other) noexcept
@@ -145,7 +145,7 @@ namespace ghostl
 		task() noexcept : coroutine(nullptr) {}
 		explicit task(std::coroutine_handle<promise_type> h) : coroutine(h) {}
 		task(const task&) = delete;
-		task(task&& other) noexcept : coroutine(std::exchange(other.coroutine, nullptr)) {};
+		task(task&& other) noexcept : coroutine(std::exchange(other.coroutine, nullptr)) {}
 		~task() { if (coroutine) coroutine.destroy(); }
 		task& operator=(const task&) = delete;
 		task& operator=(task&& other) noexcept
