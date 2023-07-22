@@ -104,7 +104,7 @@ private:
     };
     struct awaiter
     {
-        explicit awaiter(std::shared_ptr<state_type>& _state) : state(_state) {}
+        explicit awaiter(std::shared_ptr<state_type> _state) : state(std::move(_state)) {}
         awaiter(const awaiter&)           = default;
         awaiter(awaiter&& other) noexcept = default;
         auto                        operator=(const awaiter&) -> awaiter& = default;

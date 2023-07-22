@@ -264,6 +264,7 @@ size_t circular_queue_mp<T, ForEachArg>::push_n(const T* buffer, size_t size)
             while (!m_concurrent_mp.compare_exchange_weak(concurrent_mp, concurrent_mp - 1));
             return false;
         }
+        next = (inPos_mp + blockSize) % circular_queue<T, ForEachArg>::m_bufSize;
     }
     while (!m_inPos_mp.compare_exchange_weak(inPos_mp, next));
 #endif

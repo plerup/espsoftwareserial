@@ -18,7 +18,7 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include "task.h"
+#include "run_task.h"
 #include "task_completion_source.h"
 
 #include <vector>
@@ -28,37 +28,36 @@ namespace ghostl
 	template<typename T = void>
 	struct when_any
 	{
-		std::shared_ptr<std::vector<ghostl::task<>>> continuations{
-			std::make_shared<std::vector<ghostl::task<>>>() };
+		std::shared_ptr<std::vector<ghostl::run_task<T>>> continuations{
+			std::make_shared<std::vector<ghostl::run_task<T>>>() };
 		std::shared_ptr<std::atomic<bool>> completed{
 			std::make_shared<std::atomic<bool>>(false) };
 		ghostl::task_completion_source<T> tcs{};
 
-		auto run_task(ghostl::task<T> t,
-			std::shared_ptr<std::vector<ghostl::task<>>> _continuations,
-			std::shared_ptr<std::atomic<bool>> _completed) -> ghostl::task<>
+		static auto continuation(T result,
+			std::shared_ptr<std::atomic<bool>> completed,
+			ghostl::task_completion_source<T> tcs) -> void
 		{
-			auto continuations = std::move(_continuations);
-			auto completed = std::move(_completed);
-			auto result = std::move(co_await t);
 			if (auto isCompleted = completed->exchange(true); !isCompleted)
 			{
 				tcs.set_value(std::move(result));
 			}
-			co_return;
 		}
 
 		when_any() = delete;
 		template<typename C> explicit when_any(C&& tasks)
 		{
 			auto completed = this->completed;
-			for (auto& task : tasks)
+			auto tcs = this->tcs;
+			for (ghostl::task<T>& task : tasks)
 			{
-				continuations->emplace_back(run_task(std::exchange(task, {}), continuations, completed));
+				auto runner = ghostl::run_task<T>(std::move(std::exchange(task, {})));
+				runner.continue_with([completed, tcs](T result) { continuation(result, completed, tcs); });
+				continuations->emplace_back(std::move(runner));
 			}
-			for (auto& task : *continuations)
+			for (auto& runner : *continuations)
 			{
-				task.resume();
+				runner.resume();
 			}
 		}
 		when_any(const when_any& other) = delete;
@@ -69,41 +68,39 @@ namespace ghostl
 			return tcs.token();
 		}
 	};
-
 	template<>
-	struct when_any<>
+	struct when_any<void>
 	{
-		std::shared_ptr<std::vector<ghostl::task<>>> continuations{
-			std::make_shared<std::vector<ghostl::task<>>>() };
+		std::shared_ptr<std::vector<ghostl::run_task<>>> continuations{
+			std::make_shared<std::vector<ghostl::run_task<>>>() };
 		std::shared_ptr<std::atomic<bool>> completed{
 			std::make_shared<std::atomic<bool>>(false) };
 		ghostl::task_completion_source<> tcs{};
 
-		auto run_task(ghostl::task<> t,
-			std::shared_ptr<std::vector<ghostl::task<>>> _continuations,
-			std::shared_ptr<std::atomic<bool>> _completed) -> ghostl::task<>
+		static auto continuation(
+			std::shared_ptr<std::atomic<bool>> completed,
+			ghostl::task_completion_source<> tcs) -> void
 		{
-			auto continuations = std::move(_continuations);
-			auto completed = std::move(_completed);
-			co_await t;
 			if (auto isCompleted = completed->exchange(true); !isCompleted)
 			{
 				tcs.set_value();
 			}
-			co_return;
 		}
 
 		when_any() = delete;
 		template<typename C> explicit when_any(C&& tasks)
 		{
 			auto completed = this->completed;
-			for (auto& task : tasks)
+			auto tcs = this->tcs;
+			for (ghostl::task<>& task : tasks)
 			{
-				continuations->emplace_back(run_task(std::exchange(task, {}), continuations, completed));
+				auto runner = ghostl::run_task<>(std::move(std::exchange(task, {})));
+				runner.continue_with([completed, tcs]() { continuation(completed, tcs); });
+				continuations->emplace_back(std::move(runner));
 			}
-			for (auto& task : *continuations)
+			for (auto& runner : *continuations)
 			{
-				task.resume();
+				runner.resume();
 			}
 		}
 		when_any(const when_any& other) = delete;

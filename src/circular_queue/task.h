@@ -32,11 +32,11 @@ namespace ghostl
 			{
 				return task(std::coroutine_handle<promise_type>::from_promise(*this));
 			}
-			std::suspend_always initial_suspend() { return {}; }
+			constexpr std::suspend_always initial_suspend() { return {}; }
 			struct final_awaiter
 			{
-				bool await_ready() noexcept { return false; }
-				void await_resume() noexcept {}
+				constexpr bool await_ready() noexcept { return false; }
+				constexpr void await_resume() noexcept {}
 				std::coroutine_handle<>
 					await_suspend(std::coroutine_handle<promise_type> h) noexcept
 				{
@@ -55,7 +55,7 @@ namespace ghostl
 				}
 			};
 			final_awaiter final_suspend() noexcept { return {}; }
-			void unhandled_exception() { throw; }
+			void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
 			void return_value(T value) { result = std::move(value); }
 
 			T result;
@@ -80,7 +80,7 @@ namespace ghostl
 
 		struct awaiter
 		{
-			bool await_ready() { return false; }
+			constexpr bool await_ready() { return false; }
 			T await_resume() { return std::move(coroutine.promise().result); }
 			auto await_suspend(std::coroutine_handle<> h)
 			{
@@ -113,11 +113,11 @@ namespace ghostl
 			{
 				return task(std::coroutine_handle<promise_type>::from_promise(*this));
 			}
-			std::suspend_always initial_suspend() { return {}; }
+			constexpr std::suspend_always initial_suspend() { return {}; }
 			struct final_awaiter
 			{
-				bool await_ready() noexcept { return false; }
-				void await_resume() noexcept {}
+				constexpr bool await_ready() noexcept { return false; }
+				constexpr void await_resume() noexcept {}
 				std::coroutine_handle<>
 					await_suspend(std::coroutine_handle<promise_type> h) noexcept
 				{
@@ -136,8 +136,8 @@ namespace ghostl
 				}
 			};
 			final_awaiter final_suspend() noexcept { return {}; }
-			void unhandled_exception() { throw; }
-			void return_void() { }
+			void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
+			constexpr void return_void() { }
 
 			std::coroutine_handle<> previous;
 		};
@@ -160,7 +160,7 @@ namespace ghostl
 
 		struct awaiter
 		{
-			bool await_ready() { return false; }
+			constexpr bool await_ready() { return false; }
 			constexpr void await_resume() const noexcept {}
 			auto await_suspend(std::coroutine_handle<> h)
 			{

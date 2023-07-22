@@ -25,48 +25,92 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 namespace ghostl
 {
-	template<typename T = void> struct run_task {
+	namespace details
+	{
+		struct then_task final
+		{
+			struct promise_type final
+			{
+				constexpr then_task get_return_object() const noexcept { return {}; }
+				constexpr std::suspend_never initial_suspend() const noexcept { return {}; }
+				void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
+				constexpr void return_void() const noexcept {}
+				constexpr std::suspend_never final_suspend() const noexcept { return {}; }
+			};
+		};
+	}
+	template<typename T = void>
+	struct run_task
+	{
 		using task_type = ghostl::task<T>;
 		using continuation_type = std::function<void(T)>;
-		std::shared_ptr<ghostl::task<>> task = std::make_shared<ghostl::task<>>();
-		std::shared_ptr<continuation_type> continuation = std::make_shared<continuation_type>();
-		static auto coroutine(decltype(task) t, decltype(continuation) cont, task_type to_run) -> ghostl::task<> {
-			auto res = co_await std::move(to_run);
-			if (*cont) (*cont)(std::move(res));
-			t.reset();
+
+		static auto coroutine(std::shared_ptr<task_type> task_ptr, std::shared_ptr<continuation_type> continuation) -> ghostl::details::then_task
+		{
+			auto res = co_await *task_ptr;
+			if (continuation && *continuation) (*continuation)(std::move(res));
 		}
+
+		std::shared_ptr<task_type> to_run_ptr;
+		std::shared_ptr<continuation_type> continuation;
+
 		run_task() = delete;
-		explicit run_task(task_type&& to_run) { *task = coroutine(task, continuation, std::move(to_run)); }
+		explicit run_task(task_type&& to_run)
+		{
+			to_run_ptr = std::make_shared<task_type>(std::move(to_run));
+		}
 
 		run_task(const run_task&) = delete;
-		run_task(run_task&& other) noexcept = delete;
+		run_task(run_task&& other) noexcept = default;
 		auto operator=(const run_task&)->run_task & = delete;
-		auto operator=(run_task&& other) noexcept -> run_task & = delete;
+		auto operator=(run_task&& other) noexcept -> run_task & = default;
 		~run_task() {}
 
-		run_task& continue_with(continuation_type cont) { *continuation = cont; return *this; }
-		void resume() { task->resume(); }
+		run_task& continue_with(continuation_type cont)
+		{
+			continuation = std::make_shared<continuation_type>(cont);
+			return *this;
+		}
+		void resume()
+		{
+			coroutine(to_run_ptr, continuation);
+		}
 	};
-	template<> struct run_task<void> {
+	template<>
+	struct run_task<void>
+	{
 		using task_type = ghostl::task<>;
 		using continuation_type = std::function<void()>;
-		std::shared_ptr<ghostl::task<>> task = std::make_shared<ghostl::task<>>();
-		std::shared_ptr<continuation_type> continuation = std::make_shared<continuation_type>();
-		static auto coroutine(decltype(task) t, decltype(continuation) cont, task_type to_run) -> ghostl::task<> {
-			co_await std::move(to_run);
-			if (*cont) (*cont)();
-			t.reset();
+
+		static auto coroutine(std::shared_ptr<task_type> task_ptr, std::shared_ptr<continuation_type> continuation) -> ghostl::details::then_task
+		{
+			co_await *task_ptr;
+			if (continuation && *continuation) (*continuation)();
 		}
+
+		std::shared_ptr<task_type> to_run_ptr;
+		std::shared_ptr<continuation_type> continuation;
+
 		run_task() = delete;
-		explicit run_task(task_type&& to_run) { *task = coroutine(task, continuation, std::move(to_run)); }
+		explicit run_task(task_type&& to_run)
+		{
+			to_run_ptr = std::make_shared<task_type>(std::move(to_run));
+		}
 
 		run_task(const run_task&) = delete;
-		run_task(run_task&& other) noexcept = delete;
+		run_task(run_task&& other) noexcept = default;
 		auto operator=(const run_task&)->run_task & = delete;
-		auto operator=(run_task&& other) noexcept -> run_task & = delete;
+		auto operator=(run_task&& other) noexcept -> run_task & = default;
 		~run_task() {}
 
-		run_task& continue_with(continuation_type cont) { *continuation = cont; return *this; }
-		void resume() { task->resume(); }
+		run_task& continue_with(continuation_type cont)
+		{
+			continuation = std::make_shared<continuation_type>(cont);
+			return *this;
+		}
+		void resume()
+		{
+			coroutine(to_run_ptr, continuation);
+		}
 	};
 } // namespace ghostl

@@ -119,7 +119,7 @@ public:
     size_t IRAM_ATTR available() const
     {
         int avail = static_cast<int>(m_inPos.load() - m_outPos.load());
-        if (avail < 0) avail += m_bufSize;
+        if (avail < 0) avail += static_cast<int>(m_bufSize);
         return avail;
     }
 
@@ -129,7 +129,7 @@ public:
     size_t IRAM_ATTR available_for_push() const
     {
         int avail = static_cast<int>(m_outPos.load() - m_inPos.load()) - 1;
-        if (avail < 0) avail += m_bufSize;
+        if (avail < 0) avail += static_cast<int>(m_bufSize);
         return avail;
     }
 

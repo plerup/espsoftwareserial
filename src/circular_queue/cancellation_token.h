@@ -46,8 +46,9 @@ namespace ghostl
         [[nodiscard]] auto token()
         {
             task_completion_source<bool> tcs;
+            auto ct = tcs.token();
             queue.push(std::move(tcs));
-            return tcs.token();
+            return ct;
         }
         std::atomic<bool> cancelled{ false };
         circular_queue_mp<task_completion_source<bool>> queue;

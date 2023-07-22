@@ -18,7 +18,7 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include "task.h"
+#include "run_task.h"
 #include "task_completion_source.h"
 
 #include <vector>
@@ -28,32 +28,43 @@ namespace ghostl
 	template<typename T = void>
 	struct when_all
 	{
-		std::vector<ghostl::task<>> continuations;
-		std::vector<T> results;
-		std::atomic<size_t> remainingCnt{ 0 };
-		ghostl::task_completion_source<std::vector<T>> tcs;
+		std::shared_ptr<std::vector<ghostl::run_task<T>>> continuations{
+			std::make_shared<std::vector<ghostl::run_task<T>>>() };
+		std::shared_ptr<std::vector<T>> results = std::make_shared<std::vector<T>>();
+		std::shared_ptr<std::atomic<size_t>> remaining{
+			std::make_shared<std::atomic<size_t>>(0) };
+		ghostl::task_completion_source<std::vector<T>> tcs{};
 
-		auto run_task(ghostl::task<T> t, size_t pos) -> ghostl::task<>
+		static auto continuation(T result, size_t pos,
+			std::shared_ptr<std::vector<T>> results,
+			std::shared_ptr<std::atomic<size_t>> remaining,
+			ghostl::task_completion_source<std::vector<T>> tcs) -> void
 		{
-			results[pos] = std::move(co_await t);
-			if (--remainingCnt == 0)
+			(*results)[pos] = std::move(result);
+			if (auto isremaining = -- * remaining; !isremaining)
 			{
-				tcs.set_value(std::move(results));
+				tcs.set_value(std::move(*results));
 			}
-			co_return;
 		}
 
 		when_all() = delete;
 		template<typename C> explicit when_all(C&& tasks)
 		{
-			for (auto& task : tasks)
+			auto results = this->results;
+			auto remaining = this->remaining;
+			auto tcs = this->tcs;
+			for (ghostl::task<T>& task : tasks)
 			{
-				continuations.emplace_back(run_task(std::exchange(task, {}), remainingCnt++));
+				auto pos = remaining->load();
+				++*remaining;
+				auto runner = ghostl::run_task<T>(std::move(std::exchange(task, {})));
+				runner.continue_with([pos, results, remaining, tcs](T result) { continuation(result, pos, results, remaining, tcs); });
+				continuations->emplace_back(std::move(runner));
 			}
-			results.resize(remainingCnt);
-			for (auto& task : continuations)
+			results->resize(remaining->load());
+			for (auto& runner : *continuations)
 			{
-				task.resume();
+				runner.resume();
 			}
 		}
 		when_all(const when_all& other) = delete;
@@ -64,35 +75,40 @@ namespace ghostl
 			return tcs.token();
 		}
 	};
-
 	template<>
-	struct when_all<>
+	struct when_all<void>
 	{
-		std::vector<ghostl::task<>> continuations;
-		std::atomic<size_t> remainingCnt{ 0 };
-		ghostl::task_completion_source<> tcs;
+		std::shared_ptr<std::vector<ghostl::run_task<>>> continuations{
+			std::make_shared<std::vector<ghostl::run_task<>>>() };
+		std::shared_ptr<std::atomic<size_t>> remaining{
+			std::make_shared<std::atomic<size_t>>(0) };
+		ghostl::task_completion_source<> tcs{};
 
-		auto run_task(ghostl::task<> t) -> ghostl::task<>
+		static auto continuation(
+			std::shared_ptr<std::atomic<size_t>> remaining,
+			ghostl::task_completion_source<> tcs) -> void
 		{
-			co_await t;
-			if (--remainingCnt == 0)
+			if (auto isremaining = -- * remaining; !isremaining)
 			{
 				tcs.set_value();
 			}
-			co_return;
 		}
 
 		when_all() = delete;
 		template<typename C> explicit when_all(C&& tasks)
 		{
-			for (auto& task : tasks)
+			auto remaining = this->remaining;
+			auto tcs = this->tcs;
+			for (ghostl::task<>& task : tasks)
 			{
-				continuations.emplace_back(run_task(std::exchange(task, {})));
-				++remainingCnt;
+				++*remaining;
+				auto runner = ghostl::run_task<>(std::move(std::exchange(task, {})));
+				runner.continue_with([remaining, tcs]() { continuation(remaining, tcs); });
+				continuations->emplace_back(std::move(runner));
 			}
-			for (auto& task : continuations)
+			for (auto& runner : *continuations)
 			{
-				task.resume();
+				runner.resume();
 			}
 		}
 		when_all(const when_all& other) = delete;
