@@ -27,90 +27,77 @@ namespace ghostl
 {
 	namespace details
 	{
-		struct then_task final
+		struct final_task final
 		{
 			struct promise_type final
 			{
-				constexpr then_task get_return_object() const noexcept { return {}; }
+				final_task get_return_object() noexcept
+				{
+					return { std::coroutine_handle<promise_type>::from_promise(*this) };
+				}
 				constexpr std::suspend_never initial_suspend() const noexcept { return {}; }
 				void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
 				constexpr void return_void() const noexcept {}
 				constexpr std::suspend_never final_suspend() const noexcept { return {}; }
 			};
+			final_task() = default;
+			final_task(std::coroutine_handle<promise_type>&& handle) : coroutine(std::move(handle)) {}
+			std::coroutine_handle<promise_type> coroutine;
 		};
 	}
+
 	template<typename T = void>
 	struct run_task
 	{
-		using task_type = ghostl::task<T>;
-		using continuation_type = std::function<void(T)>;
-
-		static auto coroutine(std::shared_ptr<task_type> task_ptr, std::shared_ptr<continuation_type> continuation) -> ghostl::details::then_task
+		std::function<void(T)> continuation;
+		ghostl::task<T> task;
+		ghostl::details::final_task final_task;
+		void continue_with(std::function<void(T)>&& cont)
 		{
-			auto res = co_await *task_ptr;
-			if (continuation && *continuation) (*continuation)(std::move(res));
+			continuation = std::move(cont);
+		};
+		ghostl::details::final_task coroutine(ghostl::task<T>&& t) {
+			auto task = std::move(t);
+			auto cont = std::move(continuation);
+			T res = co_await task;
+			if (cont) cont(res);
+		};
+		run_task(ghostl::task<T>&& t) {
+			task = std::move(t);
 		}
-
-		std::shared_ptr<task_type> to_run_ptr;
-		std::shared_ptr<continuation_type> continuation;
-
-		run_task() = delete;
-		explicit run_task(task_type&& to_run)
-		{
-			to_run_ptr = std::make_shared<task_type>(std::move(to_run));
+		void resume() {
+			auto t = std::move(task);
+			final_task = coroutine(std::move(t));
 		}
-
-		run_task(const run_task&) = delete;
-		run_task(run_task&& other) noexcept = default;
-		auto operator=(const run_task&)->run_task & = delete;
-		auto operator=(run_task&& other) noexcept -> run_task & = default;
-		~run_task() {}
-
-		run_task& continue_with(continuation_type cont)
-		{
-			continuation = std::make_shared<continuation_type>(cont);
-			return *this;
-		}
-		void resume()
-		{
-			coroutine(to_run_ptr, continuation);
+		void destroy() {
+			final_task.coroutine.destroy();
 		}
 	};
 	template<>
 	struct run_task<void>
 	{
-		using task_type = ghostl::task<>;
-		using continuation_type = std::function<void()>;
-
-		static auto coroutine(std::shared_ptr<task_type> task_ptr, std::shared_ptr<continuation_type> continuation) -> ghostl::details::then_task
+		std::function<void()> continuation;
+		ghostl::task<> task;
+		ghostl::details::final_task final_task;
+		void continue_with(std::function<void()>&& cont)
 		{
-			co_await *task_ptr;
-			if (continuation && *continuation) (*continuation)();
+			continuation = std::move(cont);
+		};
+		ghostl::details::final_task coroutine(ghostl::task<>&& t) {
+			auto task = std::move(t);
+			auto cont = std::move(continuation);
+			co_await task;
+			if (cont) cont();
+		};
+		run_task(ghostl::task<>&& t) {
+			task = std::move(t);
 		}
-
-		std::shared_ptr<task_type> to_run_ptr;
-		std::shared_ptr<continuation_type> continuation;
-
-		run_task() = delete;
-		explicit run_task(task_type&& to_run)
-		{
-			to_run_ptr = std::make_shared<task_type>(std::move(to_run));
+		void resume() {
+			auto t = std::move(task);
+			final_task = coroutine(std::move(t));
 		}
-
-		run_task(const run_task&) = delete;
-		run_task(run_task&& other) noexcept = default;
-		auto operator=(const run_task&)->run_task & = delete;
-		auto operator=(run_task&& other) noexcept -> run_task & = default;
-		~run_task() {}
-
-		run_task& continue_with(continuation_type cont)
-		{
-			continuation = std::make_shared<continuation_type>(cont);
-			return *this;
-		}
-		void resume()
-		{
-			coroutine(to_run_ptr, continuation);
+		void destroy() {
+			final_task.coroutine.destroy();
 		}
 	};
 } // namespace ghostl
