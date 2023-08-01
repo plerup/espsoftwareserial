@@ -606,7 +606,7 @@ void UARTBase::onReceive(Delegate<void(), void*>&& handler) {
     restoreInterrupts();
 }
 
-uint32_t UARTBase::detectBaud()
+uint32_t UARTBase::detectBaud(uint32_t usTimeout)
 {
     assert((microsToTicks(1000000UL) + 1 / 2) / 1);
     // This assert is to ensure the baud is set to 1 when detectBaud() is executed.
@@ -621,12 +621,17 @@ uint32_t UARTBase::detectBaud()
     // Therefore when detecting baud rate which is lower than the preset baud rate, it gives
     // the incorrect result.
 
+    uint32_t startTime = micros();
 
     int fallingEdgeCnt = 0;
     uint32_t tickAtLastFallingEdge = 0;
     uint32_t bitTicksEstimated[3];
 
     while (fallingEdgeCnt < 4) {
+        if (micros() - startTime > usTimeout) {
+            return 0;
+        }
+
         if (!m_isrBuffer->available())
             continue;
         uint32_t isrTick = m_isrBuffer->pop();

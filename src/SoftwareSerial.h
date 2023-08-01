@@ -291,7 +291,7 @@ public:
     // By calculating 3 timespans between falling and rising edges, it can estimates
     // the baud rate by calculation.
     // Return 0 if the detection failed.
-    uint32_t detectBaud();
+    uint32_t detectBaud(uint32_t usTimeout = 3000000);
 
     using Print::write;
 

@@ -1,10 +1,18 @@
+// In this example, we use two ESP32 as the detector and detectee.
+// The detectee keeps sending 0x55 at specified baud rate.
+// The detector keeps detecting the baud rate, and when the baud rate is determined, 
+// it sends "OK" to the detectee.
+// When the detectee received "OK" (detector sent with the correct baud rate), 
+// it changes to another baud rate and continue to send 0x55. 
+// And wait for detector to detect the new baud rate.
+
 #include <Arduino.h>
 
 // If BAUD_DETECTOR is defined, it means this device is to detect baud rate.
 // If BAUD_DETECTEE is defined, it means this is the device with certain
 // baud rate, and this device should send 0x55 for the other device to detect.
 
-// #define BAUD_DETECTOR
+#define BAUD_DETECTOR
 #ifndef BAUD_DETECTOR
     #define BAUD_DETECTEE
 #endif
