@@ -606,6 +606,67 @@ void UARTBase::onReceive(Delegate<void(), void*>&& handler) {
     restoreInterrupts();
 }
 
+uint32_t UARTBase::detectBaud()
+{
+    assert((microsToTicks(1000000UL) + 1 / 2) / 1);
+    // This assert is to ensure the baud is set to 1 when detectBaud() is executed.
+    // When baud rate is set too high, especially higher than 74880, at which baud
+    // rate the rxBitSyncISR() is used instead of rxBitISR(), the detection is prone
+    // to be failed.
+    // This is because in rxBitISR(), it always uses `curTick = microsToTicks(micros())`
+    // as the timestamp. Therefore the ticks between rising and falling edges can be
+    // got correctly.
+    // But in rxBitSyncISR(), it uses `start + self->m_bitTicks * (i+2)` as the timestamp,
+    // and `self->m_bitTicks` is based on the preset baud rate.
+    // Therefore when detecting baud rate which is lower than the preset baud rate, it gives
+    // the incorrect result.
+
+
+    int fallingEdgeCnt = 0;
+    uint32_t tickAtLastFallingEdge = 0;
+    uint32_t bitTicksEstimated[3];
+
+    while (fallingEdgeCnt < 4) {
+        if (!m_isrBuffer->available())
+            continue;
+        uint32_t isrTick = m_isrBuffer->pop();
+        const bool level = (m_isrLastTick & 1) ^ m_invert;
+        m_isrLastTick = isrTick;
+
+        bool isFallingEdge = level;
+        if (isFallingEdge) {
+            fallingEdgeCnt++;
+        }
+
+        if (fallingEdgeCnt > 0) {
+            if (isFallingEdge) {
+                tickAtLastFallingEdge = isrTick;
+            }
+            else {
+                uint32_t tickAtThisRisingEdge = isrTick;
+                bitTicksEstimated[fallingEdgeCnt-1] = tickAtThisRisingEdge - tickAtLastFallingEdge;
+            }
+        }
+    }
+
+    double bitTicksEstimatedAvg = 0;
+    for (int i = 0; i < 3; ++i) {
+        bitTicksEstimatedAvg += bitTicksEstimated[i];
+    }
+    bitTicksEstimatedAvg /= 3.0;
+
+    for (int i = 0; i < 3; ++i) {
+        double error = 1.0 * bitTicksEstimated[i] / bitTicksEstimatedAvg;
+        const double tolerance = 0.02;
+        if (error < (1.0-tolerance) || error > (1.0+tolerance)) {
+            // The detection is considered failed
+            return 0;
+        }
+    }
+
+    return 1000000.0 / ticksToMicros(bitTicksEstimatedAvg);
+}
+
 #if __GNUC__ < 12
 // The template member functions below must be in IRAM, but due to a bug GCC doesn't currently
 // honor the attribute. Instead, it is possible to do explicit specialization and adorn

@@ -284,6 +284,15 @@ public:
     [[deprecated("function removed; semantics of onReceive() changed; check the header file.")]]
     void perform_work();
 
+    // detectBaud() is for detecting the (unknown) baud rate.
+    // Before detectBaud is called, the baud should be set to 1, i.e.
+    //     espSoftwareSerial.begin(1)
+    // When detectBaud is called, it's supposed that the Rx pin is receiving 0x55.
+    // By calculating 3 timespans between falling and rising edges, it can estimates
+    // the baud rate by calculation.
+    // Return 0 if the detection failed.
+    uint32_t detectBaud();
+
     using Print::write;
 
 protected:
