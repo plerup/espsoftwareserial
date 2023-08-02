@@ -608,7 +608,7 @@ void UARTBase::onReceive(Delegate<void(), void*>&& handler) {
 
 uint32_t UARTBase::detectBaud(uint32_t usTimeout)
 {
-    assert((microsToTicks(1000000UL) + 1 / 2) / 1);
+    assert(m_bitTicks == ((microsToTicks(1000000UL) + 1 / 2) / 1));
     // This assert is to ensure the baud is set to 1 when detectBaud() is executed.
     // When baud rate is set too high, especially higher than 74880, at which baud
     // rate the rxBitSyncISR() is used instead of rxBitISR(), the detection is prone
