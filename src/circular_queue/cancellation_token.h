@@ -55,6 +55,13 @@ namespace ghostl
         circular_queue_mp<task_completion_source<bool>> queue;
     };
 
+    /// <summary>
+    /// The cancellation_token class exists to check if a cancellation request
+    /// has been made for its associated cancellation_token_source object.
+    /// The cancellation_token provides a co_await'able cancellation_request()
+    /// member function, that completes if the cancellation_token's associated
+    /// cancellation_token_source is cancelled.
+    /// </summary>
     struct cancellation_token
     {
         /// <summary>
@@ -84,6 +91,13 @@ namespace ghostl
         cancellation_token(decltype(state) _state) : state(std::move(_state)) {}
     };
 
+    /// <summary>
+    /// The cancellation_token_source class can issue a cancellation request,
+    /// similar to what std::stop_token_source does for std::jthread cancellation.
+    /// A cancellation request made for one cancellation_token_source object
+    /// is visible to all cancellation_token_sources and cancellation_tokens
+    /// of the same associated cancellation_state.
+    /// </summary>
     struct cancellation_token_source
 	{
         explicit cancellation_token_source() {}
