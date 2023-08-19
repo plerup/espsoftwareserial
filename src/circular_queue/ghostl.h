@@ -123,6 +123,20 @@ namespace std
 #if defined (__cplusplus)
     extern "C" {
 #endif
+        bool __atomic_compare_exchange_4(uint32_t* ptr, uint32_t* expected, uint32_t desired,
+            bool weak, int success_memorder, int failure_memorder)
+        {
+            (void)weak;
+            (void)success_memorder;
+            (void)failure_memorder;
+            noInterrupts();
+            const bool equal = *ptr == *expected;
+            if (equal) *ptr = desired;
+            else *expected = *ptr;
+            interrupts();
+            return equal;
+        }
+
         bool __atomic_compare_exchange_1(uint8_t* ptr, uint8_t* expected, uint8_t desired,
             bool weak, int success_memorder, int failure_memorder)
         {
