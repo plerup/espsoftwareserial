@@ -28,7 +28,8 @@
 #ifdef __ZEPHYR__
 #include <zephyr/kernel.h>
 namespace {
-    long unsigned micros() { return static_cast<long unsigned>(k_uptime_get() * 1000UL); }
+	long unsigned micros() { return static_cast<long unsigned>(k_uptime_get() * 1000UL); }
+	long unsigned millis() { return static_cast<long unsigned>(k_uptime_get()); }
 }
 #elif !defined(ARDUINO) // __ZEPHYR__
 #include <thread>
@@ -40,6 +41,12 @@ namespace {
         return static_cast<long unsigned>(std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::steady_clock::now() - start).count());
     }
+	long unsigned millis()
+	{
+		static auto start = std::chrono::steady_clock::now();
+		return static_cast<long unsigned>(std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - start).count());
+	}
 }
 #endif // __ZEPHYR__
 
@@ -55,7 +62,7 @@ namespace {
 #include <circular_queue/cancellation_token.h>
 #include <circular_queue/run_task.h>
 
-constexpr unsigned DELAY = 1000000;
+constexpr unsigned DELAY = 10000;
 
 struct schedule : std::suspend_always
 {
@@ -133,7 +140,8 @@ int main_gen()
 	auto fib = fibonacci_sequence(93);
 	for (int j = 1; fib; ++j)
 	{
-		PRINTF("fib(%u)=%llu\n", j, fib());
+		auto v = fib();
+		// PRINTF("fib(%u)=%llu\n", j, v);
 	}
 
 	return 0;
@@ -156,7 +164,7 @@ auto eventAsync(int id, ghostl::cancellation_token ct = {})
 					hello << "Hello async (" << id << ") cancelled" << std::ends;
 					auto str = hello.str();
 					tcs.set_value(str);
-					PRINTF("eventAsync: %s\n", str.c_str());
+					// PRINTF("eventAsync: %s\n", str.c_str());
 					co_return;
 				}
 				hello << "Hello async (" << id << ") = " << micros() / 1000 << std::ends;
@@ -178,19 +186,15 @@ auto run_tcs(ghostl::cancellation_token ct = {}) -> ghostl::task<>
 	auto preset_tcs = ghostl::task_completion_source<>();
 	auto preset_tok = preset_tcs.token();
 	preset_tcs.set_value();
-	PRINTLN("run_tcs(): co_await preset_tok");
 	if (ct.is_cancellation_requested()) { PRINTLN("run_tcs(): cancelled"); co_return; }
 	co_await preset_tok;
-	PRINTLN("run_tcs(): co_await'ed preset_tok");
 	auto posted_tcs = ghostl::task_completion_source<>();
 	schedule_recurrent_function_us(
 		[posted_tcs]() { posted_tcs.set_value(); return false; }, DELAY / 2,
 		[ct]() { return ct.is_cancellation_requested(); });
 	auto posted_tok = posted_tcs.token();
-	PRINTLN("run_tcs(): co_await posted_tok");
 	co_await posted_tok;
 	if (ct.is_cancellation_requested()) { PRINTLN("run_tcs(): cancelled"); co_return; }
-	PRINTLN("run_tcs(): co_await'ed posted_tok");
 	co_await co_delay(DELAY / 2, ct);
 }
 
@@ -212,19 +216,26 @@ auto make_task(int id, ghostl::cancellation_token ct = {}) -> ghostl::task<std::
 
 void main_when_all(ghostl::cancellation_token ct = {});
 
-ghostl::task<> make_when_all_tasks(ghostl::cancellation_token ct = {})
+ghostl::task<> make_when_all_tasks(ghostl::cancellation_token outer_ct = {})
 {
+	auto fwd_ct = ghostl::run_task(outer_ct.cancellation_request());
+	ghostl::cancellation_token_source cts;
+	auto ct = cts.token();
+	fwd_ct.continue_with([cts](bool cancelled) { if (cancelled) cts.cancel(); });
+	fwd_ct.resume();
+
 	std::vector<ghostl::task<std::string>> main_tasks;
-	constexpr unsigned TASKCNT = 10;
+	constexpr unsigned TASKCNT = 100;
 	for (unsigned id = 0; id < TASKCNT; ++id)
 	{
 		main_tasks.emplace(main_tasks.begin(), make_task(id, ct));
 	}
-	auto wall = ghostl::when_all<std::string>(std::move(main_tasks));
+	auto wall = ghostl::when_all<std::string>(std::exchange(main_tasks, {}));
 	auto results = co_await wall();
-	PRINTLN("make_when_all_tasks results begin");
-	for (auto r : results) PRINTLN(r.c_str());
-	PRINTLN("make_when_all_tasks results end");
+	cts.cancel();
+	// PRINTLN("make_when_all_tasks results begin");
+	// for (auto r : results) PRINTLN(r.c_str());
+	// PRINTLN("make_when_all_tasks results end");
 	co_await co_delay(DELAY, ct);
 }
 
@@ -240,31 +251,30 @@ void main_when_any(ghostl::cancellation_token ct = {});
 
 ghostl::task<> make_when_any_tasks(ghostl::cancellation_token outer_ct = {})
 {
+	auto fwd_ct = ghostl::run_task(outer_ct.cancellation_request());
 	ghostl::cancellation_token_source cts;
 	auto ct = cts.token();
-	auto fwd_ct = ghostl::run_task(outer_ct.cancellation_request());
 	fwd_ct.continue_with([cts](bool cancelled) { if (cancelled) cts.cancel(); });
 	fwd_ct.resume();
 
 	std::vector<ghostl::task<std::string>> main_tasks;
-	constexpr unsigned TASKCNT = 10;
+	constexpr unsigned TASKCNT = 100;
 	for (unsigned id = 0; id < TASKCNT; ++id)
 	{
 		main_tasks.emplace(main_tasks.begin(), make_task(id, ct));
 	}
-	auto wany = ghostl::when_any<std::string>(std::move(main_tasks));
+	auto wany = ghostl::when_any<std::string>(std::exchange(main_tasks, {}));
 	auto result = co_await wany();
 	cts.cancel();
-	fwd_ct.destroy();
-	PRINTF("make_when_any_tasks result = %s\n", result.c_str());
-	co_await co_delay(DELAY, outer_ct);
+	// PRINTF("make_when_any_tasks result = %s\n", result.c_str());
+	co_await co_delay(DELAY, ct);
 }
 
 void main_when_any(ghostl::cancellation_token ct)
 {
 	auto task = make_when_any_tasks(ct);
 	auto runner = ghostl::run_task(std::move(task));
-	runner.continue_with([ct]() { schedule_function([ct]() { if (!ct.is_cancellation_requested()) main_when_any(ct); });});
+	runner.continue_with([ct]() { schedule_function([ct]() { if (!ct.is_cancellation_requested()) main_when_any(ct); }); });
 	runner.resume();
 }
 
@@ -289,9 +299,9 @@ void setup()
 
 void loop()
 {
-	if (!pending_restart && micros() - start > 10000000)
+	if (!pending_restart && micros() - start > 1000000)
 	{
-		PRINTLN("Global cancel and restart after 4 s");
+		PRINTLN("Global cancel and restart after 10 ms");
 		pending_restart = true;
 		cts.cancel();
 		schedule_recurrent_function_us([]() {
@@ -304,7 +314,7 @@ void loop()
 			main_when_all(ct);
 			main_when_any(ct);
 			return false;
-			}, 4000000);
+			}, 10000);
 	}
 
 #ifndef ESP8266
@@ -314,7 +324,7 @@ void loop()
 #endif
 	if (schedDelay_us >= 10)
 	{
-		PRINTF("Delaying scheduler: %lu us\n", schedDelay_us);
+		PRINTF("Delaying scheduler: %lu us (now = %lu s)\n", schedDelay_us, millis() / 1000);
 	}
 
 #if defined(ARDUINO)
@@ -328,7 +338,7 @@ void loop()
 	k_sleep(K_USEC(schedDelay_us));
 #endif // CONFIG_BOARD_NATIVE_POSIX
 #else //__ZEPHYR__
-	std::this_thread::sleep_for(std::chrono::microseconds(schedDelay_us));
+	std::this_thread::sleep_for(schedDelay_us < 4000000 ? std::chrono::microseconds(schedDelay_us) : std::chrono::microseconds(4000000));
 #endif //__ZEPHYR__
 
 #ifndef ESP8266

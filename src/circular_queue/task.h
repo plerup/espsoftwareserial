@@ -23,163 +23,167 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 namespace ghostl
 {
-	template<class T = void>
-	struct task
-	{
-		struct promise_type
-		{
-			auto get_return_object()
-			{
-				return task(std::coroutine_handle<promise_type>::from_promise(*this));
-			}
-			constexpr std::suspend_always initial_suspend() { return {}; }
-			struct final_awaiter
-			{
-				constexpr bool await_ready() noexcept { return false; }
-				constexpr void await_resume() noexcept {}
-				std::coroutine_handle<>
-					await_suspend(std::coroutine_handle<promise_type> h) noexcept
-				{
-					// final_awaiter::await_suspend is called when the execution of the
-					// current coroutine (referred to by 'h') is about to finish.
-					// If the current coroutine was resumed by another coroutine via
-					// co_await get_task(), a handle to that coroutine has been stored
-					// as h.promise().previous. In that case, return the handle to resume
-					// the previous coroutine.
-					// Otherwise, return noop_coroutine(), whose resumption does nothing.
+    template<class T = void>
+    struct task
+    {
+        struct promise_type final
+        {
+            auto get_return_object() noexcept
+            {
+                return task(std::coroutine_handle<promise_type>::from_promise(*this));
+            }
+            constexpr std::suspend_always initial_suspend() const { return {}; }
+            struct final_awaiter final
+            {
+                constexpr bool await_ready() const noexcept { return false; }
+                constexpr void await_resume() const noexcept {}
+                std::coroutine_handle<>
+                    await_suspend(std::coroutine_handle<promise_type> h) const noexcept
+                {
+                    // final_awaiter::await_suspend is called when the execution of the
+                    // current coroutine (referred to by 'h') is about to finish.
+                    // If the current coroutine was resumed by another coroutine via
+                    // co_await get_task(), a handle to that coroutine has been stored
+                    // as h.promise().previous. In that case, return the handle to resume
+                    // the previous coroutine.
+                    // Otherwise, return noop_coroutine(), whose resumption does nothing.
 
-					if (auto previous = h.promise().previous; previous)
-						return previous;
-					else
-						return std::noop_coroutine();
-				}
-			};
-			final_awaiter final_suspend() noexcept { return {}; }
-			void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
-			void return_value(T value) { result = std::move(value); }
+                    if (auto previous = h.promise().previous; previous)
+                        return previous;
+                    else
+                        return std::noop_coroutine();
+                }
+            };
+            final_awaiter final_suspend() const noexcept { return {}; }
+            void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
+            void return_value(T value) { result = std::move(value); }
 
-			T result;
-			std::coroutine_handle<> previous;
-		};
+            std::coroutine_handle<> previous;
+            T result{};
+        };
 
-		task() noexcept : coroutine(nullptr) {}
-		explicit task(std::coroutine_handle<promise_type> h) : coroutine(h) {}
-		task(const task&) = delete;
-		task(task&& other) noexcept : coroutine(std::exchange(other.coroutine, nullptr)) {}
-		~task() { if (coroutine) coroutine.destroy(); }
-		task& operator=(const task&) = delete;
-		task& operator=(task&& other) noexcept
-		{
-			if (std::addressof(other) != this)
-			{
-				if (coroutine) coroutine.destroy();
-				coroutine = std::exchange(other.coroutine, nullptr);
-			}
-			return *this;
-		}
+        task() noexcept : coroutine(nullptr) { }
+        explicit task(std::coroutine_handle<promise_type> h) : coroutine(h) { }
+        task(const task&) = delete;
+        task(task&& other) noexcept : coroutine(std::exchange(other.coroutine, nullptr)) { }
+        ~task() { if (coroutine) coroutine.destroy(); }
+        task& operator=(const task&) = delete;
+        task& operator=(task&& other) noexcept
+        {
+            if (std::addressof(other) != this)
+            {
+                if (coroutine) coroutine.destroy();
+                coroutine = std::exchange(other.coroutine, nullptr);
+            }
+            return *this;
+        }
 
-		struct awaiter
-		{
-			constexpr bool await_ready() { return false; }
-			T await_resume() { return std::move(coroutine.promise().result); }
-			auto await_suspend(std::coroutine_handle<> h)
-			{
-				coroutine.promise().previous = h;
-				return coroutine;
-			}
-			std::coroutine_handle<promise_type> coroutine;
-		};
-		awaiter operator co_await() { return awaiter{ coroutine }; }
-		T resume()
-		{
-			coroutine.resume();
-			return std::move(coroutine.promise().result);
-		}
-		T operator()()
-		{
-			return resume();
-		}
+        struct awaiter final
+        {
+            awaiter() = delete;
+            explicit awaiter(std::coroutine_handle<promise_type> h) : coroutine(h) { }
+            constexpr bool await_ready() const { return false; }
+            T await_resume() { return std::move(coroutine.promise().result); }
+            auto await_suspend(std::coroutine_handle<> h)
+            {
+                coroutine.promise().previous = h;
+                return coroutine;
+            }
+        private:
+            std::coroutine_handle<promise_type> coroutine;
+        };
+        awaiter operator co_await() { return awaiter{ coroutine }; }
+        T resume()
+        {
+            coroutine.resume();
+            return std::move(coroutine.promise().result);
+        }
+        T operator()()
+        {
+            return resume();
+        }
+    private:
+        std::coroutine_handle<promise_type> coroutine;
+    };
 
-	private:
-		std::coroutine_handle<promise_type> coroutine;
-	};
+    template<>
+    struct task<void>
+    {
+        struct promise_type final
+        {
+            auto get_return_object() noexcept
+            {
+                return task(std::coroutine_handle<promise_type>::from_promise(*this));
+            }
+            constexpr std::suspend_always initial_suspend() const { return {}; }
+            struct final_awaiter final
+            {
+                constexpr bool await_ready() const noexcept { return false; }
+                constexpr void await_resume() const noexcept {}
+                std::coroutine_handle<>
+                    await_suspend(std::coroutine_handle<promise_type> h) const noexcept
+                {
+                    // final_awaiter::await_suspend is called when the execution of the
+                    // current coroutine (referred to by 'h') is about to finish.
+                    // If the current coroutine was resumed by another coroutine via
+                    // co_await get_task(), a handle to that coroutine has been stored
+                    // as h.promise().previous. In that case, return the handle to resume
+                    // the previous coroutine.
+                    // Otherwise, return noop_coroutine(), whose resumption does nothing.
 
-	template<>
-	struct task<void>
-	{
-		struct promise_type
-		{
-			auto get_return_object()
-			{
-				return task(std::coroutine_handle<promise_type>::from_promise(*this));
-			}
-			constexpr std::suspend_always initial_suspend() { return {}; }
-			struct final_awaiter
-			{
-				constexpr bool await_ready() noexcept { return false; }
-				constexpr void await_resume() noexcept {}
-				std::coroutine_handle<>
-					await_suspend(std::coroutine_handle<promise_type> h) noexcept
-				{
-					// final_awaiter::await_suspend is called when the execution of the
-					// current coroutine (referred to by 'h') is about to finish.
-					// If the current coroutine was resumed by another coroutine via
-					// co_await get_task(), a handle to that coroutine has been stored
-					// as h.promise().previous. In that case, return the handle to resume
-					// the previous coroutine.
-					// Otherwise, return noop_coroutine(), whose resumption does nothing.
+                    if (auto previous = h.promise().previous; previous)
+                        return previous;
+                    else
+                        return std::noop_coroutine();
+                }
+            };
+            final_awaiter final_suspend() const noexcept { return {}; }
+            void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
+            constexpr void return_void() const { }
 
-					if (auto previous = h.promise().previous; previous)
-						return previous;
-					else
-						return std::noop_coroutine();
-				}
-			};
-			final_awaiter final_suspend() noexcept { return {}; }
-			void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
-			constexpr void return_void() { }
+            std::coroutine_handle<> previous;
+        };
 
-			std::coroutine_handle<> previous;
-		};
+        task() noexcept : coroutine(nullptr) { }
+        explicit task(std::coroutine_handle<promise_type> h) : coroutine(h) { }
+        task(const task&) = delete;
+        task(task&& other) noexcept : coroutine(std::exchange(other.coroutine, nullptr)) { }
+        ~task() { if (coroutine) coroutine.destroy(); }
+        task& operator=(const task&) = delete;
+        task& operator=(task&& other) noexcept
+        {
+            if (std::addressof(other) != this)
+            {
+                if (coroutine) coroutine.destroy();
+                coroutine = std::exchange(other.coroutine, nullptr);
+            }
+            return *this;
+        }
 
-		task() noexcept : coroutine(nullptr) {}
-		explicit task(std::coroutine_handle<promise_type> h) : coroutine(h) {}
-		task(const task&) = delete;
-		task(task&& other) noexcept : coroutine(std::exchange(other.coroutine, nullptr)) {}
-		~task() { if (coroutine) coroutine.destroy(); }
-		task& operator=(const task&) = delete;
-		task& operator=(task&& other) noexcept
-		{
-			if (std::addressof(other) != this)
-			{
-				if (coroutine) coroutine.destroy();
-				coroutine = std::exchange(other.coroutine, nullptr);
-			}
-			return *this;
-		}
-
-		struct awaiter
-		{
-			constexpr bool await_ready() { return false; }
-			constexpr void await_resume() const noexcept {}
-			auto await_suspend(std::coroutine_handle<> h)
-			{
-				coroutine.promise().previous = h;
-				return coroutine;
-			}
-			std::coroutine_handle<promise_type> coroutine;
-		};
-		awaiter operator co_await() { return awaiter{ coroutine }; }
-		void resume()
-		{
-			coroutine.resume();
-		}
-		void operator()()
-		{
-			resume();
-		}
-
-	private:
-		std::coroutine_handle<promise_type> coroutine;
-	};
+        struct awaiter final
+        {
+            awaiter() = delete;
+            explicit awaiter(std::coroutine_handle<promise_type> h) : coroutine(h) { }
+            constexpr bool await_ready() const { return false; }
+            constexpr void await_resume() const noexcept {}
+            auto await_suspend(std::coroutine_handle<> h)
+            {
+                coroutine.promise().previous = h;
+                return coroutine;
+            }
+        private:
+            std::coroutine_handle<promise_type> coroutine;
+        };
+        awaiter operator co_await() { return awaiter{ coroutine }; }
+        void resume()
+        {
+            coroutine.resume();
+        }
+        void operator()()
+        {
+            resume();
+        }
+    private:
+        std::coroutine_handle<promise_type> coroutine;
+    };
 } // namespace ghostl

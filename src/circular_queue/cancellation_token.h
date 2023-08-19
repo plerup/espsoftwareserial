@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "task_completion_source.h"
 #include "task.h"
-#include "circular_queue_mp.h"
+#include "lfllist.h"
 
 #include <atomic>
 #include <memory>
@@ -29,16 +29,23 @@ namespace ghostl
 {
     struct cancellation_token_source;
 
-    struct cancellation_state
+    struct cancellation_state_type final
     {
-        ~cancellation_state()
+        explicit cancellation_state_type() = default;
+        cancellation_state_type(const cancellation_state_type&) = delete;
+        cancellation_state_type(cancellation_state_type&& other) noexcept = delete;
+        auto operator=(const cancellation_state_type&)->cancellation_state_type & = delete;
+        auto operator=(cancellation_state_type&& other) noexcept -> cancellation_state_type & = delete;
+        ~cancellation_state_type()
         {
-            queue.for_each([](task_completion_source<bool>&& tcs) { tcs.set_value(false); });
+            if (!cancelled.load()) list.for_each([](task_completion_source<bool>&& tcs) { auto _tcs = std::move(tcs); _tcs.set_value(false); });
         }
         void cancel()
         {
-            cancelled.store(true);
-            queue.for_each([](task_completion_source<bool>&& tcs) { tcs.set_value(true); });
+            if (!cancelled.exchange(true))
+            {
+                list.for_each([](task_completion_source<bool>&& tcs) { auto _tcs = std::move(tcs); _tcs.set_value(true); });
+            }
         }
         [[nodiscard]] auto is_cancellation_requested() const
         {
@@ -46,13 +53,13 @@ namespace ghostl
         }
         [[nodiscard]] auto token()
         {
-            task_completion_source<bool> tcs;
-            auto ct = tcs.token();
-            queue.push(std::move(tcs));
+            auto node = list.emplace_front(task_completion_source<bool>());
+            auto ct = node->item.token();
             return ct;
         }
+    private:
         std::atomic<bool> cancelled{ false };
-        circular_queue_mp<task_completion_source<bool>> queue;
+        lfllist<task_completion_source<bool>> list;
     };
 
     /// <summary>
@@ -64,31 +71,48 @@ namespace ghostl
     /// </summary>
     struct cancellation_token
     {
+    private:
+        friend cancellation_token_source;
+        std::shared_ptr<cancellation_state_type> state;
+        cancellation_token(decltype(state) _state) : state(std::move(_state)) { }
+    public:
         /// <summary>
         /// create a default cancellation token that can never be cancelled
         /// </summary>
         cancellation_token() = default;
-        cancellation_token(const cancellation_token&) = default;
-        cancellation_token(cancellation_token&& other) noexcept = default;
-        auto operator=(const cancellation_token&)->cancellation_token & = default;
-        auto operator=(cancellation_token&& other) noexcept -> cancellation_token & = default;
+        cancellation_token(const cancellation_token& other) : state(other.state) { }
+        cancellation_token(cancellation_token&& other) noexcept
+        {
+            state = std::exchange(other.state, nullptr);
+        }
+        auto operator=(const cancellation_token& other) -> cancellation_token&
+        {
+            if (std::addressof(other) != this)
+            {
+                state = other.state;
+            }
+            return *this;
+        }
+        auto operator=(cancellation_token&& other) noexcept -> cancellation_token&
+        {
+            if (std::addressof(other) != this)
+            {
+                state = std::exchange(other.state, nullptr);
+            }
+            return *this;
+        }
         [[nodiscard]] auto is_cancellation_requested() const
         {
-            return state && state->is_cancellation_requested();
+            return !state || state->is_cancellation_requested();
         }
         [[nodiscard]] ghostl::task<bool> cancellation_request() const
         {
-            if (!state) co_return false;
-            if (state->is_cancellation_requested()) co_return true;
+            if (!state || state->is_cancellation_requested()) co_return true;
             auto token = state->token();
             // if concurrently cancelled, re-cancel to force processing of the new token. 
             if (state->is_cancellation_requested()) state->cancel();
             co_return co_await token;
         }
-    private:
-        friend cancellation_token_source;
-        std::shared_ptr<cancellation_state> state;
-        cancellation_token(decltype(state) _state) : state(std::move(_state)) {}
     };
 
     /// <summary>
@@ -96,25 +120,43 @@ namespace ghostl
     /// similar to what std::stop_token_source does for std::jthread cancellation.
     /// A cancellation request made for one cancellation_token_source object
     /// is visible to all cancellation_token_sources and cancellation_tokens
-    /// of the same associated cancellation_state.
+    /// of the same associated cancellation state.
     /// </summary>
     struct cancellation_token_source
-	{
-        explicit cancellation_token_source() {}
-        cancellation_token_source(const cancellation_token_source&) = default;
-        cancellation_token_source(cancellation_token_source&& other) noexcept = default;
-        auto operator=(const cancellation_token_source&)->cancellation_token_source & = default;
-        auto operator=(cancellation_token_source&& other) noexcept -> cancellation_token_source & = default;
+    {
+        explicit cancellation_token_source() = default;
+        cancellation_token_source(const cancellation_token_source& other) : state(other.state) { }
+        cancellation_token_source(cancellation_token_source&& other) noexcept
+        {
+            state = std::exchange(other.state, nullptr);
+        }
+        auto operator=(const cancellation_token_source& other) -> cancellation_token_source&
+        {
+            if (std::addressof(other) != this)
+            {
+                state = other.state;
+            }
+            return *this;
+        }
+        auto operator=(cancellation_token_source&& other) noexcept -> cancellation_token_source&
+        {
+            if (std::addressof(other) != this)
+            {
+                state = std::exchange(other.state, nullptr);
+            }
+            return *this;
+        }
         void cancel() const
         {
-            state->cancel();
+            std::shared_ptr<cancellation_state_type> _state(state);
+            if (_state) _state->cancel();
         }
         [[nodiscard]] auto is_cancellation_requested() const
         {
-            return state->is_cancellation_requested();
+            return state ? state->is_cancellation_requested() : true;
         }
         [[nodiscard]] auto token() const { return cancellation_token(state); }
     private:
-        decltype(cancellation_token::state) state{ std::make_shared<cancellation_state>() };
-	};
+        std::shared_ptr<cancellation_state_type> state{ std::make_shared<cancellation_state_type>() };
+    };
 } // namespace ghostl
