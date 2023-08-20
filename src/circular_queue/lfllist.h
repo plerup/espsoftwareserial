@@ -1,8 +1,8 @@
 /*
  lfllist.h
- A lock-free double-linked list implementation.
+ A lock free double-linked list implementation.
  Copyright (c) 2023 Dirk O. Kaar
- 
+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
  License as published by the Free Software Foundation; either
@@ -36,21 +36,23 @@ namespace ghostl
         lfllist(lfllist&&) = delete;
         ~lfllist()
         {
-            while (auto node = first.load()) erase(node);
+            while (auto node = back()) erase(node);
         }
-        auto operator =(const lfllist&) -> lfllist& = delete;
-        auto operator =(lfllist&&) -> lfllist& = delete;
+        auto operator =(const lfllist&)->lfllist & = delete;
+        auto operator =(lfllist&&)->lfllist & = delete;
+
         struct node_type
         {
+        private:
+            friend lfllist;
             std::atomic<node_type*> pred{ nullptr };
             std::atomic<node_type*> next{ nullptr };
+        public:
             T item;
         };
-        
-        std::atomic<node_type*> first = nullptr;
 
         /// <summary>
-        ///  Emplace an item at the list's front. Is safe for concurrence and reentrance.
+        ///  Emplace an item at the list's front. Is safe for concurrency and reentrance.
         /// </summary>
         /// <param name="toInsert">The item to emplace.</param>
         /// <returns>The pointer to new node, nullptr on failure.</returns>
@@ -58,16 +60,14 @@ namespace ghostl
         {
             auto node = new (std::nothrow) node_type();
             if (!node) return nullptr;
-        
             node->item = std::move(toInsert);
-        
-            auto _first = first.load();
-            do
-            {
-                node->next.store(_first);
-            }
-            while (!first.compare_exchange_weak(_first, node));
-            if (_first) _first->pred.store(node);
+
+            auto next = first.exchange(node);
+            node->next.store(next);
+            std::atomic_thread_fence(std::memory_order_release);
+            next->pred.store(node);
+            std::atomic_thread_fence(std::memory_order_release);
+
             return node;
         };
 
@@ -75,33 +75,37 @@ namespace ghostl
         /// Erase a previously emplaced node from the list.
         /// Non-reentrant, non-concurrent: erase(), for_each().
         /// </summary>
-        /// <param name="to_erase">An item that must be a member of this list.</param>
+        /// <param name="to_erase">An item (not nullptr) that must be a member of this list.</param>
         auto erase(node_type* const to_erase) -> void
         {
             for (;;)
             {
-                auto pred = to_erase->pred.load();
                 auto next = to_erase->next.load();
-                if (pred)
+                auto pred = to_erase->pred.load();
+                do
                 {
-                    pred->next.store(next);
                     next->pred.store(pred);
-                }
-                else
-                {
-                    auto current = to_erase;
-                    if (!first.compare_exchange_weak(current, next)) continue;
-                    current = to_erase;
-                    if (next && !next->pred.compare_exchange_weak(current, pred)) continue;
-                }
-        
-                delete(to_erase);
-                break;
+                    if (pred) pred->next.store(next);
+                } while (!to_erase->pred.compare_exchange_weak(pred, pred));
+
+                auto _to_erase = to_erase;
+                if (pred || first.compare_exchange_strong(_to_erase, next)) break;
             }
+            delete(to_erase);
+        };
+
+        [[nodiscard]] auto front() -> node_type*
+        {
+            return first.load();
+        };
+
+        [[nodiscard]] auto back() -> node_type*
+        {
+            return last_sentinel.pred.load();
         };
 
         /// <summary>
-        /// Traverse every node of this list, then erase that node.
+        /// Traverse every node of this list in FIFO, then erase that node.
         /// The ownership of the item contained in that node is passed to parameter function.
         /// Non-reentrant, non-concurrent: erase(), for_each().
         /// </summary>
@@ -112,12 +116,16 @@ namespace ghostl
         void for_each(Delegate<void(T&&), ForEachArg> fn)
 #endif
         {
-            while (auto node = first.load())
+            while (auto node = back())
             {
                 fn(std::move(std::exchange(node->item, {})));
                 erase(node);
             }
         };
+
+    private:
+        node_type last_sentinel;
+        std::atomic<node_type*> first = &last_sentinel;
     };
 }
 

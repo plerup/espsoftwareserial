@@ -47,7 +47,7 @@ using std::min;
 #endif
 
 /*!
-    @brief	Instance class for a single-producer, single-consumer circular queue / ring buffer (FIFO).
+    @brief  Instance class for a single-producer, single-consumer circular queue / ring buffer (FIFO).
             This implementation is lock-free between producer and consumer for the available(), peek(),
             pop(), and push() type functions.
 */
@@ -56,7 +56,7 @@ class circular_queue
 {
 public:
     /*!
-        @brief	Constructs a valid, but zero-capacity dummy queue.
+        @brief  Constructs a valid, but zero-capacity dummy queue.
     */
     circular_queue() : m_bufSize(1)
     {
@@ -89,7 +89,7 @@ public:
     circular_queue& operator=(const circular_queue&) = delete;
 
     /*!
-        @brief	Get the numer of elements the queue can hold at most.
+        @brief  Get the numer of elements the queue can hold at most.
     */
     size_t capacity() const
     {
@@ -97,7 +97,7 @@ public:
     }
 
     /*!
-        @brief	Resize the queue. The available elements in the queue are preserved.
+        @brief  Resize the queue. The available elements in the queue are preserved.
                 This is not lock-free and concurrent producer or consumer access
                 will lead to corruption.
         @return True if the new capacity could accommodate the present elements in
@@ -106,7 +106,7 @@ public:
     bool capacity(const size_t cap);
 
     /*!
-        @brief	Discard all data in the queue.
+        @brief  Discard all data in the queue.
     */
     void flush()
     {
@@ -114,7 +114,7 @@ public:
     }
 
     /*!
-        @brief	Get a snapshot number of elements that can be retrieved by pop.
+        @brief  Get a snapshot number of elements that can be retrieved by pop.
     */
     size_t IRAM_ATTR available() const
     {
@@ -124,7 +124,7 @@ public:
     }
 
     /*!
-        @brief	Get the remaining free elementes for pushing.
+        @brief  Get the remaining free elementes for pushing.
     */
     size_t IRAM_ATTR available_for_push() const
     {
@@ -134,7 +134,7 @@ public:
     }
 
     /*!
-        @brief	Peek at the next element pop will return without removing it from the queue.
+        @brief  Peek at the next element pop will return without removing it from the queue.
         @return An rvalue copy of the next element that can be popped. If the queue is empty,
                 return an rvalue copy of the element that is pending the next push.
     */
@@ -146,7 +146,7 @@ public:
     }
 
     /*!
-        @brief	Peek at the next pending input value.
+        @brief  Peek at the next pending input value.
         @return A reference to the next element that can be pushed.
     */
     T& IRAM_ATTR pushpeek()
@@ -157,7 +157,7 @@ public:
     }
 
     /*!
-        @brief	Release the next pending input value, accessible by pushpeek(), into the queue.
+        @brief  Release the next pending input value, accessible by pushpeek(), into the queue.
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
@@ -174,7 +174,7 @@ public:
     }
 
     /*!
-        @brief	Move the rvalue parameter into the queue.
+        @brief  Move the rvalue parameter into the queue.
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
@@ -192,7 +192,7 @@ public:
     }
 
     /*!
-        @brief	Push a copy of the parameter into the queue.
+        @brief  Push a copy of the parameter into the queue.
         @return true if the queue accepted the value, false if the queue
                 was full.
     */
@@ -204,7 +204,7 @@ public:
 
 #if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
     /*!
-        @brief	Push copies of multiple elements from a buffer into the queue,
+        @brief  Push copies of multiple elements from a buffer into the queue,
                 in order, beginning at buffer's head.
         @return The number of elements actually copied into the queue, counted
                 from the buffer head.
@@ -213,7 +213,7 @@ public:
 #endif
 
     /*!
-        @brief	Pop the next available element from the queue.
+        @brief  Pop the next available element from the queue.
         @return An rvalue copy of the popped element, or a default
                 value of type T if the queue is empty.
     */
@@ -221,7 +221,7 @@ public:
 
 #if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
     /*!
-        @brief	Pop multiple elements in ordered sequence from the queue to a buffer.
+        @brief  Pop multiple elements in ordered sequence from the queue to a buffer.
                 If buffer is nullptr, simply discards up to size elements from the queue.
         @return The number of elements actually popped from the queue to
                 buffer.
@@ -230,7 +230,7 @@ public:
 #endif
 
     /*!
-        @brief	Iterate over and remove each available element from queue,
+        @brief  Iterate over and remove each available element from queue,
                 calling back fun with an rvalue reference of every single element.
     */
 #if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
@@ -240,7 +240,7 @@ public:
 #endif
 
     /*!
-        @brief	In reverse order, iterate over, pop and optionally requeue each available element from the queue,
+        @brief  In reverse order, iterate over, pop and optionally requeue each available element from the queue,
                 calling back fun with a reference of every single element.
                 Requeuing is dependent on the return boolean of the callback function. If it
                 returns true, the requeue occurs.

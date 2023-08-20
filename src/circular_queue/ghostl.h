@@ -151,6 +151,16 @@ namespace std
             return equal;
         }
 
+        uint32_t __atomic_exchange_4(uint32_t* ptr, uint32_t value, int memorder)
+        {
+            (void)memorder;
+            noInterrupts();
+            uint32_t orig = *ptr;
+            *ptr = value;
+            interrupts();
+            return orig;
+        }
+
         uint8_t __atomic_exchange_1(uint8_t* ptr, uint8_t value, int memorder)
         {
             (void)memorder;

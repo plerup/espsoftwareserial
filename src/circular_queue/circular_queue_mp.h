@@ -29,7 +29,7 @@ using esp8266::InterruptLock;
 #endif
 
 /*!
-    @brief	Instance class for a multi-producer, single-consumer circular queue / ring buffer (FIFO).
+    @brief  Instance class for a multi-producer, single-consumer circular queue / ring buffer (FIFO).
             This implementation is lock-free between producers and consumer for the available(), peek(),
             pop(), and push() type functions.
 */
@@ -81,7 +81,7 @@ public:
     }
 
     /*!
-        @brief	Resize the queue. The available elements in the queue are preserved.
+        @brief  Resize the queue. The available elements in the queue are preserved.
                 This is not lock-free and concurrent producer or consumer access
                 will lead to corruption.
         @return True if the new capacity could accommodate the present elements in
@@ -90,7 +90,7 @@ public:
     bool capacity(const size_t cap);
 
     /*!
-        @brief	Move the rvalue parameter into the queue, guarded
+        @brief  Move the rvalue parameter into the queue, guarded
                 for multiple concurrent producers.
         @return true if the queue accepted the value, false if the queue
                 was full.
@@ -98,7 +98,7 @@ public:
     bool push(T&& val);
 
     /*!
-        @brief	Push a copy of the parameter into the queue, guarded
+        @brief  Push a copy of the parameter into the queue, guarded
                 for multiple concurrent producers.
         @return true if the queue accepted the value, false if the queue
                 was full.
@@ -110,7 +110,7 @@ public:
     }
 
     /*!
-        @brief	Push copies of multiple elements from a buffer into the queue,
+        @brief  Push copies of multiple elements from a buffer into the queue,
                 in order, beginning at buffer's head. This is safe for
                 multiple producers.
         @return The number of elements actually copied into the queue, counted
