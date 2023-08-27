@@ -25,7 +25,6 @@
 
 #include <atomic>
 #include <utility>
-#include <chrono>
 
 namespace ghostl
 {
@@ -82,29 +81,18 @@ namespace ghostl
         /// <param name="to_erase">An item (not nullptr) that must be a member of this list.</param>
         auto erase(node_type* const to_erase) -> void
         {
-            struct cdma
-            {
-                static auto delay(size_t addr) -> void
-                {
-                    std::this_thread::sleep_for(std::chrono::microseconds(addr % (3 * sizeof(node_type))));
-                }
-            };
-            node_type* next;
-            node_type* pred;
+            node_type* next = nullptr;
+            node_type* pred = nullptr;
+            while (to_erase->erase_lock.exchange(true)) {}
             for (;;)
             {
-                if (!to_erase->erase_lock.exchange(true))
+                next = to_erase->next.load();
+                if (!next->erase_lock.exchange(true))
                 {
-                    next = to_erase->next.load();
                     pred = to_erase->pred.load();
-                    if (!next->erase_lock.exchange(true))
-                    {
-                        if (!pred || !pred->erase_lock.load()) break;
-                        next->erase_lock.store(false);
-                    }
-                    to_erase->erase_lock.store(false);
+                    if (next == to_erase->next.load()) break;
+                    next->erase_lock.store(false);
                 }
-                cdma::delay(reinterpret_cast<size_t>(to_erase));
             }
             for (;;)
             {
