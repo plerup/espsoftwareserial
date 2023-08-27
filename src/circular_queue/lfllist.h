@@ -25,6 +25,7 @@
 
 #include <atomic>
 #include <utility>
+#include <chrono>
 
 namespace ghostl
 {
@@ -47,6 +48,7 @@ namespace ghostl
             friend lfllist;
             std::atomic<node_type*> pred{ nullptr };
             std::atomic<node_type*> next{ nullptr };
+            std::atomic<bool> erase_lock{ false };
         public:
             T item;
         };
@@ -61,6 +63,7 @@ namespace ghostl
             auto node = new (std::nothrow) node_type();
             if (!node) return nullptr;
             node->item = std::move(toInsert);
+            std::atomic_thread_fence(std::memory_order_release);
 
             auto next = first.exchange(node);
             node->next.store(next);
@@ -73,24 +76,48 @@ namespace ghostl
 
         /// <summary>
         /// Erase a previously emplaced node from the list.
-        /// Non-reentrant, non-concurrent: erase(), for_each().
+        /// Using erase(), full concurrency safety for unique nodes.
+        /// Non-reentrant, non-concurrent with for_each().
         /// </summary>
         /// <param name="to_erase">An item (not nullptr) that must be a member of this list.</param>
         auto erase(node_type* const to_erase) -> void
         {
+            struct cdma
+            {
+                static auto delay(size_t addr) -> void
+                {
+                    std::this_thread::sleep_for(std::chrono::microseconds(addr % (3 * sizeof(node_type))));
+                }
+            };
+            node_type* next;
+            node_type* pred;
             for (;;)
             {
-                auto next = to_erase->next.load();
-                auto pred = to_erase->pred.load();
+                if (!to_erase->erase_lock.exchange(true))
+                {
+                    next = to_erase->next.load();
+                    pred = to_erase->pred.load();
+                    if (!next->erase_lock.exchange(true))
+                    {
+                        if (!pred || !pred->erase_lock.load()) break;
+                        next->erase_lock.store(false);
+                    }
+                    to_erase->erase_lock.store(false);
+                }
+                cdma::delay(reinterpret_cast<size_t>(to_erase));
+            }
+            for (;;)
+            {
                 do
                 {
                     next->pred.store(pred);
                     if (pred) pred->next.store(next);
                 } while (!to_erase->pred.compare_exchange_weak(pred, pred));
-
                 auto _to_erase = to_erase;
                 if (pred || first.compare_exchange_strong(_to_erase, next)) break;
+                pred = to_erase->pred.load();
             }
+            next->erase_lock.store(false);
             delete(to_erase);
         };
 
@@ -107,7 +134,7 @@ namespace ghostl
         /// <summary>
         /// Traverse every node of this list in FIFO, then erase that node.
         /// The ownership of the item contained in that node is passed to parameter function.
-        /// Non-reentrant, non-concurrent: erase(), for_each().
+        /// Non-reentrant, non-concurrent with erase() and for_each().
         /// </summary>
         /// <param name="to_erase">A function this is invoked for each node of this list.</param>
 #if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
