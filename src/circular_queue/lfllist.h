@@ -83,15 +83,20 @@ namespace ghostl
         {
             node_type* next = nullptr;
             node_type* pred = nullptr;
-            while (to_erase->erase_lock.exchange(true)) {}
+            auto _false = false;
+            while (!to_erase->erase_lock.compare_exchange_strong(_false, true)) { _false = false; }
             for (;;)
             {
                 next = to_erase->next.load();
-                if (!next->erase_lock.exchange(true))
+                if (next->erase_lock.compare_exchange_weak(_false, true))
                 {
                     pred = to_erase->pred.load();
                     if (next == to_erase->next.load()) break;
                     next->erase_lock.store(false);
+                }
+                else
+                {
+                    _false = false;
                 }
             }
             for (;;)
