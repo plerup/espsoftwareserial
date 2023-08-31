@@ -88,7 +88,7 @@ namespace ghostl
             for (;;)
             {
                 next = to_erase->next.load();
-                if (next->erase_lock.compare_exchange_weak(_false, true))
+                if (next->erase_lock.compare_exchange_strong(_false, true))
                 {
                     pred = to_erase->pred.load();
                     if (next == to_erase->next.load()) break;
@@ -101,14 +101,15 @@ namespace ghostl
             }
             for (;;)
             {
-                do
-                {
-                    next->pred.store(pred);
-                    if (pred) pred->next.store(next);
-                } while (!to_erase->pred.compare_exchange_weak(pred, pred));
+                next->pred.store(pred);
+                if (pred) pred->next.store(next);
                 auto _to_erase = to_erase;
-                if (pred || first.compare_exchange_strong(_to_erase, next)) break;
-                pred = to_erase->pred.load();
+                if (!pred && !first.compare_exchange_strong(_to_erase, next))
+                {
+                    while (to_erase->pred.compare_exchange_strong(pred, pred)) {}
+                    continue;
+                }
+                break;
             }
             next->erase_lock.store(false);
             delete(to_erase);
