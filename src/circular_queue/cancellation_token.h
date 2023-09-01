@@ -51,11 +51,13 @@ namespace ghostl
         {
             return cancelled.load();
         }
-        [[nodiscard]] auto token()
+        [[nodiscard]] auto make_tcs_list_node()
         {
-            auto node = list.emplace_front(task_completion_source<bool>());
-            auto ct = node->item.token();
-            return ct;
+            return list.emplace_front(task_completion_source<bool>());
+        }
+        auto erase_tcs_list_node(lfllist<task_completion_source<bool>>::node_type* tcs_list_node) -> void
+        {
+            list.erase(tcs_list_node);
         }
     private:
         std::atomic<bool> cancelled{ false };
@@ -74,6 +76,7 @@ namespace ghostl
     private:
         friend cancellation_token_source;
         std::shared_ptr<cancellation_state_type> state;
+        decltype(ghostl::cancellation_state_type().make_tcs_list_node()) tcs_node{nullptr};
         cancellation_token(decltype(state) _state) : state(std::move(_state)) { }
     public:
         /// <summary>
@@ -84,6 +87,10 @@ namespace ghostl
         cancellation_token(cancellation_token&& other) noexcept
         {
             state = std::exchange(other.state, nullptr);
+        }
+        ~cancellation_token()
+        {
+            if (tcs_node) state->erase_tcs_list_node(tcs_node);
         }
         auto operator=(const cancellation_token& other) -> cancellation_token&
         {
@@ -105,13 +112,19 @@ namespace ghostl
         {
             return !state || state->is_cancellation_requested();
         }
-        [[nodiscard]] ghostl::task<bool> cancellation_request() const
+        /// <summary>
+        /// Get an awaitable that completes if the cancellation_token's associated
+        /// cancellation_token_source is cancelled. Never call this more than once
+        /// on the same cancellation_token, but get another cancellation token.
+        /// </summary>
+        /// <returns></returns>
+        [[nodiscard]] auto cancellation_request() -> ghostl::task<bool>
         {
             if (!state || state->is_cancellation_requested()) co_return true;
-            auto token = state->token();
+            tcs_node = state->make_tcs_list_node();
             // if concurrently cancelled, re-cancel to force processing of the new token. 
             if (state->is_cancellation_requested()) state->cancel();
-            co_return co_await token;
+            co_return co_await tcs_node->item.token();
         }
     };
 

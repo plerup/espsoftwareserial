@@ -32,24 +32,23 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 namespace ghostl
 {
     template<typename T = void>
-    struct async_queue : private lfllist<task_completion_source<T>>
+    struct async_queue : private lfllist<T>
     {
         async_queue()
         {
-            task_completion_source<T> tcs;
-            pending_tcs = lfllist<task_completion_source<T>>::emplace_front(std::move(tcs));
+            cur_tcs.store(tcs_queue.emplace_front(task_completion_source<>()));
         }
         async_queue(const async_queue&) = delete;
         async_queue(async_queue&&) = delete;
-        ~async_queue() = default;
         auto operator =(const async_queue&)->async_queue & = delete;
         auto operator =(async_queue&&)->async_queue & = delete;
 
         [[nodiscard]] auto push(T&& val) -> bool
         {
-            decltype(pending_tcs) next_tcs;
-            if (!(next_tcs = lfllist<task_completion_source<T>>::emplace_front(task_completion_source<T>()))) return false;
-            pending_tcs.exchange(next_tcs)->item.set_value(std::move(val));
+            if (lfllist<T>::emplace_front(std::move(val)) == nullptr) return false;
+            auto _cur_tcs = cur_tcs.exchange(tcs_queue.emplace_front(task_completion_source<>()));
+            task_completion_source<> tcs = _cur_tcs->item;
+            tcs.set_value();
             return true;
         }
         inline auto push(const T& val) -> bool ALWAYS_INLINE_ATTR
@@ -59,18 +58,22 @@ namespace ghostl
         }
         auto flush() -> void
         {
-            bool is_back = true;
-            for_each([&is_back](lfllist<task_completion_source<T>>::node_type* const to_erase) { if (std::exchange(is_back, false)) erase(to_erase); });
+            while (auto node = lfllist<T>::back()) lfllist<T>::erase(node);
         }
         auto pop() -> ghostl::task<T>
         {
-            auto next = lfllist<task_completion_source<T>>::back();
-            auto val = co_await next->item.token();
-            lfllist<task_completion_source<T>>::erase(next);
-            co_return val;
+            auto tcs = tcs_queue.back();
+            auto token = tcs->item.token();
+            co_await token;
+            tcs_queue.erase(tcs);
+            decltype(lfllist<T>::back()) node = lfllist<T>::back();
+            T item = std::move(node->item);
+            lfllist<T>::erase(node);
+            co_return item;
         }
 
     private:
-        std::atomic<typename lfllist<task_completion_source<T>>::node_type*> pending_tcs;
+        lfllist<task_completion_source<>> tcs_queue;
+        std::atomic<lfllist<task_completion_source<>>::node_type*> cur_tcs;
     };
 }
