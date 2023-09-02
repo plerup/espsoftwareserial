@@ -28,7 +28,25 @@
 
 namespace ghostl
 {
-    template<typename T, typename ForEachArg = void>
+    template<typename T, class Allocator, typename ForEachArg>
+    struct lfllist;
+
+    namespace detail {
+        template<typename T>
+        struct lfllist_node_type
+        {
+            using node_type = lfllist_node_type<T>;
+        private:
+            template<typename, class, typename> friend struct ghostl::lfllist;
+            std::atomic<node_type*> pred{ nullptr };
+            std::atomic<node_type*> next{ nullptr };
+            std::atomic<bool> erase_lock{ false };
+        public:
+            T item;
+        };
+    };
+
+    template<typename T, class Allocator = std::allocator<detail::lfllist_node_type<T>>, typename ForEachArg = void>
     struct lfllist
     {
         lfllist() = default;
@@ -41,16 +59,7 @@ namespace ghostl
         auto operator =(const lfllist&)->lfllist & = delete;
         auto operator =(lfllist&&)->lfllist & = delete;
 
-        struct node_type
-        {
-        private:
-            friend lfllist;
-            std::atomic<node_type*> pred{ nullptr };
-            std::atomic<node_type*> next{ nullptr };
-            std::atomic<bool> erase_lock{ false };
-        public:
-            T item;
-        };
+        using node_type = detail::lfllist_node_type<T>;
 
         /// <summary>
         ///  Emplace an item at the list's front. Is safe for concurrency and reentrance.
@@ -59,8 +68,9 @@ namespace ghostl
         /// <returns>The pointer to new node, nullptr on failure.</returns>
         [[nodiscard]] auto emplace_front(T&& toInsert) -> node_type*
         {
-            auto node = new (std::nothrow) node_type();
+            auto node = std::allocator_traits<Allocator>::allocate(alloc, 1);
             if (!node) return nullptr;
+            std::allocator_traits<Allocator>::construct(alloc, node);
             node->item = std::move(toInsert);
             std::atomic_thread_fence(std::memory_order_release);
 
@@ -112,7 +122,8 @@ namespace ghostl
                 break;
             }
             next->erase_lock.store(false);
-            delete(to_erase);
+            std::allocator_traits<Allocator>::destroy(alloc, to_erase);
+            std::allocator_traits<Allocator>::deallocate(alloc, to_erase, 1);
         };
 
         [[nodiscard]] auto front() -> node_type*
@@ -145,6 +156,7 @@ namespace ghostl
         };
 
     private:
+        Allocator alloc;
         node_type last_sentinel;
         std::atomic<node_type*> first = &last_sentinel;
     };
