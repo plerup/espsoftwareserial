@@ -58,6 +58,8 @@ namespace ghostl
         }
         auto flush() -> void
         {
+            while (auto node = tcs_queue.back()) tcs_queue.erase(node);
+            cur_tcs.store(tcs_queue.emplace_front(task_completion_source<>()));
             while (auto node = lfllist<T>::back()) lfllist<T>::erase(node);
         }
         auto pop() -> ghostl::task<T>
