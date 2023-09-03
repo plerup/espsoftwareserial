@@ -35,14 +35,13 @@ namespace ghostl
         template<typename T>
         struct lfllist_node_type
         {
+            T item; // must be first member to facilitate reinterpret_cast.
             using node_type = lfllist_node_type<T>;
         private:
             template<typename, class, typename> friend struct ghostl::lfllist;
             std::atomic<node_type*> pred{ nullptr };
             std::atomic<node_type*> next{ nullptr };
             std::atomic<bool> erase_lock{ false };
-        public:
-            T item;
         };
     };
 
@@ -54,7 +53,8 @@ namespace ghostl
         lfllist(lfllist&&) = delete;
         ~lfllist()
         {
-            while (auto node = back()) erase(node);
+            node_type* node;
+            while (nullptr != (node = back())) erase(node);
         }
         auto operator =(const lfllist&)->lfllist & = delete;
         auto operator =(lfllist&&)->lfllist & = delete;
@@ -86,15 +86,29 @@ namespace ghostl
         /// <summary>
         /// Erase a previously emplaced node from the list.
         /// Using erase(), full concurrency safety for unique nodes.
-        /// Non-reentrant, non-concurrent with for_each().
+        /// Non-reentrant, non-concurrent with for_each(), and try_pop().
+        /// Caveat: for_each() or try_pop() may erase any node pointer.
         /// </summary>
         /// <param name="to_erase">An item (not nullptr) that must be a member of this list.</param>
         auto erase(node_type* const to_erase) -> void
         {
+            while (!try_erase(to_erase)) {}
+        }
+
+        /// <summary>
+        /// Try to erase a previously emplaced node from the list.
+        /// Using try_erase(), full concurrency safety for unique nodes.
+        /// Non-reentrant, non-concurrent with for_each(), and try_pop().
+        /// Caveat: for_each() or try_pop() may erase any node pointer.
+        /// </summary>
+        /// <param name="to_erase">An item (not nullptr) that must be a member of this list.</param>
+        /// <returns>True on success, false if there is competition on locking to_erase.</returns>
+        auto try_erase(node_type* const to_erase) -> bool
+        {
+            auto _false = false;
+            if (!to_erase->erase_lock.compare_exchange_strong(_false, true)) { return false; }
             node_type* next = nullptr;
             node_type* pred = nullptr;
-            auto _false = false;
-            while (!to_erase->erase_lock.compare_exchange_strong(_false, true)) { _false = false; }
             for (;;)
             {
                 next = to_erase->next.load();
@@ -122,24 +136,42 @@ namespace ghostl
                 break;
             }
             next->erase_lock.store(false);
-            std::allocator_traits<Allocator>::destroy(alloc, to_erase);
-            std::allocator_traits<Allocator>::deallocate(alloc, to_erase, 1);
-        };
-
-        [[nodiscard]] auto front() -> node_type*
-        {
-            return first.load();
+            destroy(to_erase);
+            return true;
         };
 
         [[nodiscard]] auto back() -> node_type*
         {
-            return last_sentinel.pred.load();
+            if (auto node = last_sentinel.pred.load(); node) return node;
+            return nullptr;
+        }
+
+        /// <summary>
+        /// Try to atomically get the item of and erase a node at the back of the list.
+        /// Using try_pop(), full concurrency safety.
+        /// Non-reentrant, non-concurrent with erase().
+        /// </summary>
+        /// <param name="item">An out argument that on success, receives the item at the back of this list.</param>
+        /// <returns>True on success, false if the queue is empty or there is competition.</returns>
+        [[nodiscard]] auto try_pop(T& item) -> bool
+        {
+            auto _false = false;
+            while (!pop_guard.compare_exchange_strong(_false, true)) { _false = false; }
+            auto has_item = false;
+            if (auto node = back())
+            {
+                item = std::move(node->item);
+                erase(node);
+                has_item = true;
+            }
+            pop_guard.store(false);
+            return has_item;
         };
 
         /// <summary>
         /// Traverse every node of this list in FIFO, then erase that node.
         /// The ownership of the item contained in that node is passed to parameter function.
-        /// Non-reentrant, non-concurrent with erase() and for_each().
+        /// Non-reentrant, non-concurrent with erase(), try_pop(), and for_each().
         /// </summary>
         /// <param name="to_erase">A function this is invoked for each node of this list.</param>
 #if defined(ESP8266) || defined(ESP32) || !defined(ARDUINO)
@@ -148,10 +180,9 @@ namespace ghostl
         void for_each(Delegate<void(T&&), ForEachArg> fn)
 #endif
         {
-            while (auto node = back())
+            while (back())
             {
-                fn(std::move(std::exchange(node->item, {})));
-                erase(node);
+                if (T item; try_pop(item)) fn(std::move(item));
             }
         };
 
@@ -159,6 +190,13 @@ namespace ghostl
         Allocator alloc;
         node_type last_sentinel;
         std::atomic<node_type*> first = &last_sentinel;
+        std::atomic<bool> pop_guard{ false };
+
+        auto destroy(node_type* const node) -> void
+        {
+            std::allocator_traits<Allocator>::destroy(alloc, node);
+            std::allocator_traits<Allocator>::deallocate(alloc, node, 1);
+        }
     };
 }
 

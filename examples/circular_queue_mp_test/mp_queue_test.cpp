@@ -9,7 +9,7 @@
 
 struct qitem
 {
-	// produer id
+	// producer id
 	int id;
 	// monotonic increasing value
 	int val = 0;

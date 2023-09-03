@@ -58,9 +58,15 @@ namespace ghostl
         }
         auto flush() -> void
         {
-            while (auto node = tcs_queue.back()) tcs_queue.erase(node);
+            while (tcs_queue.back())
+            {
+                if (task_completion_source<> item; tcs_queue.try_pop(item)) {}
+            }
             cur_tcs.store(tcs_queue.emplace_front(task_completion_source<>()));
-            while (auto node = lfllist<T>::back()) lfllist<T>::erase(node);
+            while (lfllist<T>::back())
+            {
+                if (T item; lfllist<T>::try_pop(item)) {}
+            }
         }
         auto pop() -> ghostl::task<T>
         {
