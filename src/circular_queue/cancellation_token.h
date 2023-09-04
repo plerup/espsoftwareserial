@@ -117,14 +117,17 @@ namespace ghostl
         /// cancellation_token_source is cancelled. Never call this more than once
         /// on the same cancellation_token, but get another cancellation token.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>A bool task, that has a value of true if cancellation occured,
+        /// or false if the cancellation source etc was deleted without cancellation.</returns>
         [[nodiscard]] auto cancellation_request() -> ghostl::task<bool>
         {
             if (!state || state->is_cancellation_requested()) co_return true;
             tcs_node = state->make_tcs_list_node();
             // if concurrently cancelled, re-cancel to force processing of the new token. 
             if (state->is_cancellation_requested()) state->cancel();
-            co_return co_await tcs_node->item.token();
+            auto cancelled = co_await tcs_node->item.token();
+            tcs_node = nullptr;
+            co_return cancelled;
         }
     };
 
