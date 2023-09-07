@@ -68,7 +68,7 @@ namespace ghostl
         /// </summary>
         /// <param name="toInsert">The item to emplace.</param>
         /// <returns>The pointer to new node, nullptr on failure.</returns>
-        [[nodiscard]] auto emplace_front(T&& toInsert) -> node_type*
+        [[nodiscard]] auto IRAM_ATTR emplace_front(T&& toInsert) -> node_type*
         {
             auto node = std::allocator_traits<Allocator>::allocate(alloc, 1);
             if (!node) return nullptr;
@@ -83,7 +83,7 @@ namespace ghostl
         /// </summary>
         /// <param name="node">A node pointer from a prior remove().</param>
         /// <returns>, nullptr on failure.</returns>
-        auto push(node_type* const node) -> void
+        auto IRAM_ATTR push(node_type* const node) -> void
         {
             auto next = first.exchange(node);
             node->next.store(next);

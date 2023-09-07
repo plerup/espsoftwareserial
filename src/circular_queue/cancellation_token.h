@@ -125,9 +125,9 @@ namespace ghostl
             tcs_node = state->make_tcs_list_node();
             // if concurrently cancelled, re-cancel to force processing of the new token. 
             if (state->is_cancellation_requested()) state->cancel();
-            auto cancelled = co_await tcs_node->item.token();
+            auto token = tcs_node->item.token();
             tcs_node = nullptr;
-            co_return cancelled;
+            co_return co_await token;
         }
     };
 

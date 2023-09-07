@@ -22,13 +22,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "circular_queue/task.h"
 #include "circular_queue/lfllist.h"
 
-#if defined(__GNUC__)
-#undef ALWAYS_INLINE_ATTR
-#define ALWAYS_INLINE_ATTR __attribute__((always_inline))
-#else
-#define ALWAYS_INLINE_ATTR
-#endif
-
 namespace ghostl
 {
     template<typename T = void>

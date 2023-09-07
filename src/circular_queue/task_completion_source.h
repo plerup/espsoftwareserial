@@ -22,6 +22,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <memory>
 #include <coroutine>
 
+#if defined(__GNUC__)
+#undef ALWAYS_INLINE_ATTR
+#define ALWAYS_INLINE_ATTR __attribute__((always_inline))
+#else
+#define ALWAYS_INLINE_ATTR
+#endif
+
 namespace ghostl
 {
 template<typename T = void>
@@ -49,23 +56,19 @@ struct task_completion_source
         }
         return *this;
     }
-    void set_value(const T& v) const
+    auto set_value(T&& val) const -> void
     {
         for (bool expect{false}; !state->is_set.compare_exchange_strong(expect, true);)
             return;
-        state->value = std::make_shared<T>(v);
+        state->value = std::make_shared<T>(std::move(val));
         std::atomic_thread_fence(std::memory_order_release);
         for (bool expect{false}; !state->ready.compare_exchange_weak(expect, true); expect = false) {}
         if (auto handle = state->coroutine.load(); handle && !handle.done()) { handle.resume(); }
     }
-    void set_value(T&& v) const
+    auto set_value(const T& val) const -> void ALWAYS_INLINE_ATTR
     {
-        for (bool expect{false}; !state->is_set.compare_exchange_strong(expect, true);)
-            return;
-        state->value = std::make_shared<T>(std::move(v));
-        std::atomic_thread_fence(std::memory_order_release);
-        for (bool expect{false}; !state->ready.compare_exchange_weak(expect, true); expect = false) {}
-        if (auto handle = state->coroutine.load(); handle && !handle.done()) { handle.resume(); }
+        T v(val);
+        set_value(std::move(v));
     }
     [[nodiscard]] auto token() const { return awaiter(state); }
 private:
