@@ -27,6 +27,8 @@ namespace ghostl
     template<typename T = void>
     struct async_queue : private lfllist<T>
     {
+        using lfllist = lfllist<T>;
+
         async_queue()
         {
             cur_tcs.store(tcs_queue.emplace_front(task_completion_source<>()));
@@ -38,7 +40,7 @@ namespace ghostl
 
         [[nodiscard]] auto push(T&& val) -> bool
         {
-            if (lfllist<T>::emplace_front(std::move(val)) == nullptr) return false;
+            if (lfllist::emplace_front(std::move(val)) == nullptr) return false;
             auto _cur_tcs = cur_tcs.exchange(tcs_queue.emplace_front(task_completion_source<>()));
             task_completion_source<> tcs = _cur_tcs->item;
             tcs.set_value();
@@ -56,9 +58,9 @@ namespace ghostl
                 if (task_completion_source<> item; tcs_queue.try_pop(item)) {}
             }
             cur_tcs.store(tcs_queue.emplace_front(task_completion_source<>()));
-            while (lfllist<T>::back())
+            while (lfllist::back())
             {
-                if (T item; lfllist<T>::try_pop(item)) {}
+                if (T item; lfllist::try_pop(item)) {}
             }
         }
         auto pop() -> ghostl::task<T>
@@ -67,14 +69,14 @@ namespace ghostl
             auto token = tcs->item.token();
             co_await token;
             tcs_queue.erase(tcs);
-            decltype(lfllist<T>::back()) node = lfllist<T>::back();
+            decltype(lfllist::back()) node = lfllist::back();
             T item = std::move(node->item);
-            lfllist<T>::erase(node);
+            lfllist::erase(node);
             co_return item;
         }
 
     private:
-        lfllist<task_completion_source<>> tcs_queue;
-        std::atomic<lfllist<task_completion_source<>>::node_type*> cur_tcs;
+        ghostl::lfllist<task_completion_source<>> tcs_queue;
+        std::atomic<decltype(tcs_queue)::node_type*> cur_tcs;
     };
 }

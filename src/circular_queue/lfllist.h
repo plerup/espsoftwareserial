@@ -50,6 +50,8 @@ namespace ghostl
     template<typename T, class Allocator = std::allocator<detail::lfllist_node_type<T>>, typename ForEachArg = void>
     struct lfllist
     {
+        using node_type = detail::lfllist_node_type<T>;
+
         lfllist() = default;
         lfllist(const lfllist&) = delete;
         lfllist(lfllist&&) = delete;
@@ -60,8 +62,6 @@ namespace ghostl
         }
         auto operator =(const lfllist&)->lfllist & = delete;
         auto operator =(lfllist&&)->lfllist & = delete;
-
-        using node_type = detail::lfllist_node_type<T>;
 
         /// <summary>
         ///  Emplace an item at the list's front. Is safe for concurrency and reentrance.
@@ -93,24 +93,24 @@ namespace ghostl
         };
 
         /// <summary>
-        /// Remove, with destroying it, a previously emplaced node from the list.
+        /// Remove, without destroying it, a member node from the list.
         /// Using remove() or erase(), full concurrency safety for unique nodes.
         /// Non-reentrant, non-concurrent with for_each(), and try_pop().
         /// Caveat: for_each() or try_pop() may erase any node pointer.
         /// </summary>
-        /// <param name="node">An node (not nullptr) that must be a member of this list.</param>
+        /// <param name="node">A node (not nullptr) that must be a member of this list.</param>
         auto remove(node_type* const node) -> void
         {
             while (!try_remove(node)) {}
         }
 
         /// <summary>
-        /// Try to remove, with destroying it, a previously emplaced node from the list.
+        /// Try to remove, without destroying it, a member node from the list.
         /// Using remove() or erase(), full concurrency safety for unique nodes.
         /// Non-reentrant, non-concurrent with for_each(), and try_pop().
         /// Caveat: for_each() or try_pop() may erase any node pointer.
         /// </summary>
-        /// <param name="node">An node (not nullptr) that must be a member of this list.</param>
+        /// <param name="node">A node (not nullptr) that must be a member of this list.</param>
         /// <returns>True on success, false if there is competition on locking node.</returns>
         auto try_remove(node_type* const node) -> bool
         {
@@ -145,6 +145,7 @@ namespace ghostl
                 break;
             }
             next->remove_lock.store(false);
+            node->remove_lock.store(false);
             return true;
         };
 
@@ -204,7 +205,7 @@ namespace ghostl
         };
 
         /// <summary>
-        /// Try to atomically get the item of and erase a node at the back of the list.
+        /// Try to atomically remove a node at the back of the list.
         /// Using try_pop(), full concurrency safety.
         /// Non-reentrant, non-concurrent with erase().
         /// </summary>
