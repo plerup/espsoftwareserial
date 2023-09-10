@@ -38,7 +38,7 @@ namespace ghostl
             T item; // must be first member to facilitate reinterpret_cast.
             using node_type = lfllist_node_type<T>;
             lfllist_node_type() = default;
-            lfllist_node_type(T&& _item) : item(std::move(_item)) {}
+            explicit lfllist_node_type(T&& _item) : item(std::move(_item)) {}
         private:
             template<typename, class, typename> friend struct ghostl::lfllist;
             std::atomic<node_type*> pred{ nullptr };
@@ -214,7 +214,7 @@ namespace ghostl
         [[nodiscard]] auto try_pop(node_type*& node) -> bool
         {
             auto _false = false;
-            while (!pop_guard.compare_exchange_strong(_false, true)) { _false = false; }
+            if (!pop_guard.compare_exchange_strong(_false, true)) { return false; }
             auto has_node = false;
             if (nullptr != (node = back()))
             {

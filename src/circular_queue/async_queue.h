@@ -40,11 +40,21 @@ namespace ghostl
 
         [[nodiscard]] auto push(T&& val) -> bool
         {
-            if (lfllist::emplace_front(std::move(val)) == nullptr) return false;
-            auto _cur_tcs = cur_tcs.exchange(tcs_queue.emplace_front(task_completion_source<>()));
-            task_completion_source<> tcs = _cur_tcs->item;
-            tcs.set_value();
-            return true;
+            if (auto node = lfllist::emplace_front(std::move(val)); node != nullptr)
+            {
+                if (auto _tcs_node = tcs_queue.emplace_front(task_completion_source<>()); _tcs_node != nullptr)
+                {
+                    if (auto _cur_tcs = cur_tcs.exchange(_tcs_node); _cur_tcs != nullptr)
+                    {
+                        task_completion_source<> tcs = _cur_tcs->item;
+                        tcs.set_value();
+                        return true;
+                    }
+                    // keep new cur_tcs, this fixes previous failure to set it (OOM)
+                }
+                lfllist::erase(node);
+            }
+            return false;
         }
         inline auto push(const T& val) -> bool ALWAYS_INLINE_ATTR
         {
