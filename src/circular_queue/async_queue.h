@@ -27,7 +27,7 @@ namespace ghostl
     template<typename T = void>
     struct async_queue : private lfllist<T>
     {
-        using lfllist = lfllist<T>;
+        using lfllist_type = lfllist<T>;
 
         async_queue()
         {
@@ -40,7 +40,7 @@ namespace ghostl
 
         [[nodiscard]] auto push(T&& val) -> bool
         {
-            if (auto node = lfllist::emplace_front(std::move(val)); node != nullptr)
+            if (auto node = lfllist_type::emplace_front(std::move(val)); node != nullptr)
             {
                 if (auto _tcs_node = tcs_queue.emplace_front(task_completion_source<>()); _tcs_node != nullptr)
                 {
@@ -52,7 +52,7 @@ namespace ghostl
                     }
                     // keep new cur_tcs, this fixes previous failure to set it (OOM)
                 }
-                lfllist::erase(node);
+                lfllist_type::erase(node);
             }
             return false;
         }
@@ -68,9 +68,9 @@ namespace ghostl
                 if (task_completion_source<> item; tcs_queue.try_pop(item)) {}
             }
             cur_tcs.store(tcs_queue.emplace_front(task_completion_source<>()));
-            while (lfllist::back())
+            while (lfllist_type::back())
             {
-                if (T item; lfllist::try_pop(item)) {}
+                if (T item; lfllist_type::try_pop(item)) {}
             }
         }
         auto pop() -> ghostl::task<T>
@@ -79,14 +79,14 @@ namespace ghostl
             auto token = tcs->item.token();
             co_await token;
             tcs_queue.erase(tcs);
-            decltype(lfllist::back()) node = lfllist::back();
+            decltype(lfllist_type::back()) node = lfllist_type::back();
             T item = std::move(node->item);
-            lfllist::erase(node);
+            lfllist_type::erase(node);
             co_return item;
         }
 
     private:
         ghostl::lfllist<task_completion_source<>> tcs_queue;
-        std::atomic<decltype(tcs_queue)::node_type*> cur_tcs;
+        std::atomic<typename decltype(tcs_queue)::node_type*> cur_tcs;
     };
 }
