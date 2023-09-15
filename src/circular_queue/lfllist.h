@@ -146,6 +146,8 @@ namespace ghostl
             }
             next->remove_lock.store(false);
             node->remove_lock.store(false);
+            node->pred.store(nullptr);
+            node->next.store(nullptr);
             return true;
         };
 
