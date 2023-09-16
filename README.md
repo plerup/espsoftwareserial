@@ -156,7 +156,7 @@ The responsible maintainer of the esp8266 repository has kindly shared the
 following command line instructions to use, if one wishes to manually
 update EspSoftwareSerial to a newer release than pulled in via the ESP8266 Arduino BSP:
 
-To update esp8266/arduino EspSoftwareSerial submodule to lastest master:
+To update esp8266/arduino EspSoftwareSerial submodule to latest main:
 
 Clean it (optional):
 ```shell
@@ -166,6 +166,6 @@ $ git submodule update --init
 Now update it:
 ```shell
 $ cd libraries/SoftwareSerial
-$ git checkout master
+$ git checkout main
 $ git pull
 ```
