@@ -20,7 +20,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <atomic>
 #include <memory>
-#include <concepts>
 #include <coroutine>
 
 namespace ghostl
@@ -38,15 +37,15 @@ namespace ghostl
             std::suspend_always final_suspend() const noexcept { return {}; }
             void unhandled_exception() { exception = std::current_exception(); }
 
-            template <std::convertible_to<T> From> // C++20 concept
-            std::suspend_always yield_value(From&& from)
+            template<typename C>
+            std::suspend_always yield_value(C&& from)
             {
-                value = std::forward<From>(from); // caching the result in promise
+                value = std::move(from); // caching the result in promise
                 return {};
             }
             void return_void() const { }
 
-            T value {};
+            T value{};
             std::exception_ptr exception;
         };
 
