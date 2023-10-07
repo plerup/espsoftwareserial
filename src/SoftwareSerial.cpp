@@ -136,7 +136,7 @@ void UARTBase::end()
 }
 
 uint32_t UARTBase::baudRate() {
-    return 1000000UL / ticksToMicros(m_bitTicks);
+    return microsToTicks(1000000UL) / m_bitTicks;
 }
 
 void UARTBase::setTransmitEnablePin(int8_t txEnablePin) {
@@ -184,8 +184,8 @@ void UARTBase::enableRx(bool on) {
         if (on) {
             m_rxLastBit = m_pduBits - 1;
             // Init to stop bit level and current tick
-            m_isrLastTick = (microsToTicks(micros()) | 1) ^ m_invert;
-            if (m_bitTicks >= microsToTicks(1000000UL / 74880UL))
+            m_isrLastTick = (ticks() | 1) ^ m_invert;
+            if (m_bitTicks >= microsToTicks(1000000UL) / 74880UL)
                 attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitISR), this, CHANGE);
             else
                 attachInterruptArg(digitalPinToInterrupt(m_rxPin), reinterpret_cast<void (*)(void*)>(rxBitSyncISR), this, m_invert ? RISING : FALLING);
@@ -265,7 +265,7 @@ int UARTBase::available() {
 void UARTBase::lazyDelay() {
     // Reenable interrupts while delaying to avoid other tasks piling up
     if (!m_intTxEnabled) { restoreInterrupts(); }
-    const auto expired = microsToTicks(micros()) - m_periodStart;
+    const auto expired = ticks() - m_periodStart;
     const int32_t remaining = m_periodDuration - expired;
     const uint32_t ms = remaining > 0 ? ticksToMicros(remaining) / 1000UL : 0;
     if (ms > 0)
@@ -283,12 +283,12 @@ void UARTBase::lazyDelay() {
 }
 
 void IRAM_ATTR UARTBase::preciseDelay() {
-    uint32_t ticks;
+    uint32_t now;
     do {
-        ticks = microsToTicks(micros());
-    } while ((ticks - m_periodStart) < m_periodDuration);
+        now = ticks();
+    } while ((now - m_periodStart) < m_periodDuration);
     m_periodDuration = 0;
-    m_periodStart = ticks;
+    m_periodStart = now;
 }
 
 void IRAM_ATTR UARTBase::writePeriod(
@@ -363,7 +363,7 @@ size_t IRAM_ATTR UARTBase::write(const uint8_t* buffer, size_t size, Parity pari
     const uint32_t dataMask = ((1UL << m_dataBits) - 1);
     bool withStopBit = true;
     m_periodDuration = 0;
-    m_periodStart = microsToTicks(micros());
+    m_periodStart = ticks();
     for (size_t cnt = 0; cnt < size; ++cnt) {
         uint8_t byte = pgm_read_byte(buffer + cnt) & dataMask;
         // push LSB start-data-parity-stop bit pattern into uint32_t
@@ -480,7 +480,7 @@ void UARTBase::rxBits() {
     // extraneous stop level bit out of sequence breaks rx.
     if (m_rxLastBit < m_pduBits - 1) {
         const uint32_t detectionTicks = (m_pduBits - 1 - m_rxLastBit) * m_bitTicks;
-        if (!m_isrBuffer->available() && microsToTicks(micros()) - m_isrLastTick > detectionTicks) {
+        if (!m_isrBuffer->available() && ticks() - m_isrLastTick > detectionTicks) {
             // Produce faux stop bit level, prevents start bit maldetection
             // tick's LSB is repurposed for the level bit
             rxBits(((m_isrLastTick + detectionTicks) | 1) ^ m_invert);
@@ -492,11 +492,11 @@ void UARTBase::rxBits(const uint32_t isrTick) {
     const bool level = (m_isrLastTick & 1) ^ m_invert;
 
     // error introduced by edge value in LSB of isrTick is negligible
-    uint32_t ticks = isrTick - m_isrLastTick;
+    uint32_t ticksDiff = isrTick - m_isrLastTick;
     m_isrLastTick = isrTick;
 
-    uint32_t bits = ticks / m_bitTicks;
-    if (ticks % m_bitTicks > (m_bitTicks >> 1)) ++bits;
+    uint32_t bits = ticksDiff / m_bitTicks;
+    if (ticksDiff % m_bitTicks > (m_bitTicks >> 1)) ++bits;
     while (bits > 0) {
         // start bit detection
         if (m_rxLastBit >= (m_pduBits - 1)) {
@@ -558,7 +558,7 @@ void UARTBase::rxBits(const uint32_t isrTick) {
 
 void IRAM_ATTR UARTBase::rxBitISR(UARTBase* self) {
     const bool level = *self->m_rxReg & self->m_rxBitMask;
-    const uint32_t curTick = microsToTicks(micros());
+    const uint32_t curTick = ticks();
     const bool empty = !self->m_isrBuffer->available();
 
     // Store level and tick in the buffer unless we have an overflow
@@ -570,7 +570,7 @@ void IRAM_ATTR UARTBase::rxBitISR(UARTBase* self) {
 
 void IRAM_ATTR UARTBase::rxBitSyncISR(UARTBase* self) {
     bool level = self->m_invert;
-    const uint32_t start = microsToTicks(micros());
+    const uint32_t start = ticks();
     uint32_t wait = self->m_bitTicks;
     const bool empty = !self->m_isrBuffer->available();
 
@@ -579,7 +579,7 @@ void IRAM_ATTR UARTBase::rxBitSyncISR(UARTBase* self) {
     if (!self->m_isrBuffer->push(((start + wait) | 1U) ^ !level)) self->m_isrOverflow.store(true);
 
     for (uint32_t i = 0; i < self->m_pduBits; ++i) {
-        while (microsToTicks(micros()) - start < wait) {};
+        while (ticks() - start < wait) {};
         wait += self->m_bitTicks;
 
         // Store level and tick in the buffer unless we have an overflow
