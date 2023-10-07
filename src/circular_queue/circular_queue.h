@@ -66,7 +66,7 @@ public:
     /*!
         @brief  Constructs a queue of the given maximum capacity.
     */
-    circular_queue(const size_t capacity) : m_bufSize(capacity + 1), m_buffer{ std::make_unique<T[]>(m_bufSize) }
+    circular_queue(const size_t capacity) : m_bufSize(capacity + 1), m_buffer(new T[m_bufSize])
     {
         m_inPos.store(0);
         m_outPos.store(0);
@@ -267,7 +267,7 @@ bool circular_queue<T, ForEachArg>::capacity(const size_t cap)
 {
     if (cap + 1 == m_bufSize) return true;
     else if (available() > cap) return false;
-    std::unique_ptr<T[] > buffer{ std::make_unique<T[]>(cap + 1) };
+    std::unique_ptr<T[] > buffer(new T[cap + 1]);
     const auto available = pop_n(buffer, cap);
     m_buffer.reset(buffer);
     m_bufSize = cap + 1;
