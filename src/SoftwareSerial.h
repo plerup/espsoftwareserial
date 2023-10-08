@@ -16,7 +16,6 @@ Lesser General Public License for more details.
 You should have received a copy of the GNU Lesser General Public
 License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
 */
 
 #ifndef __SoftwareSerial_h
@@ -24,6 +23,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "circular_queue/circular_queue.h"
 #include <Stream.h>
+
+// Define lets bittiming calculation be based on cpu cycles instead
+// microseconds. This has higher resolution and general precision under
+// low-load conditions, but whenever the CPU frequency gets switched,
+// like during WiFi operation, it in turn is much more imprecise.
+// TODO: increase average timing precision in CCY mode by computing
+// bit durations in 10ths of micros.
+#undef CCY_TICKS
 
 namespace EspSoftwareSerial {
 
@@ -319,13 +326,25 @@ private:
     static void rxBitSyncISR(UARTBase* self);
 
     static inline uint32_t IRAM_ATTR ticks() ALWAYS_INLINE_ATTR {
+#ifdef CCYTICKS
+        return ESP.getCycleCount() << 1;
+#else
         return micros() << 1;
+#endif // CCYTICKS
     }
     static inline uint32_t IRAM_ATTR microsToTicks(uint32_t micros) ALWAYS_INLINE_ATTR {
+#ifdef CCYTICKS
+        return (ESP.getCpuFreqMHz() * micros) << 1;
+#else
         return micros << 1;
+#endif // CCYTICKS
     }
     static inline uint32_t ticksToMicros(uint32_t ticks) ALWAYS_INLINE_ATTR {
+#ifdef CCYTICKS
+        return (ticks >> 1) / ESP.getCpuFreqMHz();
+#else
         return ticks >> 1;
+#endif // CCYTICKS
     }
 
     // Member variables

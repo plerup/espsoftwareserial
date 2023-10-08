@@ -1,5 +1,4 @@
 /*
-
 SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266/ESP32.
 Copyright (c) 2015-2016 Peter Lerup. All rights reserved.
 Copyright (c) 2018-2019 Dirk O. Kaar. All rights reserved.
@@ -17,7 +16,6 @@ Lesser General Public License for more details.
 You should have received a copy of the GNU Lesser General Public
 License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
 */
 
 #include "SoftwareSerial.h"
