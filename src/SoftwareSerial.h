@@ -32,6 +32,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // bit durations in 10ths of micros.
 #undef CCY_TICKS
 
+//#define ALLOW_STRAPPING_PINS // Add to your code if you want to use the strapping pins for SoftwareSerial, too. Use at your own risk!
+
 namespace EspSoftwareSerial {
 
 // Interface definition for template argument of BasicUART
@@ -53,6 +55,13 @@ public:
         // Remove the strapping pins as defined in the datasheets, they affect bootup and other critical operations
         // Remmove the flash memory pins on related devices, since using these causes memory access issues.
     #ifdef CONFIG_IDF_TARGET_ESP32
+    #ifdef ALLOW_STRAPPING_PINS
+        return (pin >= 1 && pin <= 5) ||
+            (pin >= 12 && pin <= 15) ||
+            (!psramFound() && pin >= 16 && pin <= 17) ||
+            (pin >= 18 && pin <= 19) ||
+            (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 39);
+    #else
         // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf,
         // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg
         return (pin == 1) || (pin >= 3 && pin <= 5) ||
@@ -60,6 +69,7 @@ public:
             (!psramFound() && pin >= 16 && pin <= 17) ||
             (pin >= 18 && pin <= 19) ||
             (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 39);
+    #endif //  ALLOW_STRAPPING_PINS
     #elif CONFIG_IDF_TARGET_ESP32S2
         // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf,
         // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/_images/esp32-s2_saola1-pinout.jpg
