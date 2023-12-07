@@ -117,7 +117,7 @@ namespace ghostl
         /// cancellation_token_source is cancelled. Never call this more than once
         /// on the same cancellation_token, but get another cancellation token.
         /// </summary>
-        /// <returns>A bool task, that has a value of true if cancellation occured,
+        /// <returns>A bool task, that has a value of true if cancellation occurred,
         /// or false if the cancellation source etc was deleted without cancellation.</returns>
         [[nodiscard]] auto cancellation_request() -> ghostl::task<bool>
         {

@@ -89,7 +89,7 @@ public:
     circular_queue& operator=(const circular_queue&) = delete;
 
     /*!
-        @brief  Get the numer of elements the queue can hold at most.
+        @brief  Get the number of elements the queue can hold at most.
     */
     size_t capacity() const
     {

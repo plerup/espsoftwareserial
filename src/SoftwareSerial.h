@@ -51,7 +51,7 @@ public:
         return (pin >= 0 && pin <= 16) && !isFlashInterfacePin(pin);
     #elif defined(ESP32)
         // Remove the strapping pins as defined in the datasheets, they affect bootup and other critical operations
-        // Remmove the flash memory pins on related devices, since using these causes memory access issues.
+        // Remove the flash memory pins on related devices, since using these causes memory access issues.
     #ifdef CONFIG_IDF_TARGET_ESP32
         // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf,
         // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg

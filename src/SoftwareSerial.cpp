@@ -261,7 +261,7 @@ int UARTBase::available() {
 }
 
 void UARTBase::lazyDelay() {
-    // Reenable interrupts while delaying to avoid other tasks piling up
+    // Re-enable interrupts while delaying to avoid other tasks piling up
     if (!m_intTxEnabled) { restoreInterrupts(); }
     const auto expired = ticks() - m_periodStart;
     const int32_t remaining = m_periodDuration - expired;
