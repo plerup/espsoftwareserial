@@ -41,7 +41,7 @@ void setup() {
 	logSer.println(PSTR("\nOne Wire Half Duplex Bitpattern and Datarate Test"));
 	swSer.begin(TESTBPS, EspSoftwareSerial::SWSERIAL_8N1, -1, D5);
 	swSer.enableIntTx(true);
-	logSer.printf(PSTR("Tx from swSer to hwSer at %u\n"), swSer.baudRate());
+	logSer.printf(PSTR("Tx from swSer to hwSer at %lu\n"), swSer.baudRate());
 }
 
 uint8_t val = 0xff;
