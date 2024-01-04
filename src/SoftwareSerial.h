@@ -452,7 +452,48 @@ using UART = BasicUART< GpioCapabilities >;
 }; // namespace EspSoftwareSerial
 
 using SoftwareSerial = EspSoftwareSerial::UART;
-using namespace EspSoftwareSerial;
+using SoftwareSerialParity = EspSoftwareSerial::Parity;
+using SoftwareSerialConfig = EspSoftwareSerial::Config;
+using EspSoftwareSerial::SWSERIAL_5N1;
+using EspSoftwareSerial::SWSERIAL_6N1;
+using EspSoftwareSerial::SWSERIAL_7N1;
+using EspSoftwareSerial::SWSERIAL_8N1;
+using EspSoftwareSerial::SWSERIAL_5E1;
+using EspSoftwareSerial::SWSERIAL_6E1;
+using EspSoftwareSerial::SWSERIAL_7E1;
+using EspSoftwareSerial::SWSERIAL_8E1;
+using EspSoftwareSerial::SWSERIAL_5O1;
+using EspSoftwareSerial::SWSERIAL_6O1;
+using EspSoftwareSerial::SWSERIAL_7O1;
+using EspSoftwareSerial::SWSERIAL_8O1;
+using EspSoftwareSerial::SWSERIAL_5M1;
+using EspSoftwareSerial::SWSERIAL_6M1;
+using EspSoftwareSerial::SWSERIAL_7M1;
+using EspSoftwareSerial::SWSERIAL_8M1;
+using EspSoftwareSerial::SWSERIAL_5S1;
+using EspSoftwareSerial::SWSERIAL_6S1;
+using EspSoftwareSerial::SWSERIAL_7S1;
+using EspSoftwareSerial::SWSERIAL_8S1;
+using EspSoftwareSerial::SWSERIAL_5N2;
+using EspSoftwareSerial::SWSERIAL_6N2;
+using EspSoftwareSerial::SWSERIAL_7N2;
+using EspSoftwareSerial::SWSERIAL_8N2;
+using EspSoftwareSerial::SWSERIAL_5E2;
+using EspSoftwareSerial::SWSERIAL_6E2;
+using EspSoftwareSerial::SWSERIAL_7E2;
+using EspSoftwareSerial::SWSERIAL_8E2;
+using EspSoftwareSerial::SWSERIAL_5O2;
+using EspSoftwareSerial::SWSERIAL_6O2;
+using EspSoftwareSerial::SWSERIAL_7O2;
+using EspSoftwareSerial::SWSERIAL_8O2;
+using EspSoftwareSerial::SWSERIAL_5M2;
+using EspSoftwareSerial::SWSERIAL_6M2;
+using EspSoftwareSerial::SWSERIAL_7M2;
+using EspSoftwareSerial::SWSERIAL_8M2;
+using EspSoftwareSerial::SWSERIAL_5S2;
+using EspSoftwareSerial::SWSERIAL_6S2;
+using EspSoftwareSerial::SWSERIAL_7S2;
+using EspSoftwareSerial::SWSERIAL_8S2;
 
 #if __GNUC__ < 12
 // The template member functions below must be in IRAM, but due to a bug GCC doesn't currently
