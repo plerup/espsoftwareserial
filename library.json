@@ -25,6 +25,6 @@
     ],
     "dependencies":
     {
-        "dok-net/ghostl": "^1.0.0"
+	"ghostl": "https://github.com/dok-net/ghostl.git"
     }
 }
