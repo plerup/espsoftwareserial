@@ -1,6 +1,6 @@
 {
     "name": "EspSoftwareSerial",
-    "version": "8.2.0",
+    "version": "8.2.1",
     "description": "Implementation of the Arduino software serial for ESP8266/ESP32.",
     "keywords": [
         "serial", "io", "softwareserial"
@@ -25,6 +25,6 @@
     ],
     "dependencies":
     {
-        "dok-net/ghostl": "^1.0.0"
+        "dok-net/ghostl": "https://codeload.github.com/dok-net/ghostl/zip/refs/tags/1.0.1"
     }
 }
