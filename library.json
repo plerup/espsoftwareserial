@@ -22,9 +22,9 @@
     "frameworks": "arduino",
     "platforms": [
         "espressif8266", "espressif32"
-    ],
-    "dependencies":
-    {
-        "dok-net/ghostl": "^1.0.0"
+    ],    
+    "dependencies": {
+        "name": "ghostl",
+        "version": "maxgerhardt/ghostl@^1.0.0"
     }
 }
