@@ -194,10 +194,16 @@ public:
     void setTransmitEnablePin(int8_t txEnablePin);
     /// Enable (default) or disable interrupts during tx.
     void enableIntTx(bool on);
+    /// Enable baud rate estimation based on frame separator
+    void enableAutoBaud(bool on, uint8_t sep = 0x55);
     /// Enable (default) or disable internal rx GPIO pull-up.
     void enableRxGPIOPullUp(bool on);
     /// Enable or disable (default) tx GPIO output mode.
     void enableTxGPIOOpenDrain(bool on);
+#ifdef xTaskNotify
+    /// Enable or disable (default) FreeRTOS task notify
+    void enableNotify(TaskHandle_t task);
+#endif
 
     bool overflow();
 
@@ -371,7 +377,12 @@ private:
     uint8_t m_stopBits;
     bool m_lastReadParity;
     bool m_overflow = false;
+    bool m_autoBaud = false;
+    bool m_autoBaudEnabled = false;
+    uint8_t m_frameSep;
+    uint32_t m_rxByteTicks;
     uint32_t m_bitTicks;
+    uint32_t m_origBitTicks;
     uint8_t m_parityInPos;
     uint8_t m_parityOutPos;
     int8_t m_rxLastBit; // 0 thru (m_pduBits - m_stopBits - 1): data/parity bits. -1: start bit. (m_pduBits - 1): stop bit.
@@ -380,6 +391,9 @@ private:
     std::unique_ptr<circular_queue<uint8_t> > m_parityBuffer;
     uint32_t m_periodStart;
     uint32_t m_periodDuration;
+#ifdef xTaskNotify
+    TaskHandle_t m_notifyTask = nullptr;
+#endif
 #ifndef ESP32
     static uint32_t m_savedPS;
 #else
