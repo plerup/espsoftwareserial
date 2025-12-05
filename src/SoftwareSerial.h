@@ -53,21 +53,21 @@ public:
         // Remove the strapping pins as defined in the datasheets, they affect bootup and other critical operations
         // Remove the flash memory pins on related devices, since using these causes memory access issues.
     #ifdef CONFIG_IDF_TARGET_ESP32
-        // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf,
-        // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32/_images/esp32-devkitC-v4-pinout.jpg
+		// Datasheet https://documentation.espressif.com/esp32_datasheet_en.pdf
+		// Pinout    https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32/_images/esp32_devkitC_v4_pinlayout.png
         return (pin == 1) || (pin >= 3 && pin <= 5) ||
             (pin >= 12 && pin <= 15) ||
             (!psramFound() && pin >= 16 && pin <= 17) ||
             (pin >= 18 && pin <= 19) ||
             (pin >= 21 && pin <= 23) || (pin >= 25 && pin <= 27) || (pin >= 32 && pin <= 39);
     #elif CONFIG_IDF_TARGET_ESP32S2
-        // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf,
-        // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/_images/esp32-s2_saola1-pinout.jpg
+		// Datasheet https://documentation.espressif.com/esp32-s2_datasheet_en.pdf
+		// Pinout    https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s2/_images/esp32-s2-devkitm-1-v1-pin-layout.png
         return (pin >= 1 && pin <= 21) || (pin >= 33 && pin <= 44);
     #elif CONFIG_IDF_TARGET_ESP32C3
-        // Datasheet https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf,
-        // Pinout    https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/_images/esp32-c3-devkitm-1-v1-pinout.jpg
-        return (pin >= 0 && pin <= 1) || (pin >= 3 && pin <= 7) || (pin >= 18 && pin <= 21);
+		// Datasheet https://documentation.espressif.com/esp32-c3_datasheet_en.pdf
+		// Pinout    https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32c3/_images/esp32-c3-devkitm-1-v1-pinout.png
+        return (pin >= 0 && pin <= 1) || (pin >= 3 && pin <= 7) || pin == 10 || (pin >= 18 && pin <= 21);
     #else
         return pin >= 0;
     #endif
