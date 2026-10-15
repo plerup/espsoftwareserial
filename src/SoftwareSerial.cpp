@@ -274,10 +274,11 @@ void UARTBase::lazyDelay() {
     {
         optimistic_yield(10000UL);
     }
+    // Disable interrupts again if applicable, before preciseDelay() takes the
+    // period start timestamp, so an interrupt cannot make it stale and shorten the next start bit
+    if (!m_intTxEnabled) { disableInterrupts(); }
     // Assure that below-ms part of delays are not elided
     preciseDelay();
-    // Disable interrupts again if applicable
-    if (!m_intTxEnabled) { disableInterrupts(); }
 }
 
 void IRAM_ATTR UARTBase::preciseDelay() {
